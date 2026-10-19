@@ -1,9 +1,9 @@
 using System.Net;
-using Microsoft.AspNetCore.Mvc.Testing;
+using PriceExplorer.Tests.Support;
 
 namespace PriceExplorer.Tests.Api;
 
-public sealed class HealthEndpointTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public sealed class HealthEndpointTests(ExplorerApiFactory factory) : IClassFixture<ExplorerApiFactory>
 {
     [Fact]
     public async Task Live_health_check_answers_ok_as_soon_as_the_process_is_up()
