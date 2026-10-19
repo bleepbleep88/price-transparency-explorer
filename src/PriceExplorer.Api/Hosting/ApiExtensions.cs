@@ -1,8 +1,11 @@
+using System.Diagnostics;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using PriceExplorer.Api.Core.Behaviors;
+using PriceExplorer.Api.Core.Reference;
 using Scalar.AspNetCore;
 using Serilog;
 using Serilog.Events;
@@ -23,6 +26,27 @@ internal static class ApiExtensions
 
         services.AddProblemDetails();
         services.AddExceptionHandler<ExplorerExceptionHandler>();
+
+        // Binding errors (e.g. page=abc) get the same shape as validator errors: camelCase keys + code.
+        services.Configure<ApiBehaviorOptions>(options => options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(entry => entry.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    entry => JsonNamingPolicy.CamelCase.ConvertName(entry.Key),
+                    entry => entry.Value!.Errors.Select(error => string.IsNullOrEmpty(error.ErrorMessage) ? "Invalid value." : error.ErrorMessage).ToArray());
+            var problem = new ValidationProblemDetails(errors)
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Some search inputs need fixing",
+                Extensions =
+                {
+                    ["code"] = "validation_failed",
+                    ["traceId"] = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier,
+                },
+            };
+            return new BadRequestObjectResult(problem) { ContentTypes = { "application/problem+json" } };
+        });
         services.AddOpenApi();
 
         // Order matters: bad input is a 400 even while data is still loading.
@@ -33,6 +57,7 @@ internal static class ApiExtensions
             cfg.AddOpenBehavior(typeof(RequireDataBehavior<,>));
         });
         services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
+        services.AddSingleton<ReferenceCatalog>();
 
         services.AddHealthChecks();
 

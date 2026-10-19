@@ -1,0 +1,38 @@
+using MediatR;
+using Microsoft.AspNetCore.Mvc;
+using PriceExplorer.Api.Core.Models.Rates;
+using PriceExplorer.Api.Core.Queries.Rates;
+
+namespace PriceExplorer.Api.Controllers;
+
+/// <summary>Negotiated rate search and per-rate source details.</summary>
+[ApiController]
+[Route("api/v1/rates")]
+public sealed class RatesController(ISender sender) : ControllerBase
+{
+    /// <summary>
+    /// Rates for a billing code (required), optionally narrowed to a provider by NPI and/or EIN (they must match each other)
+    /// or by name. Results come back as fair comparison groups (one value per provider) plus paged provider rows.
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType<RateSearchResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public Task<RateSearchResult> Search([FromQuery] SearchRatesQuery query, CancellationToken cancellationToken) =>
+        sender.Send(query, cancellationToken);
+
+    /// <summary>Where a rate came from: file, snapshot, JSON path, values as published, and the provider groups it covers.</summary>
+    [HttpGet("{rateId:long}/source")]
+    [ProducesResponseType<RateSource>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<RateSource> Source(long rateId, CancellationToken cancellationToken) =>
+        sender.Send(new GetRateSourceQuery(rateId), cancellationToken);
+
+    /// <summary>NPIs listed for a rate, optionally only those under one provider (EIN or provider key from results).</summary>
+    [HttpGet("{rateId:long}/npis")]
+    [ProducesResponseType<RateNpisPage>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<RateNpisPage> Npis(long rateId, [FromQuery] string? provider, [FromQuery] int page = 1, [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default) =>
+        sender.Send(new ListRateNpisQuery(rateId, provider, page, pageSize), cancellationToken);
+}
