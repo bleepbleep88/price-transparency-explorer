@@ -75,7 +75,14 @@ const qualityChips = computed(() => {
     <div v-if="code" class="d-flex flex-wrap align-center ga-2 text-body-2">
       <v-chip variant="tonal" color="primary">{{ code.category.label }}</v-chip>
       <span>Priced {{ code.category.unit }}</span>
-      <span class="text-medium-emphasis">· Found as: {{ code.foundVia.join('; ') }}</span>
+      <span class="text-medium-emphasis">
+        · Found as: {{ code.foundVia.slice(0, 2).join('; ') }}
+        <v-tooltip v-if="code.foundVia.length > 2" :text="code.foundVia.slice(2).join('; ')" max-width="420" location="bottom">
+          <template #activator="{ props: tip }">
+            <span v-bind="tip" class="has-tooltip" tabindex="0">and {{ code.foundVia.length - 2 }} more</span>
+          </template>
+        </v-tooltip>
+      </span>
       <span class="text-medium-emphasis">· Snapshot {{ shortDate(result.snapshot.indexDate) }}</span>
     </div>
     <p v-if="code?.levelFamily" class="text-body-2 text-medium-emphasis">

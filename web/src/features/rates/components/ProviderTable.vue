@@ -77,7 +77,7 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
       <div class="py-1" data-testid="provider-row">
         <v-tooltip v-if="item.otherNames.length" location="top" max-width="360">
           <template #activator="{ props: tip }">
-            <span v-bind="tip" class="font-weight-medium text-decoration-underline-dotted">{{ item.businessName }}</span>
+            <span v-bind="tip" class="font-weight-medium has-tooltip" tabindex="0">{{ item.businessName }}</span>
           </template>
           Also listed as: {{ item.otherNames.join('; ') }}
         </v-tooltip>

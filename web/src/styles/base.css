@@ -18,3 +18,10 @@
     margin: 0;
   }
 }
+
+/* Text that explains itself in a tooltip. */
+.has-tooltip {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
+}
