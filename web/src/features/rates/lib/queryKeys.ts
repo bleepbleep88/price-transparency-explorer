@@ -1,0 +1,18 @@
+import type { SearchParams } from './searchParams'
+
+// Everything about rates nests under one prefix, so invalidating it refreshes every rate view at once.
+export const rateKeys = {
+  all: ['rates'] as const,
+  search: (params: SearchParams) => [...rateKeys.all, 'search', params] as const,
+  source: (rateId: number) => [...rateKeys.all, 'source', rateId] as const,
+  npis: (rateId: number, provider: string | null, page: number) => [...rateKeys.all, 'npis', rateId, provider, page] as const,
+  codes: (q: string, snapshot: number | undefined) => [...rateKeys.all, 'codes', q, snapshot] as const,
+  providers: (q: string, snapshot: number | undefined) => [...rateKeys.all, 'providers', q, snapshot] as const,
+}
+
+export const datasetKeys = {
+  all: ['dataset'] as const,
+  snapshots: () => [...datasetKeys.all, 'snapshots'] as const,
+  plans: (snapshotId: number) => [...datasetKeys.all, 'plans', snapshotId] as const,
+  reference: () => [...datasetKeys.all, 'reference'] as const,
+}
