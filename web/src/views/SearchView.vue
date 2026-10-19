@@ -159,7 +159,12 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
       </template>
     </div>
 
-    <SourceDrawer v-model="sourceOpen" :rate-id="sourceRow?.firstRateId ?? null" :provider-name="sourceRow?.businessName" />
+    <SourceDrawer
+      v-model="sourceOpen"
+      :rate-id="sourceRow?.firstRateId ?? null"
+      :provider-name="sourceRow?.businessName"
+      :provider-key="sourceRow?.providerKey ?? null"
+    />
     <NpiDialog v-model="npiOpen" :row="npiRow" />
   </v-container>
 </template>

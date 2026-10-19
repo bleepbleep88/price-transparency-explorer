@@ -96,7 +96,7 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
           </v-tooltip>
           <v-tooltip
             v-if="item.einLevel"
-            text="The file lists no individual NPIs: the rate applies to anyone billing under this tax ID."
+            text="At least one of these rates is a contract with the whole tax ID: the file lists no NPIs for it, so it applies to anyone billing under this tax ID."
             max-width="340"
             location="top"
           >

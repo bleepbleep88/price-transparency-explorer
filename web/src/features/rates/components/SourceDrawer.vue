@@ -8,11 +8,15 @@ import { ApiError } from '@/lib/apiClient'
 import { useRateSource } from '../composables/useRateQueries'
 
 const open = defineModel<boolean>({ required: true })
-const props = defineProps<{ rateId: number | null; providerName?: string }>()
+const props = defineProps<{ rateId: number | null; providerName?: string; providerKey?: string | null }>()
 
 const { smAndDown } = useDisplay()
 const { copy, copied } = useClipboard({ legacy: true, copiedDuring: 1500 })
-const source = useRateSource(() => (open.value ? props.rateId : null))
+// The row's provider is listed first, so it's visible even when a rate covers hundreds of provider groups.
+const source = useRateSource(
+  () => (open.value ? props.rateId : null),
+  () => props.providerKey ?? null,
+)
 
 const data = computed(() => source.data.value)
 const errorMessage = computed(() => (source.error.value instanceof ApiError ? source.error.value.message : source.error.value ? 'Could not load the source details.' : null))
@@ -143,7 +147,11 @@ const comparisons = computed(() => {
               :key="`${group.providerGroupId}-${group.groupIndex}`"
               :title="group.businessName ?? 'Name not published'"
               :subtitle="`Tax ID ${group.taxIdDisplay} · ${group.wholeTaxId ? 'whole tax ID (no NPIs listed)' : plural(group.npiCount, 'NPI')} · provider_group_id ${group.providerGroupId}`"
-            />
+            >
+              <template v-if="group.providerMatch" #append>
+                <v-chip size="x-small" color="primary" variant="tonal">This provider</v-chip>
+              </template>
+            </v-list-item>
           </v-list>
         </section>
       </template>

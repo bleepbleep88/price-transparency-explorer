@@ -15,10 +15,11 @@ export function useRateSearch(params: MaybeRefOrGetter<SearchParams>, enabled: M
   })
 }
 
-export function useRateSource(rateId: MaybeRefOrGetter<number | null>) {
+/** Where a rate came from; `provider` (the row's provider key) lists that provider's groups first. */
+export function useRateSource(rateId: MaybeRefOrGetter<number | null>, provider: MaybeRefOrGetter<string | null> = null) {
   return useQuery({
-    queryKey: computed(() => rateKeys.source(toValue(rateId) ?? 0)),
-    queryFn: ({ signal }) => ratesApi.source(toValue(rateId)!, signal),
+    queryKey: computed(() => rateKeys.source(toValue(rateId) ?? 0, toValue(provider))),
+    queryFn: ({ signal }) => ratesApi.source(toValue(rateId)!, toValue(provider), signal),
     enabled: computed(() => toValue(rateId) != null),
   })
 }

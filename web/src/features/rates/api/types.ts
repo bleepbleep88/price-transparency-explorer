@@ -250,6 +250,8 @@ export interface RateSourceProviderGroup {
   npiCount: number
   wholeTaxId: boolean
   networkNames: string | null
+  /** The group belongs to the provider the drawer was opened for (listed first). */
+  providerMatch: boolean
 }
 
 export interface RateSource {

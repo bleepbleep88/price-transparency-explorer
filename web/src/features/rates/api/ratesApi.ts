@@ -17,9 +17,10 @@ export const ratesApi = {
   search: (params: SearchParams, signal?: AbortSignal) =>
     requestJson<RateSearchResult>('/api/v1/rates', { query: toApiQuery(params), signal }),
 
-  source: (rateId: number, signal?: AbortSignal) =>
-    requestJson<RateSource>(`/api/v1/rates/${rateId}/source`, { signal }),
 
+  /** Where a rate came from; with `provider` (the row's provider key), that provider's groups are listed first. */
+  source: (rateId: number, provider: string | null, signal?: AbortSignal) =>
+    requestJson<RateSource>(`/api/v1/rates/${rateId}/source`, { query: { provider }, signal }),
   /** NPIs behind a result row: `rateId` plus the row's other rates (`alsoRateIds`), under one provider. */
   npis: (rateId: number, alsoRateIds: readonly number[], provider: string | null, page: number, pageSize: number, signal?: AbortSignal) =>
     requestJson<RateNpisPage>(`/api/v1/rates/${rateId}/npis`, { query: { provider, alsoRate: alsoRateIds, page, pageSize }, signal }),
