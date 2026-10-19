@@ -241,6 +241,57 @@ public sealed class SearchApiTests(ExplorerApiFactory factory) : IClassFixture<E
         source.GetProperty("providerGroupCount").GetInt32().Should().BeGreaterThanOrEqualTo(source.GetProperty("providerGroups").GetArrayLength()).And.BePositive();
     }
 
+    [Fact(Timeout = 60_000)]
+    public async Task A_drg_is_explained_as_inpatient_never_matched_to_a_revenue_code_with_the_same_digits()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "490", ["codeType"] = "MS-DRG" });
+
+        var hint = result.GetProperty("hints").EnumerateArray().Should().ContainSingle().Subject;
+        hint.GetProperty("kind").GetString().Should().Be("code_not_found");
+        hint.GetProperty("message").GetString().Should().Contain("inpatient");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_revenue_code_searched_as_cpt_says_it_is_a_revenue_code()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "0490", ["codeType"] = "CPT" });
+
+        var hint = result.GetProperty("hints").EnumerateArray().Single(h => h.GetProperty("kind").GetString() == "code_type_mismatch");
+        hint.GetProperty("message").GetString().Should().Be("No CPT rates for 0490. It's in these files as RC 0490.");
+    }
+
+    [Theory(Timeout = 60_000)]
+    [InlineData("/api/v1/rates/abc/source")]
+    [InlineData("/api/v1/rates/99999999999999999999/npis")]
+    [InlineData("/api/v1/does-not-exist")]
+    public async Task Malformed_ids_and_unknown_routes_get_a_problem_with_a_code(string path)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = await ReadyClientAsync(ct);
+
+        using var response = await client.GetAsync(path, ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        response.Content.Headers.ContentType?.MediaType.Should().Be("application/problem+json");
+        (await response.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("code").GetString().Should().Be("not_found");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task The_source_lists_the_rows_own_provider_first()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var result = await SearchAsync(ct, new() { ["code"] = "45378", ["sort"] = "-provider" });
+        var row = result.GetProperty("rows").GetProperty("items")[0];
+        using var client = await ReadyClientAsync(ct);
+
+        var source = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/v1/rates/{row.GetProperty("firstRateId").GetInt64()}/source?provider={row.GetProperty("providerKey").GetString()}", ct);
+
+        var first = source.GetProperty("providerGroups")[0];
+        first.GetProperty("providerMatch").GetBoolean().Should().BeTrue();
+        first.GetProperty("taxIdDisplay").GetString().Should().Be(row.GetProperty("einDisplay").GetString());
+    }
+
     private async Task<HttpClient> ReadyClientAsync(CancellationToken cancellationToken)
     {
         var client = factory.CreateClient();

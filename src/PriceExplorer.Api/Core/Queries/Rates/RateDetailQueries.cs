@@ -6,8 +6,11 @@ using PriceExplorer.Api.Core.Models.Rates;
 
 namespace PriceExplorer.Api.Core.Queries.Rates;
 
-/// <summary>Source details for one rate: file, snapshot, JSON path, raw values, and the provider groups it covers.</summary>
-public sealed record GetRateSourceQuery(long RateId) : IRequest<RateSource>, IRequiresData;
+/// <summary>
+/// Source details for one rate: file, snapshot, JSON path, raw values, and the provider groups it covers. With
+/// <paramref name="Provider"/> (an EIN or provider key from a result row), that provider's groups are listed first.
+/// </summary>
+public sealed record GetRateSourceQuery(long RateId, string? Provider = null) : IRequest<RateSource>, IRequiresData;
 
 /// <summary>
 /// NPIs the file lists for a rate, optionally only those under one provider (tax ID). <paramref name="AlsoRateIds"/> adds
@@ -27,21 +30,48 @@ public sealed record SuggestProvidersQuery(string? Q, int? Snapshot = null, int 
 /// <summary>Option lists for the search filters.</summary>
 public sealed record GetReferenceListsQuery : IRequest<ReferenceLists>;
 
+/// <summary>Input rules shared by the rate detail and typeahead queries.</summary>
+internal static class InputRules
+{
+    /// <summary>An EIN (dash optional) or a provider key from search results ("u…" for masked tax IDs, "type:value").</summary>
+    public static bool IsProviderKey(string? value) =>
+        value is not null && !HasControlCharacters(value)
+        && (value.Contains(':', StringComparison.Ordinal) || ProviderKeys.TryNormalizeEinFilter(value, out _));
+
+    /// <summary>Control characters (NUL included) can't be bound into a DuckDB string parameter, so they're rejected up front.</summary>
+    public static bool HasControlCharacters(string value) => value.Any(char.IsControl);
+}
+
+public sealed class GetRateSourceQueryValidator : AbstractValidator<GetRateSourceQuery>
+{
+    public GetRateSourceQueryValidator()
+    {
+        RuleFor(query => query.Provider)
+            .Must(InputRules.IsProviderKey)
+            .When(query => !string.IsNullOrWhiteSpace(query.Provider))
+            .WithMessage("Provider must be an EIN or a provider key from search results.");
+    }
+}
+
 public sealed class ListRateNpisQueryValidator : AbstractValidator<ListRateNpisQuery>
 {
+    /// <summary>Covers every result row (the largest in the 2026-08-31 files has 60 rates) and keeps the URL under 8 KB.</summary>
+    public const int MaxAlsoRates = 300;
+
     public ListRateNpisQueryValidator()
     {
         RuleFor(query => query.Provider)
-            .Must(provider => provider!.Contains(':', StringComparison.Ordinal) || ProviderKeys.TryNormalizeEinFilter(provider, out _))
+            .Must(InputRules.IsProviderKey)
             .When(query => !string.IsNullOrWhiteSpace(query.Provider))
             .WithMessage("Provider must be an EIN or a provider key from search results.");
         RuleFor(query => query.Page).InclusiveBetween(1, SearchRatesQueryValidator.MaxPage)
             .WithMessage($"Page is between 1 and {SearchRatesQueryValidator.MaxPage:N0}.");
         RuleFor(query => query.PageSize).InclusiveBetween(1, 500).WithMessage("Page size is between 1 and 500.");
         RuleFor(query => query.AlsoRateIds)
-            .Must(ids => ids!.Count <= 50)
+            .Must(ids => ids!.Distinct().Count() <= MaxAlsoRates)
             .When(query => query.AlsoRateIds is not null)
-            .WithMessage("List at most 50 other rates.");
+            .OverridePropertyName("alsoRate")
+            .WithMessage($"List at most {MaxAlsoRates} other rates.");
     }
 }
 
@@ -50,7 +80,7 @@ public sealed class SuggestCodesQueryValidator : AbstractValidator<SuggestCodesQ
     public SuggestCodesQueryValidator()
     {
         RuleFor(query => query.Q)
-            .Must(q => q is not null && q.Trim().Length is >= 1 and <= 60)
+            .Must(q => q is not null && q.Trim().Length is >= 1 and <= 60 && !InputRules.HasControlCharacters(q))
             .WithMessage("Type 1 to 60 characters: a code (45378, 0490, J0585) or words from its name (colonoscopy).");
         RuleFor(query => query.Limit).InclusiveBetween(1, 50).WithMessage("Limit is between 1 and 50.");
         RuleFor(query => query.Snapshot).GreaterThan(0).When(query => query.Snapshot is not null).WithMessage("Snapshot id must be a positive number.");
@@ -62,7 +92,7 @@ public sealed class SuggestProvidersQueryValidator : AbstractValidator<SuggestPr
     public SuggestProvidersQueryValidator()
     {
         RuleFor(query => query.Q)
-            .Must(q => q is not null && q.Trim().Length is >= 2 and <= 100)
+            .Must(q => q is not null && q.Trim().Length is >= 2 and <= 100 && !InputRules.HasControlCharacters(q))
             .WithMessage("Type at least 2 characters of the provider's name or EIN.");
         RuleFor(query => query.Limit).InclusiveBetween(1, 50).WithMessage("Limit is between 1 and 50.");
         RuleFor(query => query.Snapshot).GreaterThan(0).When(query => query.Snapshot is not null).WithMessage("Snapshot id must be a positive number.");

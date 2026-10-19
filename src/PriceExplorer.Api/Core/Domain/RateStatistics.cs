@@ -2,7 +2,10 @@ using System.Text.RegularExpressions;
 
 namespace PriceExplorer.Api.Core.Domain;
 
-/// <summary>Percentiles over one value per provider. Linear interpolation, same as DuckDB quantile_cont and numpy's default.</summary>
+/// <summary>
+/// Percentiles over one value per provider. Linear interpolation, same as DuckDB quantile_cont and numpy's default.
+/// Results are rounded to cents half away from zero, like DuckDB round() and Excel ROUND, so a check in SQL matches.
+/// </summary>
 internal static class RateStatistics
 {
     public const int MinimumForBasicStats = 5;
@@ -28,7 +31,7 @@ internal static class RateStatistics
         var lower = (int)Math.Floor(position);
         var upper = (int)Math.Ceiling(position);
         var fraction = position - lower;
-        return decimal.Round(sorted[lower] + (fraction * (sorted[upper] - sorted[lower])), 2);
+        return decimal.Round(sorted[lower] + (fraction * (sorted[upper] - sorted[lower])), 2, MidpointRounding.AwayFromZero);
     }
 
     public static decimal Median(IReadOnlyList<decimal> sorted) => Quantile(sorted, 0.5);
@@ -106,7 +109,7 @@ internal static class RateStatistics
         : "typical";
 
     public static decimal? Ratio(decimal numerator, decimal? denominator) =>
-        denominator is > 0 ? decimal.Round(numerator / denominator.Value, 2) : null;
+        denominator is > 0 ? decimal.Round(numerator / denominator.Value, 2, MidpointRounding.AwayFromZero) : null;
 }
 
 /// <summary>Turns what a user types into the canonical codes stored in the database.</summary>
@@ -136,7 +139,9 @@ internal static partial class CodeInput
         return (Clean(match.Groups["code"].Value), explicitType ?? typed);
     }
 
-    [GeneratedRegex(@"^(?<type>CPT|HCPCS?|RC|REV(?:ENUE)?(?:\s*CODE)?)\s*[:#-]?\s*(?<code>[A-Za-z0-9][A-Za-z0-9\s]*)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    // The code after the type word must contain a digit (every CPT, HCPCS and revenue code does), so a bare type word
+    // like "HCPCS" or "Revenue" is never split into a fake code ("S", "ENUE"); it stays as typed and finds nothing.
+    [GeneratedRegex(@"^(?<type>CPT|HCPCS?|RC|REV(?:ENUE)?(?:\s*CODE)?)\s*[:#-]?\s*(?<code>(?=[A-Za-z0-9\s]*[0-9])[A-Za-z0-9][A-Za-z0-9\s]*)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TypeWord();
 
     /// <summary>

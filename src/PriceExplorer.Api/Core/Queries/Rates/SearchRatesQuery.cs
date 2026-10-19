@@ -89,6 +89,12 @@ public sealed class SearchRatesQueryValidator : AbstractValidator<SearchRatesQue
             .When(query => !string.IsNullOrWhiteSpace(query.Provider))
             .WithMessage("Type at least 2 characters of the provider's name.");
 
+        // A separate rule so whitespace-only values with control characters (" \0 ") are caught too.
+        RuleFor(query => query.Provider)
+            .Must(name => !InputRules.HasControlCharacters(name!))
+            .When(query => query.Provider is not null)
+            .WithMessage("The provider name can't contain control characters.");
+
         RuleFor(query => query.Sort)
             .Must(sort => Sorts.Contains(sort))
             .When(query => query.Sort is not null)

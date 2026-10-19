@@ -24,7 +24,16 @@ internal static class ApiExtensions
         services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 
-        services.AddProblemDetails();
+        // Problems the framework writes itself (no route matched, a malformed {rateId:long}, 405) get a code too.
+        // TryAdd keeps the codes ExplorerExceptionHandler and the binding-error factory already set.
+        services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
+            context.ProblemDetails.Extensions.TryAdd("code", context.ProblemDetails.Status switch
+            {
+                StatusCodes.Status404NotFound => "not_found",
+                StatusCodes.Status405MethodNotAllowed => "method_not_allowed",
+                StatusCodes.Status500InternalServerError => "server_error",
+                var status => $"http_{status}",
+            }));
         services.AddExceptionHandler<ExplorerExceptionHandler>();
 
         // Binding errors (e.g. page=abc) get the same shape as validator errors: camelCase keys + code.

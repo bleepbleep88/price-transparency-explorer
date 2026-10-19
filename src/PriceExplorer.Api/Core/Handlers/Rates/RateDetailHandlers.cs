@@ -20,7 +20,7 @@ public sealed class GetRateSourceHandler(DuckDbConnectionFactory connections, Re
             ?? throw new NotFoundException($"Rate {request.RateId} doesn't exist. It may come from a snapshot that was reloaded.", "rate_not_found");
 
         var groups = await connection.QueryAsync<GroupRow>(
-            SqlFile.For<GetRateSourceHandler>("RateSourceGroups.sql"), new { rateId = request.RateId });
+            SqlFile.For<GetRateSourceHandler>("RateSourceGroups.sql"), new { rateId = request.RateId, provider = ProviderKeys.NormalizeKey(request.Provider) });
         var groupCount = await connection.ExecuteScalarAsync<long>(
             """
             SELECT count(*)
@@ -62,7 +62,8 @@ public sealed class GetRateSourceHandler(DuckDbConnectionFactory connections, Re
                 group.BusinessName,
                 group.NpiCount,
                 group.EinLevel,
-                group.NetworkNames)).ToList(),
+                group.NetworkNames,
+                group.ProviderMatch)).ToList(),
             (int)groupCount);
     }
 
@@ -84,20 +85,14 @@ public sealed class GetRateSourceHandler(DuckDbConnectionFactory connections, Re
 
     private sealed record GroupRow(
         int ProviderGroupId, int GroupIndex, string? TinType, string? TinValue, string? Ein, bool EinUnverified,
-        string? BusinessName, int NpiCount, bool EinLevel, string? NetworkNames);
+        string? BusinessName, int NpiCount, bool EinLevel, string? NetworkNames, bool ProviderMatch);
 }
 
 public sealed class ListRateNpisHandler(DuckDbConnectionFactory connections) : IRequestHandler<ListRateNpisQuery, RateNpisPage>
 {
     public async Task<RateNpisPage> Handle(ListRateNpisQuery request, CancellationToken cancellationToken)
     {
-        string? provider = null;
-        if (!string.IsNullOrWhiteSpace(request.Provider))
-        {
-            provider = request.Provider.Contains(':', StringComparison.Ordinal)
-                ? request.Provider.Trim()
-                : ProviderKeys.TryNormalizeEinFilter(request.Provider, out var normalized) ? normalized : null;
-        }
+        var provider = ProviderKeys.NormalizeKey(request.Provider);
 
         await using var connection = await connections.OpenAsync(cancellationToken);
         var exists = await connection.ExecuteScalarAsync<long>("SELECT count(*) FROM rates WHERE rate_id = $rateId", new { rateId = request.RateId }) > 0;

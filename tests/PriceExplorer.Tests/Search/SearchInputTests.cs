@@ -36,6 +36,56 @@ public sealed class SearchInputTests
         _validator.TestValidate(new SearchRatesQuery(input, CodeType: codeType)).ShouldNotHaveAnyValidationErrors();
     }
 
+    [Theory]
+    [InlineData("HCPCS", "HCPCS")]
+    [InlineData("CPTS", "CPTS")]
+    [InlineData("RCA", "RCA")]
+    [InlineData("Revenue", "REVENUE")]
+    [InlineData("rev code", "REVCODE")]
+    public void A_bare_type_word_is_kept_as_typed_not_split_into_a_fake_code(string input, string code)
+    {
+        CodeInput.Parse(input, null).Should().Be((code, (string?)null));
+    }
+
+    [Theory]
+    [InlineData("CPT00812", "00812", "CPT")]
+    [InlineData("cpt 0001U", "0001U", "CPT")]
+    [InlineData("CPT 3074F", "3074F", "CPT")]
+    [InlineData("HCPCS: J0585", "J0585", "HCPCS")]
+    [InlineData("rev code 0490", "0490", "RC")]
+    public void Codes_after_a_type_word_keep_parsing(string input, string code, string type)
+    {
+        CodeInput.Parse(input, null).Should().Be((code, (string?)type));
+    }
+
+    [Fact]
+    public void Control_characters_in_free_text_are_rejected_before_they_reach_sql()
+    {
+        _validator.TestValidate(new SearchRatesQuery("99213", Provider: "\0\0")).ShouldHaveValidationErrorFor(q => q.Provider);
+        _validator.TestValidate(new SearchRatesQuery("99213", Provider: "a\0b")).ShouldHaveValidationErrorFor(q => q.Provider);
+        new SuggestCodesQueryValidator().TestValidate(new SuggestCodesQuery("\0")).ShouldHaveValidationErrorFor(q => q.Q);
+        new SuggestProvidersQueryValidator().TestValidate(new SuggestProvidersQuery("\0\0")).ShouldHaveValidationErrorFor(q => q.Q);
+    }
+
+    [Fact]
+    public void The_npi_list_takes_every_rate_behind_the_largest_row_and_reports_the_limit_under_its_parameter_name()
+    {
+        var validator = new ListRateNpisQueryValidator();
+
+        validator.TestValidate(new ListRateNpisQuery(1, AlsoRateIds: Enumerable.Range(2, 59).Select(i => (long)i).ToList()))
+            .ShouldNotHaveAnyValidationErrors();
+        validator.TestValidate(new ListRateNpisQuery(1, AlsoRateIds: Enumerable.Range(2, 301).Select(i => (long)i).ToList()))
+            .ShouldHaveValidationErrorFor("alsoRate");
+    }
+
+    [Fact]
+    public void Statistics_round_half_cents_up_like_sql_round()
+    {
+        RateStatistics.Median([321.18m, 331.15m]).Should().Be(326.17m, "326.165 rounds up, as DuckDB round() and Excel ROUND do");
+        RateStatistics.Ratio(34.65m, 42.00m).Should().Be(0.83m, "0.825 rounds up");
+        RateStatistics.Median([1.00m, 1.01m]).Should().Be(1.01m);
+    }
+
     [Fact]
     public void A_missing_code_is_rejected_with_a_helpful_message()
     {

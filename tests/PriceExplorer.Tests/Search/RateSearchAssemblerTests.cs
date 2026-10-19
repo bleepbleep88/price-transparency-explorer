@@ -177,6 +177,57 @@ public sealed class RateSearchAssemblerTests
     }
 
     [Fact]
+    public void A_filtered_row_carries_the_name_of_the_facility_that_matched_not_a_sibling_under_the_same_tax_id()
+    {
+        // A hospital system: one tax ID, two facilities with their own rates. The name filter matched only Jacobi's.
+        var facts = new[]
+        {
+            Fact(provider: "132655001", rate: 400m, rateId: 1, matched: false, names: "Bellevue Hospital Center"),
+            Fact(provider: "132655001", rate: 755.98m, rateId: 2, matched: true, names: "Jacobi Medical Center", matchedNames: "Jacobi Medical Center"),
+        };
+
+        var result = Assemble(facts, providerFilterActive: true);
+
+        var row = result.Rows.Items.Should().ContainSingle().Subject;
+        row.BusinessName.Should().Be("Jacobi Medical Center");
+        row.OtherNames.Should().Equal("Bellevue Hospital Center");
+        row.Rate.Should().Be(755.98m);
+        result.Groups.Single().Highlights.Single().DisplayName.Should().Be("Jacobi Medical Center");
+        Assemble(facts).Rows.Items.Single().BusinessName.Should().Be("Bellevue Hospital Center", "without a filter the first name leads");
+    }
+
+    [Fact]
+    public void Provider_counters_count_tax_ids_not_rows()
+    {
+        // One provider with two rates in each of two groups (office and hospital outpatient).
+        var facts = new[]
+        {
+            Fact(provider: "111111111", rate: 100m, rateId: 1, pos: "11", billingClass: "professional"),
+            Fact(provider: "111111111", rate: 140m, rateId: 2, pos: "11", billingClass: "professional"),
+            Fact(provider: "111111111", rate: 100m, rateId: 3, pos: "22", billingClass: "professional"),
+            Fact(provider: "111111111", rate: 140m, rateId: 4, pos: "22", billingClass: "professional"),
+        };
+
+        Assemble(facts).Quality.ProvidersWithMultipleRates.Should().Be(1);
+    }
+
+    [Fact]
+    public void A_rate_from_a_whole_tax_id_contract_flags_the_row_even_when_another_rate_lists_npis()
+    {
+        var facts = new[]
+        {
+            Fact(provider: "161078102", rate: 84m, rateId: 1, npis: 0, wholeTaxId: true),
+            Fact(provider: "161078102", rate: 84m, rateId: 2, npis: 1),
+        };
+
+        var result = Assemble(facts);
+
+        result.Rows.Items.Single().EinLevel.Should().BeTrue();
+        result.Quality.WholeTaxIdContracts.Should().Be(1);
+        Assemble([Fact(provider: "222222222", npis: 3)]).Rows.Items.Single().EinLevel.Should().BeFalse();
+    }
+
+    [Fact]
     public void A_page_past_the_end_is_empty_but_reports_the_total()
     {
         var facts = Enumerable.Range(1, 30).Select(i => Fact(provider: $"9{i:D8}", rate: i)).ToList();
@@ -273,7 +324,10 @@ public sealed class RateSearchAssemblerTests
         int occurrences = 1,
         string? ein = null,
         bool einUnverified = false,
-        int npis = 1) =>
+        int npis = 1,
+        string? names = null,
+        string? matchedNames = null,
+        bool wholeTaxId = false) =>
         new(
             RateId: rateId ?? Interlocked.Increment(ref _nextRateId) + 1000,
             ProductKey: "ambetter",
@@ -292,9 +346,10 @@ public sealed class RateSearchAssemblerTests
             ProviderKey: provider,
             Ein: ein ?? (provider.Length == 9 ? provider : null),
             EinUnverified: einUnverified,
-            EinLevel: false,
-            BusinessNames: $"Provider {provider}",
+            EinLevel: wholeTaxId,
+            BusinessNames: names ?? $"Provider {provider}",
             NpiCount: npis,
             FilterMatch: matched,
-            IdMatch: matched);
+            IdMatch: matched,
+            MatchedBusinessNames: matched ? matchedNames ?? names ?? $"Provider {provider}" : null);
 }

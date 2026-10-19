@@ -1,8 +1,12 @@
 -- One row per unique rate x place of service x provider (tax ID) for the searched code(s).
--- IdMatch: the provider matches the NPI / EIN filters, which must hold within the SAME provider group ("this NPI bills
--- under this EIN"). NameMatch: a group's business name contains the name filter. FilterMatch: one group meets both.
+-- Each provider filter gets its own flag, so an empty result can say which filter is the reason:
+--   NpiMatch / EinMatch: one of the provider's groups on this rate lists the NPI / has the EIN.
+--   IdMatch: both hold in the SAME group ("this NPI bills under this EIN").
+--   NameMatch: a group's business name contains the name filter.
+-- FilterMatch: one group meets every filter; MatchedBusinessNames are those groups' names (a tax ID with several
+-- facilities shows the one that matched). EinLevel: the rate comes from a contract with the whole tax ID (npi [0]).
 -- NpiCount (summed over the provider's groups for the rate) weights the provider's rates when it has several.
--- Grouping and statistics happen in RateSearchAssembler.
+-- Grouping and statistics happen in RateSearchAssembler; the column order must match RateFactRow.
 WITH target_files AS (
     SELECT file_id, product_key, product_label
     FROM source_files
@@ -25,14 +29,12 @@ linked AS (
             ELSE pg.ein
         END AS provider_key,
         pg.ein, pg.ein_unverified, pg.ein_level, pg.business_name, pg.npi_count,
-        (
-            ($npi::BIGINT IS NULL OR EXISTS (
-                SELECT 1 FROM group_npis gn
-                WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
-                  AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
-            AND ($ein::VARCHAR IS NULL OR pg.ein = $ein::VARCHAR
-                 OR (pg.ein_unverified AND 'u' || substr(sha256(pg.ein), 1, 12) = $ein::VARCHAR))
-        ) AS id_match,
+        ($npi::BIGINT IS NULL OR EXISTS (
+            SELECT 1 FROM group_npis gn
+            WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
+              AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT)) AS npi_match,
+        ($ein::VARCHAR IS NULL OR pg.ein = $ein::VARCHAR
+            OR (pg.ein_unverified AND 'u' || substr(sha256(pg.ein), 1, 12) = $ein::VARCHAR)) AS ein_match,
         ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR)) AS name_match
     FROM matched m
     JOIN rate_provider_refs rr ON rr.rate_id = m.rate_id
@@ -56,12 +58,16 @@ SELECT
     l.provider_key                           AS ProviderKey,
     any_value(l.ein)                         AS Ein,
     bool_or(l.ein_unverified)                AS EinUnverified,
-    bool_and(l.ein_level)                    AS EinLevel,
-    string_agg(DISTINCT l.business_name, ' | ') AS BusinessNames,
+    bool_or(l.ein_level)                     AS EinLevel,
+    string_agg(DISTINCT l.business_name, ' | ' ORDER BY l.business_name) AS BusinessNames,
     CAST(sum(l.npi_count) AS INTEGER)        AS NpiCount,
-    bool_or(l.id_match AND l.name_match)     AS FilterMatch,
-    bool_or(l.id_match)                      AS IdMatch,
-    bool_or(l.name_match)                    AS NameMatch
+    bool_or(l.npi_match AND l.ein_match AND l.name_match) AS FilterMatch,
+    bool_or(l.npi_match AND l.ein_match)     AS IdMatch,
+    bool_or(l.name_match)                    AS NameMatch,
+    bool_or(l.npi_match)                     AS NpiMatch,
+    bool_or(l.ein_match)                     AS EinMatch,
+    string_agg(DISTINCT l.business_name, ' | ' ORDER BY l.business_name)
+        FILTER (WHERE l.npi_match AND l.ein_match AND l.name_match) AS MatchedBusinessNames
 FROM matched m
 JOIN rate_places rp ON rp.rate_id = m.rate_id
 JOIN linked l ON l.rate_id = m.rate_id

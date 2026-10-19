@@ -30,7 +30,10 @@ internal sealed record RateFactRow(
     int NpiCount,
     bool FilterMatch,
     bool IdMatch = true,
-    bool NameMatch = true);
+    bool NameMatch = true,
+    bool NpiMatch = true,
+    bool EinMatch = true,
+    string? MatchedBusinessNames = null);
 
 internal sealed record AssemblyOptions(
     string? Product,
@@ -148,7 +151,7 @@ internal static class RateSearchAssembler
                 .Take(5)
                 .Select(pair => new ProviderPosition(
                     pair.Provider.Key,
-                    pair.Provider.DisplayName,
+                    pair.Provider.MatchedDisplayName,
                     pair.View.Value,
                     basic ? RateStatistics.PercentRank(values, pair.View.Value, pair.Provider.Value) : null,
                     RateStatistics.Ratio(pair.View.Value, median),
@@ -201,8 +204,10 @@ internal static class RateSearchAssembler
                 continue;
             }
 
-            // With a provider filter the row shows only the matched rates: an NPI's own rate, not its tax ID's blend.
+            // With a provider filter the row shows only the matched rates: an NPI's own rate, not its tax ID's blend, and
+            // the name of the facility that matched, not another one under the same tax ID.
             var view = providerFilterActive ? provider.MatchedRates : provider.AllRates;
+            var name = providerFilterActive ? provider.MatchedDisplayName : provider.DisplayName;
             string? band = null;
             if (basic && group.Stats is { P25: { } p25, Median: { } median, P75: { } p75 })
             {
@@ -215,9 +220,9 @@ internal static class RateSearchAssembler
                 Ein: provider.EinUnverified ? null : provider.Ein,
                 EinDisplay: provider.EinDisplay,
                 EinMasked: provider.EinUnverified,
-                EinLevel: provider.EinLevel,
-                BusinessName: provider.DisplayName,
-                OtherNames: provider.OtherNames,
+                EinLevel: view.WholeTaxId,
+                BusinessName: name,
+                OtherNames: provider.NamesOtherThan(name),
                 Rate: view.Value,
                 RateLow: view.Low,
                 RateHigh: view.High,
@@ -252,10 +257,11 @@ internal static class RateSearchAssembler
 
     private static SearchQuality QualityOf(IReadOnlyList<GroupAccumulator> groups)
     {
+        // Every provider counter is distinct tax IDs, even when a provider shows up in several groups.
         var occurrencesByRate = new Dictionary<long, int>();
         var masked = new HashSet<string>(StringComparer.Ordinal);
         var wholeTin = new HashSet<string>(StringComparer.Ordinal);
-        var multiple = 0;
+        var multiple = new HashSet<string>(StringComparer.Ordinal);
         foreach (var group in groups)
         {
             foreach (var (rateId, occurrences) in group.RateIds)
@@ -265,14 +271,14 @@ internal static class RateSearchAssembler
 
             foreach (var provider in group.Providers.Values)
             {
-                if (provider.AllRates.High != provider.AllRates.Low) multiple++;
+                if (provider.AllRates.High != provider.AllRates.Low) multiple.Add(provider.Key);
                 if (provider.EinUnverified) masked.Add(provider.Key);
-                if (provider.EinLevel) wholeTin.Add(provider.Key);
+                if (provider.AllRates.WholeTaxId) wholeTin.Add(provider.Key);
             }
         }
 
         var published = occurrencesByRate.Values.Sum(o => (long)o);
-        return new SearchQuality(published, occurrencesByRate.Count, published - occurrencesByRate.Count, multiple, masked.Count, wholeTin.Count);
+        return new SearchQuality(published, occurrencesByRate.Count, published - occurrencesByRate.Count, multiple.Count, masked.Count, wholeTin.Count);
     }
 
     private static List<string> NotesFor(GroupAccumulator group, ServiceCategory category, ReferenceCatalog catalog, IReadOnlyList<decimal> values)
@@ -380,15 +386,14 @@ internal static class RateSearchAssembler
     private sealed class ProviderAccumulator(string key, string? ein, bool einUnverified)
     {
         private readonly SortedSet<string> _names = new(StringComparer.Ordinal);
+        private readonly SortedSet<string> _matchedNames = new(StringComparer.Ordinal);
         private readonly Dictionary<long, RateEntry> _rates = [];
         private RateView? _all;
         private RateView? _matched;
-        private bool _anyNotEinLevel;
 
         public string Key { get; } = key;
         public string? Ein { get; } = ein;
         public bool EinUnverified { get; private set; } = einUnverified;
-        public bool EinLevel => !_anyNotEinLevel;
         public bool Matched { get; private set; }
 
         /// <summary>Every rate the provider has in the group.</summary>
@@ -402,7 +407,13 @@ internal static class RateSearchAssembler
 
         public string DisplayName => _names.Count > 0 ? _names.Min! : "Name not published";
 
-        public IReadOnlyList<string> OtherNames => _names.Skip(1).ToList();
+        /// <summary>
+        /// The name on the provider groups that matched the filters. A tax ID with several facilities (a hospital system)
+        /// lists each under its own name; the matched facility's name belongs next to the matched rate.
+        /// </summary>
+        public string MatchedDisplayName => _matchedNames.Count > 0 ? _matchedNames.Min! : DisplayName;
+
+        public IReadOnlyList<string> NamesOtherThan(string name) => _names.Where(other => other != name).ToList();
 
         public string EinDisplay => Ein switch
         {
@@ -426,20 +437,35 @@ internal static class RateSearchAssembler
             if (_rates.TryGetValue(fact.RateId, out var existing))
             {
                 existing.Matched |= fact.FilterMatch;
+                existing.WholeTaxId |= fact.EinLevel;
             }
             else
             {
-                _rates[fact.RateId] = new RateEntry(fact.RateId, fact.Rate, fact.Occurrences, fact.NpiCount) { Matched = fact.FilterMatch };
+                _rates[fact.RateId] = new RateEntry(fact.RateId, fact.Rate, fact.Occurrences, fact.NpiCount)
+                {
+                    Matched = fact.FilterMatch,
+                    WholeTaxId = fact.EinLevel,
+                };
             }
 
             Matched |= fact.FilterMatch;
             EinUnverified |= fact.EinUnverified;
-            _anyNotEinLevel |= !fact.EinLevel;
-            foreach (var name in (fact.BusinessNames ?? "").Split(" | ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            foreach (var name in SplitNames(fact.BusinessNames))
             {
                 _names.Add(name);
             }
+
+            if (fact.FilterMatch)
+            {
+                foreach (var name in SplitNames(fact.MatchedBusinessNames))
+                {
+                    _matchedNames.Add(name);
+                }
+            }
         }
+
+        private static string[] SplitNames(string? names) =>
+            (names ?? "").Split(" | ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private sealed class RateEntry(long rateId, decimal rate, int occurrences, int npiCount)
@@ -449,6 +475,9 @@ internal static class RateSearchAssembler
         public int Occurrences { get; } = occurrences;
         public int NpiCount { get; } = npiCount;
         public bool Matched { get; set; }
+
+        /// <summary>The rate comes (at least partly) from a contract with the whole tax ID: the file lists npi [0] for it.</summary>
+        public bool WholeTaxId { get; set; }
     }
 
     /// <summary>A provider's rates in one group, summed up for display.</summary>
@@ -458,8 +487,10 @@ internal static class RateSearchAssembler
     /// </param>
     /// <param name="SourceRateId">The rate carrying <paramref name="Value"/> that lists the most NPIs (shown in the source drawer).</param>
     /// <param name="LargestNpiCount">NPIs under the largest single rate: a lower bound until the handler counts them exactly.</param>
+    /// <param name="WholeTaxId">At least one of the rates comes from a contract with the whole tax ID (npi [0]).</param>
     private sealed record RateView(
-        decimal Value, decimal Low, decimal High, long SourceRateId, IReadOnlyList<long> RateIds, int Occurrences, int LargestNpiCount)
+        decimal Value, decimal Low, decimal High, long SourceRateId, IReadOnlyList<long> RateIds, int Occurrences, int LargestNpiCount,
+        bool WholeTaxId)
     {
         public static RateView Of(IEnumerable<RateEntry> entries)
         {
@@ -473,7 +504,8 @@ internal static class RateSearchAssembler
                 source.RateId,
                 list.Select(entry => entry.RateId).ToList(),
                 list.Sum(entry => entry.Occurrences),
-                list.Max(entry => entry.NpiCount));
+                list.Max(entry => entry.NpiCount),
+                list.Any(entry => entry.WholeTaxId));
         }
     }
 }

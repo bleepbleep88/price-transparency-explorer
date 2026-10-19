@@ -108,12 +108,15 @@ public sealed record RateRowsPage(int Total, int Page, int PageSize, IReadOnlyLi
 /// matched (an NPI's own rate, not its tax ID's blend); the group's statistics stay market-wide.
 /// </summary>
 /// <param name="Ein">Full EIN, or null when masked (IRS never issues the prefix; it may be a Social Security number).</param>
+/// <param name="EinLevel">At least one rate behind the row comes from a contract with the whole tax ID (the file lists
+/// npi [0] for it). <paramref name="NpiCount"/> counts only the NPIs the file lists.</param>
+/// <param name="BusinessName">The provider's name; with a provider filter, the name on the provider groups that matched.</param>
 /// <param name="Rate">The provider's rate. With several rates, their NPI-weighted median: always one it is really paid.</param>
 /// <param name="Band">"low" (at or below the 25th percentile and under the median), "high" (at or above the 75th and over
 /// the median), or "typical". Null for small groups.</param>
 /// <param name="NpiCount">Distinct NPIs the provider lists under the row's rates.</param>
 /// <param name="FirstRateId">The rate shown in the source drawer: the one carrying <paramref name="Rate"/>.</param>
-/// <param name="RateIds">Every rate behind the row (for the NPI list).</param>
+/// <param name="RateIds">Every rate behind the row (for the NPI list, which accepts up to 300 more besides its own).</param>
 public sealed record RateRow(
     string GroupKey,
     string ProviderKey,

@@ -1,4 +1,5 @@
--- Typeahead over provider business names (and exact EINs) in the snapshot, busiest first.
+-- Typeahead over provider business names (and exact EINs) in the snapshot, busiest first. Names are listed in a fixed
+-- order (the first is the label) and ties break on the provider key, so the same text always gives the same list.
 WITH target_files AS (
     SELECT file_id
     FROM source_files
@@ -21,10 +22,10 @@ SELECT
     m.provider_key                           AS ProviderKey,
     any_value(m.ein)                         AS Ein,
     bool_or(m.ein_unverified)                AS EinUnverified,
-    string_agg(DISTINCT m.business_name, ' | ') AS BusinessNames,
+    string_agg(DISTINCT m.business_name, ' | ' ORDER BY m.business_name) AS BusinessNames,
     count(DISTINCT rr.rate_id)               AS Rates
 FROM matches m
 LEFT JOIN rate_provider_refs rr ON rr.file_id = m.file_id AND rr.provider_ref_id = m.provider_ref_id
 GROUP BY m.provider_key
-ORDER BY Rates DESC, BusinessNames
+ORDER BY Rates DESC, BusinessNames, ProviderKey
 LIMIT $limit

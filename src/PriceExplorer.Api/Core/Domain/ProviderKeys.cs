@@ -34,6 +34,25 @@ internal static partial class ProviderKeys
         return value is not null;
     }
 
+    /// <summary>
+    /// A provider key from a result row, as the SQL computes it: a 9-digit EIN, an opaque "u…" key, or "type:value" for a
+    /// tax ID that isn't an EIN. Null for blank or invalid input (validators reject invalid input first).
+    /// </summary>
+    public static string? NormalizeKey(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return null;
+        }
+
+        if (input.Contains(':', StringComparison.Ordinal))
+        {
+            return input.Trim();
+        }
+
+        return TryNormalizeEinFilter(input, out var value) ? value : null;
+    }
+
     [GeneratedRegex("^[uU][0-9a-fA-F]{12}$")]
     private static partial Regex OpaqueKey();
 }
