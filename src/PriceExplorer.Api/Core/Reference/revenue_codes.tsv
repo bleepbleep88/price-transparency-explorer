@@ -1,0 +1,79 @@
+code	label
+025	Pharmacy
+026	IV therapy
+027	Medical/surgical supplies
+028	Oncology
+029	Durable medical equipment
+030	Laboratory
+031	Laboratory pathology
+032	Diagnostic radiology
+033	Therapeutic radiology
+034	Nuclear medicine
+035	CT scan
+036	Operating room
+037	Anesthesia
+038	Blood
+039	Blood storage and processing
+040	Other imaging
+041	Respiratory services
+042	Physical therapy
+043	Occupational therapy
+044	Speech therapy
+045	Emergency room
+046	Pulmonary function
+047	Audiology
+048	Cardiology
+049	Ambulatory surgery
+050	Outpatient services
+051	Clinic
+052	Freestanding clinic
+053	Osteopathic services
+054	Ambulance
+055	Skilled nursing
+056	Home health
+057	Home health aide
+058	Home health visits
+059	Home health units
+060	Home health oxygen
+061	MRI
+062	Medical/surgical supplies (extension)
+063	Drugs requiring specific identification
+064	Home IV therapy
+065	Hospice
+066	Respite care
+067	Outpatient special residence
+068	Trauma response
+070	Cast room
+071	Recovery room
+072	Labor and delivery
+073	EKG/ECG
+074	EEG
+075	Gastrointestinal services
+076	Treatment or observation room
+077	Preventive care services
+078	Telemedicine
+079	Lithotripsy
+080	Inpatient renal dialysis
+082	Hemodialysis
+083	Peritoneal dialysis
+084	CAPD
+085	CCPD
+088	Miscellaneous dialysis
+090	Behavioral health treatment
+091	Behavioral health treatment (extension)
+092	Other diagnostic services
+093	Medical rehabilitation day program
+094	Other therapeutic services
+095	Other therapeutic services (extension)
+096	Professional fees
+097	Professional fees (extension)
+098	Professional fees (extension)
+0490	Ambulatory surgery
+0510	Clinic
+0520	Freestanding clinic
+0521	Clinic visit at a rural health clinic or community health center
+0529	Freestanding clinic, other
+0450	Emergency room
+0456	Urgent care
+0761	Treatment room
+0762	Observation room
