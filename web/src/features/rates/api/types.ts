@@ -180,8 +180,11 @@ export interface RateRow {
   npiCount: number
   occurrences: number
   rateCount: number
+  /** The rate carrying `rate`; the source drawer shows this one. */
   firstRateId: number
   matched: boolean
+  /** Every rate behind the row (a provider can have several in one group); the NPI list covers all of them. */
+  rateIds: number[]
 }
 
 export interface RateRowsPage {
@@ -283,12 +286,17 @@ export interface RateSource {
   occurrences: number
   itemLabelCount: number
   itemLabelSamples: string[]
+  /** The first 200 provider groups; `providerGroupCount` is the full count. */
   providerGroups: RateSourceProviderGroup[]
+  providerGroupCount: number
 }
 
 export interface ListedNpi {
   npi: number
   valid: boolean
+  /** The rate this NPI is listed for (the lowest, if several of the row's rates list it). */
+  rate: number
+  rateHigh: number
 }
 
 export interface RateNpisPage {

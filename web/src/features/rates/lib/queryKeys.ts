@@ -5,7 +5,7 @@ export const rateKeys = {
   all: ['rates'] as const,
   search: (params: SearchParams) => [...rateKeys.all, 'search', params] as const,
   source: (rateId: number) => [...rateKeys.all, 'source', rateId] as const,
-  npis: (rateId: number, provider: string | null, page: number) => [...rateKeys.all, 'npis', rateId, provider, page] as const,
+  npis: (rateIds: readonly number[], provider: string | null, page: number) => [...rateKeys.all, 'npis', rateIds, provider, page] as const,
   codes: (q: string, snapshot: number | undefined) => [...rateKeys.all, 'codes', q, snapshot] as const,
   providers: (q: string, snapshot: number | undefined) => [...rateKeys.all, 'providers', q, snapshot] as const,
 }

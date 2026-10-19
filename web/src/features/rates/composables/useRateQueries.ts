@@ -23,16 +23,20 @@ export function useRateSource(rateId: MaybeRefOrGetter<number | null>) {
   })
 }
 
+/** NPIs behind a result row. `rateIds` starts with the row's own rate (firstRateId), then its other rates. */
 export function useRateNpis(
-  rateId: MaybeRefOrGetter<number | null>,
+  rateIds: MaybeRefOrGetter<readonly number[] | null>,
   provider: MaybeRefOrGetter<string | null>,
   page: MaybeRefOrGetter<number>,
   pageSize = 50,
 ) {
   return useQuery({
-    queryKey: computed(() => rateKeys.npis(toValue(rateId) ?? 0, toValue(provider), toValue(page))),
-    queryFn: ({ signal }) => ratesApi.npis(toValue(rateId)!, toValue(provider), toValue(page), pageSize, signal),
-    enabled: computed(() => toValue(rateId) != null),
+    queryKey: computed(() => rateKeys.npis(toValue(rateIds) ?? [], toValue(provider), toValue(page))),
+    queryFn: ({ signal }) => {
+      const [first, ...others] = toValue(rateIds)!
+      return ratesApi.npis(first!, others, toValue(provider), toValue(page), pageSize, signal)
+    },
+    enabled: computed(() => (toValue(rateIds)?.length ?? 0) > 0),
     placeholderData: keepPreviousData,
   })
 }

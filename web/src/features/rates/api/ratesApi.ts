@@ -20,8 +20,9 @@ export const ratesApi = {
   source: (rateId: number, signal?: AbortSignal) =>
     requestJson<RateSource>(`/api/v1/rates/${rateId}/source`, { signal }),
 
-  npis: (rateId: number, provider: string | null, page: number, pageSize: number, signal?: AbortSignal) =>
-    requestJson<RateNpisPage>(`/api/v1/rates/${rateId}/npis`, { query: { provider, page, pageSize }, signal }),
+  /** NPIs behind a result row: `rateId` plus the row's other rates (`alsoRateIds`), under one provider. */
+  npis: (rateId: number, alsoRateIds: readonly number[], provider: string | null, page: number, pageSize: number, signal?: AbortSignal) =>
+    requestJson<RateNpisPage>(`/api/v1/rates/${rateId}/npis`, { query: { provider, alsoRate: alsoRateIds, page, pageSize }, signal }),
 
   codes: (q: string, snapshot: number | undefined, signal?: AbortSignal) =>
     requestJson<CodeSuggestion[]>('/api/v1/codes', { query: { q, snapshot, limit: 8 }, signal }),

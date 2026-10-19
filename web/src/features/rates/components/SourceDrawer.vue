@@ -133,7 +133,10 @@ const comparisons = computed(() => {
         </section>
 
         <section>
-          <h3 class="text-subtitle-2 mb-1">Provider groups covered ({{ data.providerGroups.length }})</h3>
+          <h3 class="text-subtitle-2 mb-1">Provider groups covered ({{ data.providerGroupCount }})</h3>
+          <p v-if="data.providerGroupCount > data.providerGroups.length" class="text-caption text-medium-emphasis mb-1">
+            Showing the first {{ data.providerGroups.length }}.
+          </p>
           <v-list density="compact" class="py-0">
             <v-list-item
               v-for="group in data.providerGroups"
