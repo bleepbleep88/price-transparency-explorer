@@ -28,11 +28,14 @@ public sealed class RatesController(ISender sender) : ControllerBase
     public Task<RateSource> Source(long rateId, CancellationToken cancellationToken) =>
         sender.Send(new GetRateSourceQuery(rateId), cancellationToken);
 
-    /// <summary>NPIs listed for a rate, optionally only those under one provider (EIN or provider key from results).</summary>
+    /// <summary>
+    /// NPIs listed for a rate, optionally only those under one provider (EIN or provider key from results). Repeat
+    /// <c>alsoRate</c> to include the other rates behind a result row; each NPI then shows the rate it gets.
+    /// </summary>
     [HttpGet("{rateId:long}/npis")]
     [ProducesResponseType<RateNpisPage>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public Task<RateNpisPage> Npis(long rateId, [FromQuery] string? provider, [FromQuery] int page = 1, [FromQuery] int pageSize = 50,
-        CancellationToken cancellationToken = default) =>
-        sender.Send(new ListRateNpisQuery(rateId, provider, page, pageSize), cancellationToken);
+    public Task<RateNpisPage> Npis(long rateId, [FromQuery] string? provider, [FromQuery] long[]? alsoRate, [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default) =>
+        sender.Send(new ListRateNpisQuery(rateId, provider, page, pageSize, alsoRate), cancellationToken);
 }

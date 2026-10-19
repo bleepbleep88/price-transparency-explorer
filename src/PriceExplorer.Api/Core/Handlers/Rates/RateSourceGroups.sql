@@ -1,3 +1,4 @@
+-- The provider groups a rate covers, first 200 (a few rates list hundreds; the handler reports the full count).
 SELECT
     pg.provider_ref_id AS ProviderGroupId,
     pg.group_idx       AS GroupIndex,

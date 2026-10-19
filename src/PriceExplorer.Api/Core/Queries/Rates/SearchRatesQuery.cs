@@ -38,6 +38,9 @@ public sealed class SearchRatesQueryValidator : AbstractValidator<SearchRatesQue
 {
     public static readonly string[] Sorts = ["rate", "-rate", "provider", "-provider", "vsMedian", "-vsMedian"];
 
+    /// <summary>Far beyond any real result set; keeps page arithmetic well inside integer range.</summary>
+    public const int MaxPage = 100_000;
+
     // Code types allowed by the CMS in-network schema.
     public static readonly string[] CodeTypes =
         ["CPT", "HCPCS", "RC", "NDC", "ICD", "MS-DRG", "R-DRG", "S-DRG", "APS-DRG", "AP-DRG", "APR-DRG", "APC", "LOCAL", "EAPG", "HIPPS", "CDT", "CSTM-ALL"];
@@ -45,13 +48,15 @@ public sealed class SearchRatesQueryValidator : AbstractValidator<SearchRatesQue
     public SearchRatesQueryValidator(ReferenceCatalog catalog)
     {
         // Two separate rules: a trailing When() applies to every check in its chain, which would disable "required".
+        // A leading code-type word ("CPT 99213", "rc 0490") is allowed; the code after it is what's checked.
         RuleFor(query => query.Code)
             .Must(code => CodeInput.Clean(code).Length > 0)
             .WithMessage("Enter a billing code, for example 45378 (colonoscopy) or 0490 (ambulatory surgery).");
 
-        RuleFor(query => query.Code)
-            .Must(code => CodeInput.Clean(code) is { Length: <= 8 } clean && clean.All(char.IsAsciiLetterOrDigit))
+        RuleFor(query => query)
+            .Must(query => CodeInput.Parse(query.Code, query.CodeType).Code is { Length: > 0 and <= 8 } clean && clean.All(char.IsAsciiLetterOrDigit))
             .When(query => CodeInput.Clean(query.Code).Length > 0)
+            .OverridePropertyName(nameof(SearchRatesQuery.Code))
             .WithMessage("A billing code is up to 8 letters and digits, for example 45378, J0585 or 0490.");
 
         RuleFor(query => query.CodeType)
@@ -91,7 +96,7 @@ public sealed class SearchRatesQueryValidator : AbstractValidator<SearchRatesQue
 
         RuleFor(query => query.Snapshot).GreaterThan(0).When(query => query.Snapshot is not null)
             .WithMessage("Snapshot id must be a positive number.");
-        RuleFor(query => query.Page).GreaterThanOrEqualTo(1).WithMessage("Page starts at 1.");
+        RuleFor(query => query.Page).InclusiveBetween(1, MaxPage).WithMessage($"Page is between 1 and {MaxPage:N0}.");
         RuleFor(query => query.PageSize).InclusiveBetween(1, 100).WithMessage("Page size is between 1 and 100.");
     }
 }

@@ -21,6 +21,14 @@ public sealed class GetRateSourceHandler(DuckDbConnectionFactory connections, Re
 
         var groups = await connection.QueryAsync<GroupRow>(
             SqlFile.For<GetRateSourceHandler>("RateSourceGroups.sql"), new { rateId = request.RateId });
+        var groupCount = await connection.ExecuteScalarAsync<long>(
+            """
+            SELECT count(*)
+            FROM rate_provider_refs rr
+            JOIN provider_groups pg ON pg.file_id = rr.file_id AND pg.provider_ref_id = rr.provider_ref_id
+            WHERE rr.rate_id = $rateId
+            """,
+            new { rateId = request.RateId });
 
         return new RateSource(
             row.RateId,
@@ -54,7 +62,8 @@ public sealed class GetRateSourceHandler(DuckDbConnectionFactory connections, Re
                 group.BusinessName,
                 group.NpiCount,
                 group.EinLevel,
-                group.NetworkNames)).ToList());
+                group.NetworkNames)).ToList(),
+            (int)groupCount);
     }
 
     internal static string TaxIdDisplay(string? ein, bool unverified, string? tinType, string? tinValue) => ein switch
@@ -97,20 +106,23 @@ public sealed class ListRateNpisHandler(DuckDbConnectionFactory connections) : I
             throw new NotFoundException($"Rate {request.RateId} doesn't exist.", "rate_not_found");
         }
 
-        var rows = (await connection.QueryAsync<NpiRow>(
+        var rateIds = new[] { request.RateId }.Concat(request.AlsoRateIds ?? []).Distinct().ToList();
+        var total = await connection.ExecuteScalarAsync<long>(
+            SqlFile.For<ListRateNpisHandler>("RateNpisCount.sql"), new { rateIds, provider });
+        var rows = await connection.QueryAsync<NpiRow>(
             SqlFile.For<ListRateNpisHandler>("RateNpis.sql"),
-            new { rateId = request.RateId, provider, limit = request.PageSize, offset = (request.Page - 1) * request.PageSize })).ToList();
+            new { rateIds, provider, limit = request.PageSize, offset = (long)(request.Page - 1) * request.PageSize });
 
         return new RateNpisPage(
             request.RateId,
             provider,
-            rows.Count > 0 ? (int)rows[0].Total : 0,
+            (int)total,
             request.Page,
             request.PageSize,
-            rows.Select(row => new ListedNpi(row.Npi, row.Valid)).ToList());
+            rows.Select(row => new ListedNpi(row.Npi, row.Valid, row.Rate, row.RateHigh)).ToList());
     }
 
-    private sealed record NpiRow(long Npi, bool Valid, long Total);
+    private sealed record NpiRow(long Npi, bool Valid, decimal Rate, decimal RateHigh);
 }
 
 public sealed class SuggestCodesHandler(DuckDbConnectionFactory connections) : IRequestHandler<SuggestCodesQuery, IReadOnlyList<CodeSuggestion>>

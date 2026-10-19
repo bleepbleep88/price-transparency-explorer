@@ -103,9 +103,17 @@ public sealed record ModifierRef(string Code, string Label);
 
 public sealed record RateRowsPage(int Total, int Page, int PageSize, IReadOnlyList<RateRow> Items);
 
-/// <summary>One provider (tax ID) in one comparison group.</summary>
+/// <summary>
+/// One provider (tax ID) in one comparison group. With an NPI, EIN or name filter, the row describes only the rates that
+/// matched (an NPI's own rate, not its tax ID's blend); the group's statistics stay market-wide.
+/// </summary>
 /// <param name="Ein">Full EIN, or null when masked (IRS never issues the prefix; it may be a Social Security number).</param>
-/// <param name="Band">"low" (at or below the 25th percentile), "typical", or "high" (at or above the 75th). Null for small groups.</param>
+/// <param name="Rate">The provider's rate. With several rates, their NPI-weighted median: always one it is really paid.</param>
+/// <param name="Band">"low" (at or below the 25th percentile and under the median), "high" (at or above the 75th and over
+/// the median), or "typical". Null for small groups.</param>
+/// <param name="NpiCount">Distinct NPIs the provider lists under the row's rates.</param>
+/// <param name="FirstRateId">The rate shown in the source drawer: the one carrying <paramref name="Rate"/>.</param>
+/// <param name="RateIds">Every rate behind the row (for the NPI list).</param>
 public sealed record RateRow(
     string GroupKey,
     string ProviderKey,
@@ -126,7 +134,8 @@ public sealed record RateRow(
     int Occurrences,
     int RateCount,
     long FirstRateId,
-    bool Matched);
+    bool Matched,
+    IReadOnlyList<long> RateIds);
 
 /// <param name="Kind">Stable identifier the UI can switch on, e.g. "code_not_found", "npi_check_digit".</param>
 /// <param name="Severity">"info" or "warning".</param>

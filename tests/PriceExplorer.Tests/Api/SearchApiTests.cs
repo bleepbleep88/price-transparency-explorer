@@ -138,6 +138,109 @@ public sealed class SearchApiTests(ExplorerApiFactory factory) : IClassFixture<E
         byNumber[0].GetProperty("code").GetString().Should().Be("00812");
     }
 
+    [Fact(Timeout = 60_000)]
+    public async Task A_name_filter_that_doesnt_fit_never_claims_the_provider_lacks_the_code()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken,
+            new() { ["code"] = "45378", ["ein"] = "460857425", ["provider"] = "Mercy" });
+
+        Groups(result).Should().BeEmpty();
+        Hints(result).Should().Contain("provider_name_no_match").And.NotContain("provider_no_rate");
+        result.GetProperty("hints").EnumerateArray().Single(h => h.GetProperty("kind").GetString() == "provider_name_no_match")
+            .GetProperty("message").GetString().Should().Contain("\"Mercy\"", "the name is echoed as typed");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_setting_filter_that_hides_a_providers_rates_only_offers_settings_where_it_has_some()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken,
+            new() { ["code"] = "45378", ["npi"] = "1174873780", ["setting"] = "office" });
+
+        var hint = result.GetProperty("hints").EnumerateArray().Single(h => h.GetProperty("kind").GetString() == "filters_hide_results");
+        var links = hint.GetProperty("links").EnumerateArray().ToList();
+        links.Select(l => l.GetProperty("query").GetProperty("setting").GetString()).Should().Equal("asc");
+        links.Should().OnlyContain(l => l.GetProperty("query").GetProperty("codeType").ValueKind == JsonValueKind.Null);
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_code_searched_as_the_wrong_type_says_what_type_it_is()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "29881", ["codeType"] = "HCPCS" });
+
+        var hint = result.GetProperty("hints").EnumerateArray().Single(h => h.GetProperty("kind").GetString() == "code_type_mismatch");
+        hint.GetProperty("message").GetString().Should().Be("No HCPCS rates for 29881. It's in these files as CPT 29881.");
+        hint.GetProperty("links")[0].GetProperty("query").GetProperty("codeType").GetString().Should().Be("CPT");
+    }
+
+    [Theory(Timeout = 60_000)]
+    [InlineData("0490")]
+    [InlineData("rc 0490")]
+    [InlineData("Revenue code 490")]
+    public async Task A_revenue_code_points_to_the_procedure_codes_its_facility_rates_are_filed_under(string code)
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = code });
+
+        var hint = result.GetProperty("hints").EnumerateArray().Single(h => h.GetProperty("kind").GetString() == "revenue_code_procedures");
+        hint.GetProperty("message").GetString().Should().Contain("revenue code 0490 (Ambulatory surgery)");
+        hint.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("query").GetProperty("code").GetString()).Should().Contain("29881");
+        Hints(result).Should().NotContain("code_not_found");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task Each_rows_npi_count_matches_the_npi_list_behind_it()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var result = await SearchAsync(ct, new() { ["code"] = "45378", ["pageSize"] = "50" });
+        using var client = await ReadyClientAsync(ct);
+
+        foreach (var row in result.GetProperty("rows").GetProperty("items").EnumerateArray().Take(20))
+        {
+            var rateIds = row.GetProperty("rateIds").EnumerateArray().Select(id => id.GetInt64()).ToList();
+            var also = string.Concat(rateIds.Skip(1).Select(id => $"&alsoRate={id}"));
+            var npis = await client.GetFromJsonAsync<JsonElement>(
+                $"/api/v1/rates/{rateIds[0]}/npis?provider={Uri.EscapeDataString(row.GetProperty("providerKey").GetString()!)}{also}&pageSize=500", ct);
+
+            npis.GetProperty("total").GetInt32().Should().Be(row.GetProperty("npiCount").GetInt32());
+            npis.GetProperty("items").EnumerateArray().Should().OnlyContain(npi =>
+                npi.GetProperty("rate").GetDecimal() >= row.GetProperty("rateLow").GetDecimal()
+                && npi.GetProperty("rateHigh").GetDecimal() <= row.GetProperty("rateHigh").GetDecimal());
+        }
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task The_npi_list_reports_its_total_on_every_page_and_typeahead_needs_text()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var result = await SearchAsync(ct, new() { ["code"] = "45378" });
+        var rateId = result.GetProperty("rows").GetProperty("items")[0].GetProperty("firstRateId").GetInt64();
+        using var client = await ReadyClientAsync(ct);
+
+        var first = await client.GetFromJsonAsync<JsonElement>($"/api/v1/rates/{rateId}/npis?pageSize=1", ct);
+        var beyond = await client.GetFromJsonAsync<JsonElement>($"/api/v1/rates/{rateId}/npis?page=99999&pageSize=1", ct);
+        using var codes = await client.GetAsync("/api/v1/codes", ct);
+        using var providers = await client.GetAsync("/api/v1/providers?q=", ct);
+        using var hugePage = await client.GetAsync($"/api/v1/rates/{rateId}/npis?page=4294969&pageSize=500", ct);
+
+        beyond.GetProperty("total").GetInt32().Should().Be(first.GetProperty("total").GetInt32()).And.BePositive();
+        beyond.GetProperty("items").GetArrayLength().Should().Be(0);
+        (await Errors(codes)).Should().ContainKey("q");
+        (await Errors(providers)).Should().ContainKey("q");
+        (await Errors(hugePage)).Should().ContainKey("page");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task The_source_reports_how_many_provider_groups_a_rate_covers()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var result = await SearchAsync(ct, new() { ["code"] = "45378" });
+        var rateId = result.GetProperty("rows").GetProperty("items")[0].GetProperty("firstRateId").GetInt64();
+        using var client = await ReadyClientAsync(ct);
+
+        var source = await client.GetFromJsonAsync<JsonElement>($"/api/v1/rates/{rateId}/source", ct);
+
+        source.GetProperty("providerGroupCount").GetInt32().Should().BeGreaterThanOrEqualTo(source.GetProperty("providerGroups").GetArrayLength()).And.BePositive();
+    }
+
     private async Task<HttpClient> ReadyClientAsync(CancellationToken cancellationToken)
     {
         var client = factory.CreateClient();

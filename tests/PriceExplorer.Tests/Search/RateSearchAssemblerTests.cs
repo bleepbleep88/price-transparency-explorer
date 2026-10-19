@@ -103,19 +103,88 @@ public sealed class RateSearchAssemblerTests
     }
 
     [Fact]
-    public void A_provider_with_two_different_rates_shows_a_range_and_its_median()
+    public void A_provider_with_two_different_rates_shows_a_range_and_the_rate_most_of_its_npis_get()
     {
         var facts = new[]
         {
-            Fact(provider: "111111111", rate: 100m, rateId: 1),
-            Fact(provider: "111111111", rate: 140m, rateId: 2),
+            Fact(provider: "111111111", rate: 100m, rateId: 1, npis: 2),
+            Fact(provider: "111111111", rate: 140m, rateId: 2, npis: 5),
         };
 
         var row = Assemble(facts).Rows.Items.Should().ContainSingle().Subject;
 
         row.MultipleRates.Should().BeTrue();
-        row.Rate.Should().Be(120m);
+        row.Rate.Should().Be(140m, "a real rate, never the $120 midpoint nobody is paid");
         (row.RateLow, row.RateHigh).Should().Be((100m, 140m));
+        row.FirstRateId.Should().Be(2, "the source drawer shows the rate the row displays");
+        row.RateIds.Should().Equal(1, 2);
+    }
+
+    [Fact]
+    public void With_an_npi_filter_the_row_shows_that_npis_own_rate_not_its_tax_ids_blend()
+    {
+        // One tax ID pays its clinicians differently: the searched NPI is only on the $45 rate.
+        var facts = new List<RateFactRow>
+        {
+            Fact(provider: "454115569", rate: 45m, rateId: 1, npis: 1, matched: true),
+            Fact(provider: "454115569", rate: 90m, rateId: 2, npis: 3, matched: false),
+        };
+        facts.AddRange(Enumerable.Range(1, 9).Select(i => Fact(provider: $"60000000{i}", rate: 50m + (5m * i), matched: false)));
+
+        var result = Assemble(facts, providerFilterActive: true);
+
+        var row = result.Rows.Items.Should().ContainSingle().Subject;
+        row.Rate.Should().Be(45m);
+        (row.RateLow, row.RateHigh, row.MultipleRates).Should().Be((45m, 45m, false));
+        row.FirstRateId.Should().Be(1);
+        row.RateIds.Should().Equal(1);
+        row.Percentile.Should().Be(0, "every other provider is paid more than $45");
+        var group = result.Groups.Single();
+        group.ProviderCount.Should().Be(10, "the market still counts the tax ID once, at its own value");
+        group.Highlights.Should().ContainSingle().Which.Rate.Should().Be(45m);
+    }
+
+    [Fact]
+    public void Paging_through_many_equal_rates_shows_every_row_exactly_once_in_a_stable_order()
+    {
+        var facts = Enumerable.Range(1, 57).Select(i => Fact(provider: $"7{i:D8}", rate: i % 3 == 0 ? 101.05m : 99m)).ToList();
+
+        foreach (var sort in new[] { "rate", "-rate", "vsMedian", "-vsMedian", "provider", "-provider" })
+        {
+            var seen = new List<string>();
+            for (var page = 1; page <= 3; page++)
+            {
+                seen.AddRange(Assemble(facts, sort: sort, page: page, pageSize: 25).Rows.Items.Select(row => row.ProviderKey));
+            }
+
+            seen.Should().HaveCount(57).And.OnlyHaveUniqueItems($"sort {sort} must not repeat or skip rows");
+            Assemble(facts, sort: sort, page: 2, pageSize: 25).Rows.Items.Select(row => row.ProviderKey)
+                .Should().Equal(Assemble(facts.AsEnumerable().Reverse(), sort: sort, page: 2, pageSize: 25).Rows.Items.Select(row => row.ProviderKey),
+                    "the same request gives the same page whatever order the database returned rows in");
+        }
+    }
+
+    [Fact]
+    public void In_a_fee_schedule_providers_paid_the_standard_rate_are_typical()
+    {
+        var facts = Enumerable.Range(1, 12).Select(i => Fact(provider: $"8{i:D8}", rate: i == 1 ? 140m : i == 12 ? 190m : 167.09m)).ToList();
+
+        var rows = Assemble(facts).Rows.Items;
+
+        rows.Where(row => row.Rate == 167.09m).Should().OnlyContain(row => row.Band == "typical");
+        rows.Single(row => row.Rate == 140m).Band.Should().Be("low");
+        rows.Single(row => row.Rate == 190m).Band.Should().Be("high");
+    }
+
+    [Fact]
+    public void A_page_past_the_end_is_empty_but_reports_the_total()
+    {
+        var facts = Enumerable.Range(1, 30).Select(i => Fact(provider: $"9{i:D8}", rate: i)).ToList();
+
+        var page = Assemble(facts, page: 100_000, pageSize: 100).Rows;
+
+        page.Items.Should().BeEmpty();
+        page.Total.Should().Be(30);
     }
 
     [Fact]
@@ -203,7 +272,8 @@ public sealed class RateSearchAssemblerTests
         bool matched = true,
         int occurrences = 1,
         string? ein = null,
-        bool einUnverified = false) =>
+        bool einUnverified = false,
+        int npis = 1) =>
         new(
             RateId: rateId ?? Interlocked.Increment(ref _nextRateId) + 1000,
             ProductKey: "ambetter",
@@ -224,6 +294,7 @@ public sealed class RateSearchAssemblerTests
             EinUnverified: einUnverified,
             EinLevel: false,
             BusinessNames: $"Provider {provider}",
-            NpiCount: 1,
-            FilterMatch: matched);
+            NpiCount: npis,
+            FilterMatch: matched,
+            IdMatch: matched);
 }

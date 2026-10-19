@@ -21,6 +21,21 @@ public sealed class SearchInputTests
         CodeInput.Candidates(CodeInput.Clean(input), codeType).Should().Equal(expected);
     }
 
+    [Theory]
+    [InlineData("CPT 99213", null, "99213", "CPT")]
+    [InlineData("rc 0490", null, "0490", "RC")]
+    [InlineData("RC0490", null, "0490", "RC")]
+    [InlineData("Revenue code 450", null, "450", "RC")]
+    [InlineData("hcpcs j0585", null, "J0585", "HCPCS")]
+    [InlineData("CPT 99213", "HCPCS", "99213", "HCPCS")]   // an explicit code type wins over the typed word
+    [InlineData("C9399", null, "C9399", null)]             // a real HCPCS code, not a "CPT" prefix
+    [InlineData(" 45378 ", null, "45378", null)]
+    public void A_leading_code_type_word_becomes_the_code_type(string input, string? codeType, string code, string? expectedType)
+    {
+        CodeInput.Parse(input, codeType).Should().Be((code, expectedType));
+        _validator.TestValidate(new SearchRatesQuery(input, CodeType: codeType)).ShouldNotHaveAnyValidationErrors();
+    }
+
     [Fact]
     public void A_missing_code_is_rejected_with_a_helpful_message()
     {
@@ -83,6 +98,45 @@ public sealed class SearchInputTests
         result.ShouldHaveValidationErrorFor(q => q.Sort);
         result.ShouldHaveValidationErrorFor(q => q.Page);
         result.ShouldHaveValidationErrorFor(q => q.PageSize);
+    }
+
+    [Fact]
+    public void Pages_far_beyond_any_result_are_rejected_instead_of_overflowing()
+    {
+        _validator.TestValidate(new SearchRatesQuery("45378", Page: 100_000_001)).ShouldHaveValidationErrorFor(q => q.Page);
+        _validator.TestValidate(new SearchRatesQuery("45378", Page: 100_000)).ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Theory]
+    [InlineData(new[] { 100.0, 140.0 }, new[] { 1, 1 }, 100.0)]          // tie: the lower rate, never the $120 midpoint
+    [InlineData(new[] { 100.0, 140.0 }, new[] { 1, 3 }, 140.0)]          // most NPIs are paid $140
+    [InlineData(new[] { 100.0, 120.0, 140.0 }, new[] { 5, 3, 4 }, 120.0)] // weighted median, not the most common
+    [InlineData(new[] { 90.0 }, new[] { 0 }, 90.0)]                      // a whole-tax-ID contract lists no NPIs
+    public void A_providers_several_rates_reduce_to_one_it_is_really_paid(double[] rates, int[] npis, double expected)
+    {
+        RateStatistics.WeightedMedian(rates.Zip(npis, (rate, weight) => ((decimal)rate, weight))).Should().Be((decimal)expected);
+    }
+
+    [Theory]
+    [InlineData(167.09, "typical")]   // at the median of a fee schedule: not "low"
+    [InlineData(150.00, "low")]
+    [InlineData(185.40, "high")]
+    public void Bands_never_call_the_median_low_or_high(double value, string expected)
+    {
+        // A fee schedule: 25th percentile = median = 75th percentile.
+        RateStatistics.Band((decimal)value, 167.09m, 167.09m, 167.09m).Should().Be(expected);
+        RateStatistics.Band(300m, 300m, 400m, 500m).Should().Be("low", "at the 25th percentile and under the median");
+        RateStatistics.Band(500m, 300m, 400m, 500m).Should().Be("high");
+        RateStatistics.Band(400m, 300m, 400m, 500m).Should().Be("typical");
+    }
+
+    [Fact]
+    public void A_matched_providers_percentile_leaves_out_its_own_market_value()
+    {
+        decimal[] market = [45m, 60m, 67.5m, 70m, 80m];   // 67.50 is the provider's own blended value
+
+        RateStatistics.PercentRank(market, 45m, own: 67.5m).Should().Be(0);
+        RateStatistics.PercentRank(market, 90m, own: 67.5m).Should().Be(100, "everyone else is below 90; its own 67.50 isn't counted");
     }
 
     [Fact]

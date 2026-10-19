@@ -5,7 +5,8 @@ er	Hospital emergency room		30
 office	Doctor's office	Office rates for doctors usually include practice costs, so they run higher than the same doctor's fee in a facility.	40
 fqhc	Federally qualified health center	Community health center rates are usually one all-inclusive payment per visit, so they aren't comparable to other settings.	50
 rhc	Rural health clinic	Rural health clinic rates are usually one all-inclusive payment per visit, so they aren't comparable to other settings.	60
-telehealth	Telehealth		70
+telehealth-home	Telehealth, patient at home	Plans can pay telehealth differently depending on where the patient is, so the two are compared separately.	70
+telehealth-other	Telehealth, patient not at home	Plans can pay telehealth differently depending on where the patient is, so the two are compared separately.	71
 lab	Independent laboratory		80
 urgent-care	Urgent care center		90
 home	Patient's home		100

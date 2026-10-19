@@ -29,7 +29,8 @@ public sealed record RateSource(
     int Occurrences,
     int ItemLabelCount,
     IReadOnlyList<string> ItemLabelSamples,
-    IReadOnlyList<RateSourceProviderGroup> ProviderGroups);
+    IReadOnlyList<RateSourceProviderGroup> ProviderGroups,
+    int ProviderGroupCount);
 
 public sealed record RateSourceFile(
     int FileId,
@@ -60,7 +61,9 @@ public sealed record RateSourceProviderGroup(
 public sealed record RateNpisPage(long RateId, string? ProviderKey, int Total, int Page, int PageSize, IReadOnlyList<ListedNpi> Items);
 
 /// <param name="Valid">Passes the NPI check digit. Invalid NPIs are shown as published.</param>
-public sealed record ListedNpi(long Npi, bool Valid);
+/// <param name="Rate">The rate this NPI is listed for. When several of the requested rates list it, the lowest.</param>
+/// <param name="RateHigh">The highest of the requested rates that list this NPI (equal to <paramref name="Rate"/> when only one does).</param>
+public sealed record ListedNpi(long Npi, bool Valid, decimal Rate, decimal RateHigh);
 
 public sealed record CodeSuggestion(
     string CodeType,

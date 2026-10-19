@@ -28,7 +28,9 @@ internal sealed record RateFactRow(
     bool EinLevel,
     string? BusinessNames,
     int NpiCount,
-    bool FilterMatch);
+    bool FilterMatch,
+    bool IdMatch = true,
+    bool NameMatch = true);
 
 internal sealed record AssemblyOptions(
     string? Product,
@@ -91,10 +93,10 @@ internal static class RateSearchAssembler
             .SelectMany(pair => RowsFor(pair.Accumulator, pair.Group, options.ProviderFilterActive))
             .ToList();
 
-        var page = Sort(rows, options.Sort)
-            .Skip((options.Page - 1) * options.PageSize)
-            .Take(options.PageSize)
-            .ToList();
+        var skip = (long)(options.Page - 1) * options.PageSize;
+        var page = skip >= rows.Count
+            ? []
+            : Sort(rows, options.Sort).Skip((int)skip).Take(options.PageSize).ToList();
 
         return new AssembledSearch(
             visible.Select(pair => pair.Group).ToList(),
@@ -135,19 +137,22 @@ internal static class RateSearchAssembler
             : group.Modifiers.Split(',').Select(code => new ModifierRef(code, catalog.Modifier(code).Label)).ToList();
 
         // Positions are only meaningful when a provider filter picked someone out; otherwise everyone "matches".
+        // A matched provider is placed by its matched rates (an NPI's own rate), against everyone else's market value.
         List<ProviderPosition> highlights = !providerFilterActive
             ? []
             : group.Providers.Values
                 .Where(provider => provider.Matched)
-                .OrderBy(provider => provider.Value)
+                .Select(provider => (Provider: provider, View: provider.MatchedRates))
+                .OrderBy(pair => pair.View.Value)
+                .ThenBy(pair => pair.Provider.Key, StringComparer.Ordinal)
                 .Take(5)
-                .Select(provider => new ProviderPosition(
-                    provider.Key,
-                    provider.DisplayName,
-                    provider.Value,
-                    basic ? RateStatistics.PercentRank(values, provider.Value) : null,
-                    RateStatistics.Ratio(provider.Value, median),
-                    p25 is { } low ? provider.Value - low : null))
+                .Select(pair => new ProviderPosition(
+                    pair.Provider.Key,
+                    pair.Provider.DisplayName,
+                    pair.View.Value,
+                    basic ? RateStatistics.PercentRank(values, pair.View.Value, pair.Provider.Value) : null,
+                    RateStatistics.Ratio(pair.View.Value, median),
+                    p25 is { } low ? pair.View.Value - low : null))
                 .ToList();
 
         return new RateGroup(
@@ -196,11 +201,12 @@ internal static class RateSearchAssembler
                 continue;
             }
 
-            var distinctRates = provider.DistinctRates;
+            // With a provider filter the row shows only the matched rates: an NPI's own rate, not its tax ID's blend.
+            var view = providerFilterActive ? provider.MatchedRates : provider.AllRates;
             string? band = null;
-            if (basic && group.Stats.P25 is { } p25 && group.Stats.P75 is { } p75)
+            if (basic && group.Stats is { P25: { } p25, Median: { } median, P75: { } p75 })
             {
-                band = provider.Value <= p25 ? "low" : provider.Value >= p75 ? "high" : "typical";
+                band = RateStatistics.Band(view.Value, p25, median, p75);
             }
 
             yield return new RateRow(
@@ -212,30 +218,37 @@ internal static class RateSearchAssembler
                 EinLevel: provider.EinLevel,
                 BusinessName: provider.DisplayName,
                 OtherNames: provider.OtherNames,
-                Rate: provider.Value,
-                RateLow: distinctRates[0],
-                RateHigh: distinctRates[^1],
-                MultipleRates: distinctRates.Count > 1,
-                VsMedian: RateStatistics.Ratio(provider.Value, group.Stats.Median),
-                Percentile: basic ? RateStatistics.PercentRank(values, provider.Value) : null,
+                Rate: view.Value,
+                RateLow: view.Low,
+                RateHigh: view.High,
+                MultipleRates: view.High != view.Low,
+                VsMedian: RateStatistics.Ratio(view.Value, group.Stats.Median),
+                Percentile: basic ? RateStatistics.PercentRank(values, view.Value, provider.Value) : null,
                 Band: band,
-                NpiCount: provider.NpiCount,
-                Occurrences: provider.Occurrences,
-                RateCount: provider.RateIds.Count,
-                FirstRateId: provider.RateIds.Min(),
-                Matched: provider.Matched);
+                NpiCount: view.LargestNpiCount,
+                Occurrences: view.Occurrences,
+                RateCount: view.RateIds.Count,
+                FirstRateId: view.SourceRateId,
+                Matched: provider.Matched,
+                RateIds: view.RateIds);
         }
     }
 
-    private static IEnumerable<RateRow> Sort(IEnumerable<RateRow> rows, string sort) => sort switch
+    /// <summary>Every sort ends on group and provider keys, so equal values keep one stable order and pages never overlap.</summary>
+    private static IEnumerable<RateRow> Sort(IEnumerable<RateRow> rows, string sort)
     {
-        "-rate" => rows.OrderByDescending(r => r.Rate).ThenBy(r => r.BusinessName, StringComparer.OrdinalIgnoreCase),
-        "provider" => rows.OrderBy(r => r.BusinessName, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Rate),
-        "-provider" => rows.OrderByDescending(r => r.BusinessName, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Rate),
-        "vsMedian" => rows.OrderBy(r => r.VsMedian ?? decimal.MaxValue).ThenBy(r => r.Rate),
-        "-vsMedian" => rows.OrderByDescending(r => r.VsMedian ?? decimal.MinValue).ThenBy(r => r.Rate),
-        _ => rows.OrderBy(r => r.Rate).ThenBy(r => r.BusinessName, StringComparer.OrdinalIgnoreCase),
-    };
+        var sorted = sort switch
+        {
+            "-rate" => rows.OrderByDescending(r => r.Rate).ThenBy(r => r.BusinessName, StringComparer.OrdinalIgnoreCase),
+            "provider" => rows.OrderBy(r => r.BusinessName, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Rate),
+            "-provider" => rows.OrderByDescending(r => r.BusinessName, StringComparer.OrdinalIgnoreCase).ThenBy(r => r.Rate),
+            "vsMedian" => rows.OrderBy(r => r.VsMedian ?? decimal.MaxValue).ThenBy(r => r.Rate).ThenBy(r => r.BusinessName, StringComparer.OrdinalIgnoreCase),
+            "-vsMedian" => rows.OrderByDescending(r => r.VsMedian ?? decimal.MinValue).ThenBy(r => r.Rate).ThenBy(r => r.BusinessName, StringComparer.OrdinalIgnoreCase),
+            _ => rows.OrderBy(r => r.Rate).ThenBy(r => r.BusinessName, StringComparer.OrdinalIgnoreCase),
+        };
+
+        return sorted.ThenBy(r => r.GroupKey, StringComparer.Ordinal).ThenBy(r => r.ProviderKey, StringComparer.Ordinal);
+    }
 
     private static SearchQuality QualityOf(IReadOnlyList<GroupAccumulator> groups)
     {
@@ -252,7 +265,7 @@ internal static class RateSearchAssembler
 
             foreach (var provider in group.Providers.Values)
             {
-                if (provider.DistinctRates.Count > 1) multiple++;
+                if (provider.AllRates.High != provider.AllRates.Low) multiple++;
                 if (provider.EinUnverified) masked.Add(provider.Key);
                 if (provider.EinLevel) wholeTin.Add(provider.Key);
             }
@@ -367,9 +380,9 @@ internal static class RateSearchAssembler
     private sealed class ProviderAccumulator(string key, string? ein, bool einUnverified)
     {
         private readonly SortedSet<string> _names = new(StringComparer.Ordinal);
-        private readonly Dictionary<long, decimal> _rates = [];
-        private readonly Dictionary<long, int> _occurrences = [];
-        private List<decimal>? _distinctRates;
+        private readonly Dictionary<long, RateEntry> _rates = [];
+        private RateView? _all;
+        private RateView? _matched;
         private bool _anyNotEinLevel;
 
         public string Key { get; } = key;
@@ -377,14 +390,15 @@ internal static class RateSearchAssembler
         public bool EinUnverified { get; private set; } = einUnverified;
         public bool EinLevel => !_anyNotEinLevel;
         public bool Matched { get; private set; }
-        public int NpiCount { get; private set; }
-        public ICollection<long> RateIds => _rates.Keys;
-        public int Occurrences => _occurrences.Values.Sum();
 
-        public List<decimal> DistinctRates => _distinctRates ??= _rates.Values.Distinct().Order().ToList();
+        /// <summary>Every rate the provider has in the group.</summary>
+        public RateView AllRates => _all ??= RateView.Of(_rates.Values);
 
-        /// <summary>One value per provider per group: the median of its distinct rates (they usually have just one).</summary>
-        public decimal Value => RateStatistics.Median(DistinctRates);
+        /// <summary>Only the rates that matched the provider filters (every rate when no filter is set, since all match).</summary>
+        public RateView MatchedRates => _matched ??= MatchedOrAll();
+
+        /// <summary>One value per provider per group for the statistics (see <see cref="RateView.Value"/>).</summary>
+        public decimal Value => AllRates.Value;
 
         public string DisplayName => _names.Count > 0 ? _names.Min! : "Name not published";
 
@@ -397,19 +411,69 @@ internal static class RateSearchAssembler
             _ => Domain.Ein.Format(Ein),
         };
 
+        private RateView MatchedOrAll()
+        {
+            var matched = _rates.Values.Where(rate => rate.Matched).ToList();
+            return matched.Count > 0 ? RateView.Of(matched) : AllRates;
+        }
+
         public void Add(RateFactRow fact)
         {
-            _distinctRates = null;
-            _rates[fact.RateId] = fact.Rate;
-            _occurrences[fact.RateId] = fact.Occurrences;
+            _all = null;
+            _matched = null;
+
+            // The same rate can arrive once per place of service that maps to this group's setting.
+            if (_rates.TryGetValue(fact.RateId, out var existing))
+            {
+                existing.Matched |= fact.FilterMatch;
+            }
+            else
+            {
+                _rates[fact.RateId] = new RateEntry(fact.RateId, fact.Rate, fact.Occurrences, fact.NpiCount) { Matched = fact.FilterMatch };
+            }
+
             Matched |= fact.FilterMatch;
             EinUnverified |= fact.EinUnverified;
             _anyNotEinLevel |= !fact.EinLevel;
-            NpiCount = Math.Max(NpiCount, fact.NpiCount);
             foreach (var name in (fact.BusinessNames ?? "").Split(" | ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 _names.Add(name);
             }
+        }
+    }
+
+    private sealed class RateEntry(long rateId, decimal rate, int occurrences, int npiCount)
+    {
+        public long RateId { get; } = rateId;
+        public decimal Rate { get; } = rate;
+        public int Occurrences { get; } = occurrences;
+        public int NpiCount { get; } = npiCount;
+        public bool Matched { get; set; }
+    }
+
+    /// <summary>A provider's rates in one group, summed up for display.</summary>
+    /// <param name="Value">
+    /// The NPI-weighted median of the rates: always one the provider is really paid (never a midpoint). Most providers
+    /// have a single rate per group, so this is usually just that rate.
+    /// </param>
+    /// <param name="SourceRateId">The rate carrying <paramref name="Value"/> that lists the most NPIs (shown in the source drawer).</param>
+    /// <param name="LargestNpiCount">NPIs under the largest single rate: a lower bound until the handler counts them exactly.</param>
+    private sealed record RateView(
+        decimal Value, decimal Low, decimal High, long SourceRateId, IReadOnlyList<long> RateIds, int Occurrences, int LargestNpiCount)
+    {
+        public static RateView Of(IEnumerable<RateEntry> entries)
+        {
+            var list = entries.OrderBy(entry => entry.RateId).ToList();
+            var value = RateStatistics.WeightedMedian(list.Select(entry => (entry.Rate, entry.NpiCount)));
+            var source = list.Where(entry => entry.Rate == value).OrderByDescending(entry => entry.NpiCount).ThenBy(entry => entry.RateId).First();
+            return new RateView(
+                value,
+                list.Min(entry => entry.Rate),
+                list.Max(entry => entry.Rate),
+                source.RateId,
+                list.Select(entry => entry.RateId).ToList(),
+                list.Sum(entry => entry.Occurrences),
+                list.Max(entry => entry.NpiCount));
         }
     }
 }

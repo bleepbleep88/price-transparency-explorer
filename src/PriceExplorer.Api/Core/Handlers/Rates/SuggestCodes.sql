@@ -13,6 +13,7 @@ codes AS (
         string_agg(DISTINCT CASE WHEN r.code_source = 'additional_information' THEN r.billing_code END, ',') AS revenue_codes
     FROM rates r
     JOIN target_files tf ON tf.file_id = r.file_id
+    WHERE r.expiration_date IS NULL OR r.expiration_date >= current_date
     GROUP BY r.code_type, r.code
 ),
 names AS (

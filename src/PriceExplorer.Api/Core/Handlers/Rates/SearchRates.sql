@@ -1,6 +1,8 @@
 -- One row per unique rate x place of service x provider (tax ID) for the searched code(s).
--- FilterMatch: this provider matches the NPI / EIN / name filters. NPI and EIN must match within the SAME provider
--- group, i.e. "this NPI bills under this EIN". Grouping and statistics happen in RateSearchAssembler.
+-- IdMatch: the provider matches the NPI / EIN filters, which must hold within the SAME provider group ("this NPI bills
+-- under this EIN"). NameMatch: a group's business name contains the name filter. FilterMatch: one group meets both.
+-- NpiCount (summed over the provider's groups for the rate) weights the provider's rates when it has several.
+-- Grouping and statistics happen in RateSearchAssembler.
 WITH target_files AS (
     SELECT file_id, product_key, product_label
     FROM source_files
@@ -30,8 +32,8 @@ linked AS (
                   AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
             AND ($ein::VARCHAR IS NULL OR pg.ein = $ein::VARCHAR
                  OR (pg.ein_unverified AND 'u' || substr(sha256(pg.ein), 1, 12) = $ein::VARCHAR))
-            AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))
-        ) AS filter_match
+        ) AS id_match,
+        ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR)) AS name_match
     FROM matched m
     JOIN rate_provider_refs rr ON rr.rate_id = m.rate_id
     JOIN provider_groups pg ON pg.file_id = rr.file_id AND pg.provider_ref_id = rr.provider_ref_id
@@ -57,9 +59,12 @@ SELECT
     bool_and(l.ein_level)                    AS EinLevel,
     string_agg(DISTINCT l.business_name, ' | ') AS BusinessNames,
     CAST(sum(l.npi_count) AS INTEGER)        AS NpiCount,
-    bool_or(l.filter_match)                  AS FilterMatch
+    bool_or(l.id_match AND l.name_match)     AS FilterMatch,
+    bool_or(l.id_match)                      AS IdMatch,
+    bool_or(l.name_match)                    AS NameMatch
 FROM matched m
 JOIN rate_places rp ON rp.rate_id = m.rate_id
 JOIN linked l ON l.rate_id = m.rate_id
 GROUP BY m.rate_id, m.product_key, m.product_label, m.code_type, m.code, m.code_source, m.billing_code_type,
          m.billing_code, m.billing_class, m.negotiated_type, m.modifiers, m.rate, m.occurrences, rp.pos, l.provider_key
+ORDER BY m.rate_id, rp.pos, l.provider_key

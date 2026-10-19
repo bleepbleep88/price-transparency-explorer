@@ -1,6 +1,6 @@
 pos	name	setting_key
 01	Pharmacy	other
-02	Telehealth provided other than in patient's home	telehealth
+02	Telehealth provided other than in patient's home	telehealth-other
 03	School	other
 04	Homeless shelter	other
 05	Indian Health Service free-standing facility	other
@@ -8,7 +8,7 @@ pos	name	setting_key
 07	Tribal 638 free-standing facility	other
 08	Tribal 638 provider-based facility	other
 09	Prison/correctional facility	other
-10	Telehealth provided in patient's home	telehealth
+10	Telehealth provided in patient's home	telehealth-home
 11	Office	office
 12	Home	home
 13	Assisted living facility	other

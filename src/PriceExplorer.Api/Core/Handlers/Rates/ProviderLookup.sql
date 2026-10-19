@@ -1,4 +1,4 @@
--- Where an NPI and/or EIN appears in this snapshot (ignoring the searched code), and how many codes it has rates for.
+-- Where an NPI and/or EIN appears in this snapshot, and how many OTHER codes (not the searched ones) it has rates for.
 -- Used to explain an empty provider-filtered search.
 WITH target_files AS (
     SELECT file_id
@@ -21,6 +21,8 @@ codes AS (
     FROM groups g
     JOIN rate_provider_refs rr ON rr.file_id = g.file_id AND rr.provider_ref_id = g.provider_ref_id
     JOIN rates r ON r.rate_id = rr.rate_id
+    WHERE r.code NOT IN $codes
+      AND (r.expiration_date IS NULL OR r.expiration_date >= current_date)
     GROUP BY r.code_type, r.code
 )
 SELECT
