@@ -1,0 +1,20 @@
+/*
+ * Vuetify 4's reset keeps the browser's default margins on text blocks, and those margins don't collapse inside the
+ * flex columns used across the app. Spacing comes from Vuetify's spacing utilities and flex gaps instead.
+ * The rule sits in Vuetify's own reset layer so the utilities (later layers, not !important) still win.
+ */
+@layer vuetify-core.reset {
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  ul,
+  ol,
+  figure,
+  blockquote {
+    margin: 0;
+  }
+}

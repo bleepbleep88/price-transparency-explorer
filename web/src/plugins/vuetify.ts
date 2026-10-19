@@ -42,6 +42,8 @@ export const vuetify = createVuetify({
     VCard: { variant: 'outlined', rounded: 'lg' },
     VTextField: { variant: 'outlined', density: 'compact', hideDetails: 'auto' },
     VAutocomplete: { variant: 'outlined', density: 'compact', hideDetails: 'auto' },
+    VCombobox: { variant: 'outlined', density: 'compact', hideDetails: 'auto' },
+    VNumberInput: { variant: 'outlined', density: 'compact' },
     VSelect: { variant: 'outlined', density: 'compact', hideDetails: 'auto' },
     VChip: { size: 'small' },
     VDataTableServer: { density: 'compact' },
