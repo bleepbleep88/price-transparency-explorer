@@ -68,9 +68,15 @@ internal sealed class InNetworkFileBuilder
         DanglingReferences: _usedReferences.Count(id => !_definedReferences.Contains(id)),
         RejectedPrices: _rejects.Values.Where(r => r.AffectsPrices).Sum(r => r.Count));
 
-    public void AddProviderReference(ProviderReference reference)
+    public void AddProviderReference(ProviderReference? reference)
     {
         _providerReferences++;
+
+        if (reference is null)
+        {
+            Reject(RejectReasons.NullElement, $"provider_references[{_providerReferences - 1}]");
+            return;
+        }
 
         if (reference.ProviderGroupId is not { } referenceId)
         {
@@ -96,14 +102,20 @@ internal sealed class InNetworkFileBuilder
         AddGroups(referenceId, reference.ProviderGroups, string.IsNullOrEmpty(networks) ? null : networks);
     }
 
-    public void AddItem(InNetworkItem item)
+    public void AddItem(InNetworkItem? item)
     {
         var itemIndex = ++_itemIndex;
         _items++;
 
+        if (item is null)
+        {
+            Reject(RejectReasons.NullElement, $"in_network[{itemIndex}]");
+            return;
+        }
+
         var billingType = BillingCodes.NormalizeType(item.BillingCodeType);
         var billingRaw = (item.BillingCode ?? "").Trim();
-        var priceCount = item.NegotiatedRates?.Sum(block => block.NegotiatedPrices?.Count ?? 0) ?? 0;
+        var priceCount = item.NegotiatedRates?.Sum(block => block?.NegotiatedPrices?.Count ?? 0) ?? 0;
         if (billingType.Length == 0 || billingRaw.Length == 0)
         {
             _pricesRaw += priceCount;
@@ -132,6 +144,12 @@ internal sealed class InNetworkFileBuilder
         for (var rateIndex = 0; rateIndex < blocks.Count; rateIndex++)
         {
             var block = blocks[rateIndex];
+            if (block is null)
+            {
+                Reject(RejectReasons.NullElement, $"in_network[{itemIndex}].negotiated_rates[{rateIndex}]");
+                continue;
+            }
+
             var prices = block.NegotiatedPrices ?? [];
             var references = ResolveReferences(block);
             if (references.Length == 0)
@@ -165,11 +183,17 @@ internal sealed class InNetworkFileBuilder
     }
 
     private void AddPrice(
-        NegotiatedPrice price, int itemIndex, int rateIndex, int priceIndex,
+        NegotiatedPrice? price, int itemIndex, int rateIndex, int priceIndex,
         string billingType, string billingCode, string billingRaw, string arrangement, string label,
         int[] references, string referencesKey)
     {
         var path = $"in_network[{itemIndex}].negotiated_rates[{rateIndex}].negotiated_prices[{priceIndex}]";
+
+        if (price is null)
+        {
+            Reject(RejectReasons.NullPrice, path, affectsPrices: true);
+            return;
+        }
 
         if (price.NegotiatedRate is not { } rate)
         {
@@ -253,7 +277,7 @@ internal sealed class InNetworkFileBuilder
         return result;
     }
 
-    private void AddGroups(int referenceId, List<ProviderGroup>? groups, string? networks)
+    private void AddGroups(int referenceId, List<ProviderGroup?>? groups, string? networks)
     {
         if (groups is null || groups.Count == 0)
         {
@@ -264,6 +288,12 @@ internal sealed class InNetworkFileBuilder
         for (var groupIndex = 0; groupIndex < groups.Count; groupIndex++)
         {
             var group = groups[groupIndex];
+            if (group is null)
+            {
+                Reject(RejectReasons.NullElement, $"provider group {referenceId}[{groupIndex}]");
+                continue;
+            }
+
             var tinType = Intern(Lower(group.Tin?.Type) ?? "");
             var tinValue = Clean(group.Tin?.Value);
             var businessName = Clean(group.Tin?.BusinessName);
@@ -434,6 +464,15 @@ internal sealed class InNetworkFileBuilder
     }
 
     private static string? Lower(string? value) => Clean(value)?.ToLowerInvariant();
+}
+
+internal static class RejectReasons
+{
+    /// <summary>A bare null inside an array (valid JSON, no content).</summary>
+    public const string NullElement = "null_element";
+
+    /// <summary>A bare null inside negotiated_prices; counted as a rejected price.</summary>
+    public const string NullPrice = "null_price";
 }
 
 internal static class CodeSources

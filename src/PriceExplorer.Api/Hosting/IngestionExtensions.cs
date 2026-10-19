@@ -27,6 +27,9 @@ internal static class IngestionExtensions
         services.AddHostedService<IngestionService>();
 
         // Large bodies are streamed with our own stall watchdog, so the client-wide timeout is off.
+        // No compressed transfers: the payer's CDN then always sends Content-Length (checked after download), a strong
+        // ETag and working byte ranges. Big rate files aren't compressed in transit anyway; .json.gz files are
+        // unwrapped when read.
         services.AddHttpClient(FileDownloader.HttpClientName, (provider, client) =>
             {
                 client.Timeout = Timeout.InfiniteTimeSpan;
@@ -34,7 +37,7 @@ internal static class IngestionExtensions
             })
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
-                AutomaticDecompression = DecompressionMethods.All,
+                AutomaticDecompression = DecompressionMethods.None,
                 PooledConnectionLifetime = TimeSpan.FromMinutes(5),
             });
 

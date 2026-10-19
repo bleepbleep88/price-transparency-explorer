@@ -19,10 +19,7 @@ public sealed class ListSnapshotsHandler(DuckDbConnectionFactory connections) : 
             .Select(group => (Rows: group.ToList(), First: group.First()))
             .ToList();
 
-        var latestId = snapshots
-            .Where(s => s.First.SnapshotStatus is "ready" or "partial")
-            .Select(s => (int?)s.First.SnapshotId)
-            .FirstOrDefault();
+        var latestId = await connection.ExecuteScalarAsync<int?>(SqlFile.For<DuckDbConnectionFactory>("LatestSnapshot.sql"));
 
         return snapshots.Select(s => new SnapshotSummary(
             s.First.SnapshotId,
@@ -37,9 +34,9 @@ public sealed class ListSnapshotsHandler(DuckDbConnectionFactory connections) : 
                 .Where(row => row.FileId is not null)
                 .Select(row => new ProductFileSummary(
                     row.FileId!.Value, row.ProductKey!, row.ProductLabel!, row.Url!, row.FileStatus!, row.Error, row.Warning,
-                    row.FileLastUpdatedOn, row.HttpLastModified, row.ContentLength, row.Sha256,
+                    row.FileLastUpdatedOn, UtcTimestamps.From(row.HttpLastModified), row.ContentLength, row.Sha256,
                     (int)row.PlanEntries, (int)row.DistinctPlanIds, row.Items, row.PricesPublished, row.UniqueRates,
-                    row.DuplicatesRemoved, row.DistinctNpis, row.DistinctEins, row.LoadedAt))
+                    row.DuplicatesRemoved, row.DistinctNpis, row.DistinctEins, UtcTimestamps.From(row.LoadedAt)))
                 .ToList()))
             .ToList();
     }

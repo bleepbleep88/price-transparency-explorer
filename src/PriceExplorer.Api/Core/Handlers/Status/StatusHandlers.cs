@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using MediatR;
 using PriceExplorer.Api.Core.Ingestion;
 using PriceExplorer.Api.Core.Queries.Status;
@@ -10,8 +11,17 @@ public sealed class GetIngestionStatusHandler(IngestionStatus status) : IRequest
         Task.FromResult(status.Current);
 }
 
-public sealed class WatchIngestionStatusHandler(IngestionStatus status) : IStreamRequestHandler<WatchIngestionStatusQuery, IngestionStatusSnapshot>
+public sealed class WatchIngestionStatusHandler(IngestionStatus status, IHostApplicationLifetime lifetime)
+    : IStreamRequestHandler<WatchIngestionStatusQuery, IngestionStatusSnapshot>
 {
-    public IAsyncEnumerable<IngestionStatusSnapshot> Handle(WatchIngestionStatusQuery request, CancellationToken cancellationToken) =>
-        status.WatchAsync(cancellationToken);
+    /// <summary>Ends when the client disconnects or the app starts shutting down, so an open browser tab never delays a stop.</summary>
+    public async IAsyncEnumerable<IngestionStatusSnapshot> Handle(
+        WatchIngestionStatusQuery request, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        using var stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.ApplicationStopping);
+        await foreach (var snapshot in status.WatchAsync(stopping.Token))
+        {
+            yield return snapshot;
+        }
+    }
 }

@@ -28,18 +28,25 @@ internal sealed partial class TableOfContentsReader(FileDownloader downloader)
 
         var plans = new List<PlanRecord>();
         var files = new List<InNetworkFileRef>();
+        var structureFiles = new HashSet<StructureFileRecord>();
         var usedKeys = new HashSet<string>(StringComparer.Ordinal);
-        var seenUrls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var firstSpelling = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         for (var structureIndex = 0; structureIndex < structures.Count; structureIndex++)
         {
-            var structure = structures[structureIndex];
-            var structurePlans = structure.ReportingPlans ?? [];
+            // Null elements are valid JSON with nothing in them; skip them.
+            if (structures[structureIndex] is not { } structure)
+            {
+                continue;
+            }
+
+            var structurePlans = (structure.ReportingPlans ?? []).OfType<ReportingPlan>().ToList();
             plans.AddRange(structurePlans.Select(plan => new PlanRecord(
                 structureIndex, plan.PlanName?.Trim(), plan.PlanIdType?.Trim(), plan.PlanId?.Trim(),
                 plan.PlanMarketType?.Trim(), plan.IssuerName?.Trim(), plan.PlanSponsorName?.Trim())));
 
             var locations = (structure.InNetworkFiles ?? [])
+                .OfType<FileLocation>()
                 .Where(file => !string.IsNullOrWhiteSpace(file.Location))
                 .ToList();
 
@@ -53,11 +60,14 @@ internal sealed partial class TableOfContentsReader(FileDownloader downloader)
 
             foreach (var location in locations)
             {
+                // A file shared by several structures is loaded once, but every structure keeps its link to it.
                 var url = location.Location!.Trim();
-                if (seenUrls.Add(url))
+                if (firstSpelling.TryAdd(url, url))
                 {
                     files.Add(new InNetworkFileRef(structureIndex, key, label, url, location.Description?.Trim()));
                 }
+
+                structureFiles.Add(new StructureFileRecord(structureIndex, firstSpelling[url]));
             }
         }
 
@@ -69,7 +79,7 @@ internal sealed partial class TableOfContentsReader(FileDownloader downloader)
             SchemaVersion: index.Version?.Trim(),
             Sha256: download.Sha256);
 
-        return new TableOfContents(indexUrl, header, plans, files, download.Warning);
+        return new TableOfContents(indexUrl, header, plans, files, [.. structureFiles], download.Warning);
     }
 
     /// <summary>CMS names index files "YYYY-MM-DD_..._index.json"; that date identifies the snapshot.</summary>
@@ -93,6 +103,10 @@ internal sealed record TableOfContents(
     SnapshotHeader Header,
     IReadOnlyList<PlanRecord> Plans,
     IReadOnlyList<InNetworkFileRef> InNetworkFiles,
+    IReadOnlyList<StructureFileRecord> StructureFiles,
     string? Warning);
+
+/// <summary>One reporting structure's link to one rate file (the URL as stored on the file's source_files row).</summary>
+internal sealed record StructureFileRecord(int StructureIndex, string Url);
 
 internal sealed record InNetworkFileRef(int StructureIndex, string ProductKey, string ProductLabel, string Url, string? Description);

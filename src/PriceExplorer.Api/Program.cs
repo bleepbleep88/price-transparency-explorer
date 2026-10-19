@@ -25,6 +25,7 @@ try
 catch (Exception ex) when (ex is not HostAbortedException)
 {
     Log.Fatal(ex, "Price Explorer API terminated unexpectedly");
+    Environment.ExitCode = 1;
 }
 finally
 {

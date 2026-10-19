@@ -31,6 +31,6 @@ public abstract class StreamingSink<T>(Action<T> onItem) : ICollection<T>
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-public sealed class ProviderReferenceSink(Action<ProviderReference> onItem) : StreamingSink<ProviderReference>(onItem);
+public sealed class ProviderReferenceSink(Action<ProviderReference?> onItem) : StreamingSink<ProviderReference?>(onItem);
 
-public sealed class InNetworkItemSink(Action<InNetworkItem> onItem) : StreamingSink<InNetworkItem>(onItem);
+public sealed class InNetworkItemSink(Action<InNetworkItem?> onItem) : StreamingSink<InNetworkItem?>(onItem);

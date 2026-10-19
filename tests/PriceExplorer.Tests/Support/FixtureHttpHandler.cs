@@ -26,9 +26,13 @@ public sealed class FixtureHttpHandler : HttpMessageHandler
     /// <summary>Every request seen: URL and whether it was a conditional (If-None-Match) re-check.</summary>
     public ConcurrentQueue<(string Url, bool Conditional)> Requests { get; } = new();
 
-    public void ServeFixture(string url, string fixtureName)
+    public void ServeFixture(string url, string fixtureName) => ServeBytes(url, File.ReadAllBytes(TestFiles.Fixture(fixtureName)));
+
+    /// <summary>Serves JSON written by the test, for index shapes the real fixtures don't have.</summary>
+    public void ServeJson(string url, string json) => ServeBytes(url, Encoding.UTF8.GetBytes(json));
+
+    private void ServeBytes(string url, byte[] bytes)
     {
-        var bytes = File.ReadAllBytes(TestFiles.Fixture(fixtureName));
         var etag = $"\"{Convert.ToHexString(SHA256.HashData(bytes))[..16]}\"";
         _routes[url] = request =>
         {
@@ -52,14 +56,30 @@ public sealed class FixtureHttpHandler : HttpMessageHandler
             Content = new StringContent("<html><body>Page not found</body></html>", Encoding.UTF8, "text/html"),
         };
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    /// <summary>Requests to this URL hang until the test ends, so the app stays in its "still loading" state.</summary>
+    public void Hold(string url) => _held[url] = true;
+
+    private readonly ConcurrentDictionary<string, bool> _held = new(StringComparer.OrdinalIgnoreCase);
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var url = request.RequestUri!.ToString();
         Requests.Enqueue((url, request.Headers.IfNoneMatch.Count > 0));
+
+        if (_held.ContainsKey(url))
+        {
+            // Completes only when the app shuts down and cancels the request.
+            var never = new TaskCompletionSource<HttpResponseMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+            await using (cancellationToken.Register(() => never.TrySetCanceled(cancellationToken)))
+            {
+                return await never.Task;
+            }
+        }
+
         var response = _routes.TryGetValue(url, out var route)
             ? route(request)
             : new HttpResponseMessage(HttpStatusCode.NotFound) { Content = new StringContent("<html>404</html>", Encoding.UTF8, "text/html") };
         response.RequestMessage = request;
-        return Task.FromResult(response);
+        return response;
     }
 }

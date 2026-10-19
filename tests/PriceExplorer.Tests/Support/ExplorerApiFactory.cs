@@ -14,23 +14,29 @@ namespace PriceExplorer.Tests.Support;
 public class ExplorerApiFactory : WebApplicationFactory<Program>
 {
     private readonly bool _ownsDirectory;
+    private readonly IReadOnlyDictionary<string, string?> _settings;
 
     public ExplorerApiFactory()
-        : this(configureHttp: null, dataDirectory: null)
+        : this(configureHttp: null, dataDirectory: null, settings: null)
     {
     }
 
-    protected ExplorerApiFactory(Action<FixtureHttpHandler>? configureHttp, string? dataDirectory)
+    protected ExplorerApiFactory(Action<FixtureHttpHandler>? configureHttp, string? dataDirectory, IReadOnlyDictionary<string, string?>? settings)
     {
         Http = new FixtureHttpHandler();
         configureHttp?.Invoke(Http);
         _ownsDirectory = dataDirectory is null;
+        _settings = settings ?? new Dictionary<string, string?>();
         DataDirectory = dataDirectory ?? Directory.CreateTempSubdirectory("pte-api-").FullName;
     }
 
-    /// <summary>A factory with a customized fake payer server and/or a shared data folder (e.g. to simulate a restart).</summary>
-    public static ExplorerApiFactory With(Action<FixtureHttpHandler>? configureHttp = null, string? dataDirectory = null) =>
-        new Configured(configureHttp, dataDirectory);
+    /// <summary>
+    /// A factory with a customized fake payer server, a shared data folder (e.g. to simulate a restart), and/or extra
+    /// configuration settings.
+    /// </summary>
+    public static ExplorerApiFactory With(
+        Action<FixtureHttpHandler>? configureHttp = null, string? dataDirectory = null, IReadOnlyDictionary<string, string?>? settings = null) =>
+        new Configured(configureHttp, dataDirectory, settings);
 
     public FixtureHttpHandler Http { get; }
 
@@ -62,7 +68,7 @@ public class ExplorerApiFactory : WebApplicationFactory<Program>
             ["Ingestion:MaxDownloadAttempts"] = "2",
             ["Ingestion:StallTimeoutSeconds"] = "10",
             ["Serilog:MinimumLevel:Default"] = "Warning",
-        }));
+        }).AddInMemoryCollection(_settings));
 
         builder.ConfigureTestServices(services => services
             .AddHttpClient(FileDownloader.HttpClientName)
@@ -80,6 +86,6 @@ public class ExplorerApiFactory : WebApplicationFactory<Program>
         }
     }
 
-    private sealed class Configured(Action<FixtureHttpHandler>? configureHttp, string? dataDirectory)
-        : ExplorerApiFactory(configureHttp, dataDirectory);
+    private sealed class Configured(Action<FixtureHttpHandler>? configureHttp, string? dataDirectory, IReadOnlyDictionary<string, string?>? settings)
+        : ExplorerApiFactory(configureHttp, dataDirectory, settings);
 }

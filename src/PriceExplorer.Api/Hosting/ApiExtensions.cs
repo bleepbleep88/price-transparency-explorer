@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using PriceExplorer.Api.Core.Behaviors;
 using Scalar.AspNetCore;
 using Serilog;
+using Serilog.Events;
 
 namespace PriceExplorer.Api.Hosting;
 
@@ -40,9 +41,18 @@ internal static class ApiExtensions
 
     public static WebApplication UseExplorerApi(this WebApplication app)
     {
+        // Outermost, so each request is logged with the status the client actually got (a handled 404 is a 404, not a
+        // 500), using the host's configured logger. Expected 503s (data still loading) aren't errors.
+        app.UseSerilogRequestLogging(options =>
+        {
+            options.Logger = app.Services.GetRequiredService<Serilog.ILogger>();
+            options.GetLevel = (context, _, exception) =>
+                exception is not null || (context.Response.StatusCode >= 500 && context.Response.StatusCode != StatusCodes.Status503ServiceUnavailable)
+                    ? LogEventLevel.Error
+                    : LogEventLevel.Information;
+        });
         app.UseExceptionHandler();
         app.UseStatusCodePages();
-        app.UseSerilogRequestLogging();
 
         app.MapControllers();
         app.MapOpenApi();

@@ -7,18 +7,21 @@ using PriceExplorer.Api.Core.Data;
 namespace PriceExplorer.Api.Core.Ingestion;
 
 /// <summary>Writes parsed files into DuckDB. Each file is replaced inside one transaction, so readers never see half a file.</summary>
-internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections, ILogger<DuckDbIngestionWriter> logger)
+internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections, TimeProvider time, ILogger<DuckDbIngestionWriter> logger)
 {
     /// <summary>Bump when Schema.sql changes: all tables are rebuilt from the download cache.</summary>
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     /// <summary>Bump when normalization rules change: every file is re-parsed even if its bytes didn't change.</summary>
     public const int ParserVersion = 1;
 
+    /// <summary>Timestamps are stored as UTC. DuckDB's now() would write the server's local time without an offset.</summary>
+    private DateTime UtcNow => time.GetUtcNow().UtcDateTime;
+
     private static readonly string[] Tables =
     [
         "ingestion_rejects", "code_descriptions", "rate_provider_refs", "rate_places", "rates",
-        "group_npis", "provider_groups", "source_files", "plans", "snapshots", "meta",
+        "group_npis", "provider_groups", "source_files", "structure_files", "plans", "snapshots", "meta",
     ];
 
     public async Task EnsureSchemaAsync(CancellationToken cancellationToken)
@@ -71,7 +74,7 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
             INSERT INTO snapshots
                 (snapshot_id, index_url, index_date, index_last_updated_on, reporting_entity_name, reporting_entity_type,
                  schema_version, index_sha256, status, error, updated_at)
-            VALUES ($id, $indexUrl, $indexDate, $lastUpdatedOn, $entityName, $entityType, $schemaVersion, $sha256, 'loading', NULL, now())
+            VALUES ($id, $indexUrl, $indexDate, $lastUpdatedOn, $entityName, $entityType, $schemaVersion, $sha256, 'loading', NULL, $now)
             ON CONFLICT (snapshot_id) DO UPDATE SET
                 index_date = excluded.index_date,
                 index_last_updated_on = excluded.index_last_updated_on,
@@ -79,7 +82,7 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
                 reporting_entity_type = excluded.reporting_entity_type,
                 schema_version = excluded.schema_version,
                 index_sha256 = excluded.index_sha256,
-                updated_at = now()
+                updated_at = excluded.updated_at
             """,
             new
             {
@@ -91,15 +94,26 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
                 entityType = header.ReportingEntityType,
                 schemaVersion = header.SchemaVersion,
                 sha256 = header.Sha256,
+                now = UtcNow,
             });
         return id;
     }
 
-    public async Task ReplacePlansAsync(int snapshotId, IReadOnlyList<PlanRecord> plans, CancellationToken cancellationToken)
+    public async Task ReplacePlansAsync(
+        int snapshotId, IReadOnlyList<PlanRecord> plans, IReadOnlyList<StructureFileRecord> structureFiles, CancellationToken cancellationToken)
     {
         await using var connection = await connections.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         await connection.ExecuteAsync("DELETE FROM plans WHERE snapshot_id = $snapshotId", new { snapshotId }, transaction);
+        await connection.ExecuteAsync("DELETE FROM structure_files WHERE snapshot_id = $snapshotId", new { snapshotId }, transaction);
+        using (var appender = connection.CreateAppender("structure_files"))
+        {
+            foreach (var link in structureFiles)
+            {
+                appender.CreateRow().AppendValue(snapshotId).AppendValue(link.StructureIndex).AppendValue(link.Url).EndRow();
+            }
+        }
+
         using (var appender = connection.CreateAppender("plans"))
         {
             foreach (var plan in plans)
@@ -176,7 +190,7 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
                 provider_references = $providerReferences, provider_groups = $providerGroups, distinct_npis = $distinctNpis,
                 distinct_eins = $distinctEins, invalid_npis = $invalidNpis, ein_level_groups = $einLevelGroups,
                 unverified_ein_groups = $unverifiedEinGroups, dangling_references = $danglingReferences,
-                rejected_prices = $rejectedPrices, download_ms = $downloadMs, parse_ms = $parseMs, loaded_at = now()
+                rejected_prices = $rejectedPrices, download_ms = $downloadMs, parse_ms = $parseMs, loaded_at = $now
             WHERE file_id = $fileId
             """,
             new
@@ -208,6 +222,7 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
                 rejectedPrices = stats.RejectedPrices,
                 downloadMs = (int)download.Elapsed.TotalMilliseconds,
                 parseMs = (int)parseTime.TotalMilliseconds,
+                now = UtcNow,
             },
             transaction);
 
@@ -253,8 +268,8 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
             new { snapshotId }) ?? "failed";
 
         await connection.ExecuteAsync(
-            "UPDATE snapshots SET status = $status, error = $error, updated_at = now() WHERE snapshot_id = $snapshotId",
-            new { snapshotId, status, error });
+            "UPDATE snapshots SET status = $status, error = $error, updated_at = $now WHERE snapshot_id = $snapshotId",
+            new { snapshotId, status, error, now = UtcNow });
         return status;
     }
 

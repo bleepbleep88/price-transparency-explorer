@@ -32,7 +32,15 @@ CREATE TABLE IF NOT EXISTS plans (
     plan_sponsor_name VARCHAR
 );
 
--- One row per data file referenced by an index.
+-- Which rate files each reporting structure (plan group) points to. Several structures may share one file;
+-- it is downloaded and parsed once, and its plans are the plans of every structure that lists it.
+CREATE TABLE IF NOT EXISTS structure_files (
+    snapshot_id     INTEGER NOT NULL,
+    structure_index INTEGER NOT NULL,
+    url             VARCHAR NOT NULL
+);
+
+-- One row per data file referenced by an index. structure_index is the first structure that lists it.
 CREATE TABLE IF NOT EXISTS source_files (
     file_id               INTEGER PRIMARY KEY,
     snapshot_id           INTEGER NOT NULL,

@@ -22,7 +22,7 @@ public sealed record ProductFileSummary(
     string? Error,
     string? Warning,
     DateOnly? FileLastUpdatedOn,
-    DateTime? HttpLastModified,
+    DateTimeOffset? HttpLastModified,
     long? ContentLength,
     string? Sha256,
     int PlanEntries,
@@ -33,7 +33,7 @@ public sealed record ProductFileSummary(
     long? DuplicatesRemoved,
     int? DistinctNpis,
     int? DistinctEins,
-    DateTime? LoadedAt);
+    DateTimeOffset? LoadedAt);
 
 public sealed record SnapshotPlans(int SnapshotId, IReadOnlyList<ProductPlans> Products);
 

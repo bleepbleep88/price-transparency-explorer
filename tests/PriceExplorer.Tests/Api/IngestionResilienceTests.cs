@@ -76,6 +76,33 @@ public sealed class IngestionResilienceTests
         }
     }
 
+    [Fact(Timeout = 60_000)]
+    public async Task Plan_groups_that_share_one_rate_file_all_keep_their_plans()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var index = $$"""
+            { "reporting_entity_name": "Test Payer", "reporting_entity_type": "health insurance issuer", "version": "2.0.0",
+              "last_updated_on": "2026-09-01", "reporting_structure": [
+                { "reporting_plans": [ { "plan_name": "SILVER PLAN A", "plan_id_type": "HIOS", "plan_id": "11111NY0010001", "plan_market_type": "individual" } ],
+                  "in_network_files": [ { "description": "in-network file", "location": "{{FixtureHttpHandler.AmbetterUrl}}" } ] },
+                { "reporting_plans": [ { "plan_name": "GOLD PLAN B", "plan_id_type": "HIOS", "plan_id": "22222NY0020002", "plan_market_type": "individual" } ],
+                  "in_network_files": [ { "description": "in-network file", "location": "{{FixtureHttpHandler.AmbetterUrl}}" } ] } ] }
+            """;
+        await using var factory = ExplorerApiFactory.With(http => http.ServeJson(FixtureHttpHandler.IndexUrl, index));
+        using var client = factory.CreateClient();
+        await factory.WaitForIngestionAsync(ct);
+
+        var snapshot = (await client.GetFromJsonAsync<JsonElement>("/api/v1/snapshots", ct)).EnumerateArray().Single();
+        var plans = await client.GetFromJsonAsync<JsonElement>("/api/v1/snapshots/1/plans", ct);
+
+        var file = snapshot.GetProperty("products").EnumerateArray().Should().ContainSingle("the shared file is loaded once").Subject;
+        file.GetProperty("planEntries").GetInt32().Should().Be(2);
+        file.GetProperty("distinctPlanIds").GetInt32().Should().Be(2);
+        plans.GetProperty("products").EnumerateArray().Single().GetProperty("plans").EnumerateArray()
+            .Select(plan => plan.GetProperty("planId").GetString()).Should().BeEquivalentTo(["11111NY0010001", "22222NY0020002"]);
+        factory.Http.Requests.Count(r => r.Url == FixtureHttpHandler.AmbetterUrl).Should().Be(1);
+    }
+
     private static async Task<DateTime?> AmbetterLoadedAtAsync(HttpClient client, CancellationToken ct)
     {
         var snapshot = (await client.GetFromJsonAsync<JsonElement>("/api/v1/snapshots", ct)).EnumerateArray().Single();

@@ -51,30 +51,54 @@ internal sealed class IngestionCoordinator(
         foreach (var index in indexes)
         {
             // Each snapshot is isolated: a failure here is reported and the next snapshot still loads.
+            int? snapshotId = null;
+            string? snapshotError = "Loading stopped before every file was read; it continues on the next start.";
             try
             {
-                var snapshotId = await writer.UpsertSnapshotAsync(index.IndexUrl, index.Header, cancellationToken);
-                await writer.ReplacePlansAsync(snapshotId, index.Plans, cancellationToken);
+                snapshotId = await writer.UpsertSnapshotAsync(index.IndexUrl, index.Header, cancellationToken);
+                await writer.ReplacePlansAsync(snapshotId.Value, index.Plans, index.StructureFiles, cancellationToken);
 
                 foreach (var file in index.InNetworkFiles)
                 {
-                    var available = await LoadFileAsync(snapshotId, index, file, cancellationToken);
+                    var available = await LoadFileAsync(snapshotId.Value, index, file, cancellationToken);
                     status.Update(s => s with { FilesDone = s.FilesDone + 1, DataAvailable = s.DataAvailable || available });
                 }
 
-                var snapshotStatus = await writer.CompleteSnapshotAsync(snapshotId, null, cancellationToken);
-                logger.LogInformation("Ingestion: snapshot {IndexDate} is {Status}", index.Header.IndexDate, snapshotStatus);
+                snapshotError = null;
             }
             catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
                 logger.LogError(ex, "Ingestion: snapshot {IndexUrl} failed", index.IndexUrl);
                 status.AddIssue("error", $"Snapshot {ShortName(index.IndexUrl)} couldn't be saved: {ex.Message}", index.IndexUrl);
+                snapshotError = ex.Message;
+            }
+            finally
+            {
+                // Always settle the snapshot (ready, partial or failed) so it never stays "loading" after a stop or an error.
+                if (snapshotId is { } id)
+                {
+                    await CompleteSnapshotAsync(id, index, snapshotError);
+                }
             }
         }
 
         status.Update(s => s.DataAvailable
             ? s with { Phase = IngestionPhase.Ready, Message = "Data is ready.", CurrentFile = null, CurrentFileProgress = null }
             : s with { Phase = IngestionPhase.Failed, Message = "No rate data could be loaded. See the issues listed below.", CurrentFile = null, CurrentFileProgress = null });
+    }
+
+    private async Task CompleteSnapshotAsync(int snapshotId, TableOfContents index, string? error)
+    {
+        try
+        {
+            // Not cancellable: this runs during shutdown too, and it's one small UPDATE.
+            var snapshotStatus = await writer.CompleteSnapshotAsync(snapshotId, error, CancellationToken.None);
+            logger.LogInformation("Ingestion: snapshot {IndexDate} is {Status}", index.Header.IndexDate, snapshotStatus);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Ingestion: couldn't record the status of snapshot {IndexUrl}", index.IndexUrl);
+        }
     }
 
     /// <returns>True when this file has queryable data afterwards (fresh, unchanged, partial, or from an earlier run).</returns>

@@ -13,7 +13,6 @@ public sealed class DataPaths
         Root = Path.GetFullPath(Path.Combine(environment.ContentRootPath, options.Value.DataDirectory));
         Downloads = Path.Combine(Root, "downloads");
         Database = Path.Combine(Root, "explorer.duckdb");
-        Directory.CreateDirectory(Downloads);
     }
 
     public string Root { get; }
@@ -21,6 +20,9 @@ public sealed class DataPaths
     public string Downloads { get; }
 
     public string Database { get; }
+
+    /// <summary>Creates the data and download folders. Called at startup, where a failure is reported instead of crashing.</summary>
+    public void EnsureCreated() => Directory.CreateDirectory(Downloads);
 
     /// <summary>Cache file for a URL: a short hash (so equal file names from different paths never collide) plus the original name.</summary>
     public string CachePathFor(string url)

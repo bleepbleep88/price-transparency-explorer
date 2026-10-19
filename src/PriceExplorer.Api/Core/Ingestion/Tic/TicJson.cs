@@ -28,7 +28,7 @@ internal static class TicJson
     };
 
     /// <summary>Options whose two big arrays stream element by element into the given callbacks.</summary>
-    public static JsonSerializerOptions CreateStreamingInNetworkOptions(Action<ProviderReference> onReference, Action<InNetworkItem> onItem)
+    public static JsonSerializerOptions CreateStreamingInNetworkOptions(Action<ProviderReference?> onReference, Action<InNetworkItem?> onItem)
     {
         var resolver = new DefaultJsonTypeInfoResolver();
         resolver.Modifiers.Add(info =>

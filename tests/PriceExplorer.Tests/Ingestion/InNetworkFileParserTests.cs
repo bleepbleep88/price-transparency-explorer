@@ -133,6 +133,54 @@ public sealed class InNetworkFileParserTests : IDisposable
     }
 
     [Fact]
+    public async Task A_bare_null_inside_any_array_is_counted_and_the_rest_of_the_file_is_kept()
+    {
+        const string referenceWithNullGroup = """
+            { "provider_group_id": 3, "network_name": [], "provider_groups": [ null,
+              { "npi": [1174873780], "tin": { "type": "ein", "value": "460857425", "business_name": "Yorkville Endoscopy" } } ] }
+            """;
+        const string itemWithNullRateBlock = """
+            { "negotiation_arrangement": "ffs", "name": "COLONOSCOPY AND BIOPSY", "billing_code_type": "CPT", "billing_code": "45380",
+              "negotiated_rates": [ null, { "provider_references": [3], "negotiated_prices": [
+                { "negotiated_type": "negotiated", "negotiated_rate": 400, "expiration_date": "9999-12-31",
+                  "service_code": ["24"], "billing_class": "professional" } ] } ] }
+            """;
+
+        var (builder, outcome) = await ParseAsync(File(
+            ["null", Minkowitz, referenceWithNullGroup],
+            [Item("CPT", "45378", "DIAGNOSTIC COLONOSCOPY", "[1]", "null", Price("300.00")), "null", itemWithNullRateBlock]));
+
+        outcome.IsComplete.Should().BeTrue();
+        builder.Rates.Select(r => r.Key.Rate).Should().BeEquivalentTo([300.00m, 400m]);
+        builder.Groups.Select(g => g.Ein).Should().BeEquivalentTo(["113471596", "460857425"]);
+        builder.Rejects.Should().ContainSingle(r => r.Reason == "null_element").Which.Count.Should().Be(4);
+        builder.Rejects.Should().ContainSingle(r => r.Reason == "null_price").Which.Count.Should().Be(1);
+
+        var stats = builder.GetStats();
+        stats.Items.Should().Be(3);
+        stats.PricesRaw.Should().Be(3);
+        stats.RejectedPrices.Should().Be(1);
+        stats.DuplicatesRemoved.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_gzip_file_that_turns_corrupt_keeps_the_items_before_the_damage()
+    {
+        var items = Enumerable.Range(0, 120)
+            .Select(i => Item("CPT", (10000 + i).ToString(System.Globalization.CultureInfo.InvariantCulture), "PROCEDURE", "[1]", Price("300.00")))
+            .ToList();
+        var json = Utf8(File([Minkowitz], items));
+        json.Length.Should().BeInRange(40_000, ushort.MaxValue, "the damaged block must come after a few read buffers");
+
+        var (builder, outcome) = await ParseAsync(File([Minkowitz], items), GzipThatBreaksAfterTheData);
+
+        outcome.IsComplete.Should().BeFalse();
+        outcome.Problem.Should().Contain("InvalidDataException");
+        builder.ItemsParsed.Should().BeInRange(1, items.Count - 1);
+        builder.Rates.Should().HaveCount(builder.ItemsParsed);
+    }
+
+    [Fact]
     public async Task Gzip_compressed_files_are_read_transparently()
     {
         var json = File([Minkowitz], [Item("CPT", "45378", "DIAGNOSTIC COLONOSCOPY", "[1]", Price("300.00"))]);
@@ -219,6 +267,22 @@ public sealed class InNetworkFileParserTests : IDisposable
         var builder = new InNetworkFileBuilder();
         var outcome = await InNetworkFileParser.ParseAsync(path, builder, null, TestContext.Current.CancellationToken);
         return (builder, outcome);
+    }
+
+    /// <summary>
+    /// A gzip file whose data is one uncompressed ("stored") deflate block followed by a block of the reserved type 11,
+    /// which every decoder rejects. Readers see good data first, then a decoder error.
+    /// </summary>
+    private static byte[] GzipThatBreaksAfterTheData(byte[] bytes)
+    {
+        var length = checked((ushort)bytes.Length);
+        return
+        [
+            0x1F, 0x8B, 0x08, 0x00, 0, 0, 0, 0, 0x00, 0xFF,
+            0x00, (byte)length, (byte)(length >> 8), (byte)~length, (byte)(~length >> 8),
+            .. bytes,
+            0x07,
+        ];
     }
 
     private static byte[] Gzip(byte[] bytes)

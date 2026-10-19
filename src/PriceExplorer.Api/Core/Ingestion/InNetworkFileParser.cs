@@ -32,6 +32,12 @@ internal static class InNetworkFileParser
             var where = ex.LineNumber is { } line ? $" (line {line + 1})" : "";
             return ParseOutcome.Partial($"Stopped reading after {builder.ItemsParsed:N0} items: {ex.Message}{where}");
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Anything else (a decoder error, an input shape nobody planned for) also keeps what was read so far.
+            builder.Complete(null);
+            return ParseOutcome.Partial($"Stopped reading after {builder.ItemsParsed:N0} items: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 }
 

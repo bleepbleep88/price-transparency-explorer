@@ -18,9 +18,11 @@ SELECT
     f.content_length        AS ContentLength,
     f.sha256                AS Sha256,
     (SELECT count(*) FROM plans p
-      WHERE p.snapshot_id = s.snapshot_id AND p.structure_index = f.structure_index)                    AS PlanEntries,
+      JOIN structure_files sf ON sf.snapshot_id = p.snapshot_id AND sf.structure_index = p.structure_index
+      WHERE sf.snapshot_id = s.snapshot_id AND sf.url = f.url)                                          AS PlanEntries,
     (SELECT count(DISTINCT p.plan_id) FROM plans p
-      WHERE p.snapshot_id = s.snapshot_id AND p.structure_index = f.structure_index)                    AS DistinctPlanIds,
+      JOIN structure_files sf ON sf.snapshot_id = p.snapshot_id AND sf.structure_index = p.structure_index
+      WHERE sf.snapshot_id = s.snapshot_id AND sf.url = f.url)                                          AS DistinctPlanIds,
     f.items                 AS Items,
     f.prices_raw            AS PricesPublished,
     f.rates_unique          AS UniqueRates,

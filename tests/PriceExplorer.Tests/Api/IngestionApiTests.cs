@@ -38,6 +38,8 @@ public sealed class IngestionApiTests(ExplorerApiFactory factory) : IClassFixtur
         ambetter.GetProperty("uniqueRates").GetInt32().Should().Be(23);
         ambetter.GetProperty("duplicatesRemoved").GetInt64().Should().Be(4);
         ambetter.GetProperty("sha256").GetString().Should().HaveLength(64);
+        ambetter.GetProperty("httpLastModified").GetString().Should().Be("2026-09-04T18:23:42+00:00", "times are UTC and say so");
+        ambetter.GetProperty("loadedAt").GetString().Should().EndWith("+00:00");
 
         products[1].GetProperty("uniqueRates").GetInt32().Should().Be(8);
     }
