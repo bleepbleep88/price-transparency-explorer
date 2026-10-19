@@ -1,18 +1,7 @@
-WITH loaded AS (
-    SELECT snapshot_id, index_date
-    FROM snapshots
-    WHERE status IN ('ready', 'partial')
-),
-latest AS (
-    SELECT snapshot_id
-    FROM loaded
-    ORDER BY index_date DESC NULLS LAST, snapshot_id DESC
-    LIMIT 1
-)
-SELECT
-    l.snapshot_id                                     AS SnapshotId,
-    l.index_date                                      AS IndexDate,
-    l.snapshot_id = (SELECT snapshot_id FROM latest)  AS IsLatest
-FROM loaded l
-WHERE ($snapshotId::INTEGER IS NULL AND l.snapshot_id = (SELECT snapshot_id FROM latest))
-   OR l.snapshot_id = $snapshotId::INTEGER
+-- A snapshot with saved rate data (at least one rate file loaded, fully or partly).
+SELECT s.snapshot_id AS SnapshotId, s.index_date AS IndexDate
+FROM snapshots s
+WHERE s.snapshot_id = $snapshotId
+  AND EXISTS (
+      SELECT 1 FROM source_files f
+      WHERE f.snapshot_id = s.snapshot_id AND f.kind = 'in_network' AND f.status IN ('loaded', 'partial'))

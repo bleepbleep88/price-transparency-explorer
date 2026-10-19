@@ -25,7 +25,7 @@ public sealed class GetRateSourceHandler(DuckDbConnectionFactory connections, Re
         return new RateSource(
             row.RateId,
             new RateSourceFile(row.FileId, row.ProductKey, row.ProductLabel, row.FileUrl, row.Sha256, row.FileLastUpdatedOn,
-                row.HttpLastModified, row.ContentLength, row.ReportingEntityName, row.SchemaVersion),
+                UtcTimestamps.From(row.HttpLastModified), row.ContentLength, row.ReportingEntityName, row.SchemaVersion),
             new RateSourceSnapshot(row.SnapshotId, row.IndexUrl, row.IndexDate, row.IndexLastUpdatedOn),
             $"$.in_network[{row.ItemIndex}].negotiated_rates[{row.RateIndex}].negotiated_prices[{row.PriceIndex}]",
             row.BillingCodeType,

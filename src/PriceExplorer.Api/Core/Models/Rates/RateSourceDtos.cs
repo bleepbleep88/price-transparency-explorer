@@ -38,7 +38,7 @@ public sealed record RateSourceFile(
     string Url,
     string? Sha256,
     DateOnly? LastUpdatedOn,
-    DateTime? HttpLastModified,
+    DateTimeOffset? HttpLastModified,
     long? ContentLength,
     string? ReportingEntityName,
     string? SchemaVersion);

@@ -35,4 +35,27 @@ public sealed class LoadingStateTests
         ready.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
         invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest, "bad input is reported even while data loads");
     }
+
+    [Fact(Timeout = 60_000)]
+    public async Task On_the_first_load_searches_answer_as_soon_as_the_first_file_is_saved()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = ExplorerApiFactory.With(http => http.Hold(FixtureHttpHandler.EssentialUrl));
+        using var client = factory.CreateClient();
+
+        await foreach (var status in factory.Status.WatchAsync(ct))
+        {
+            if (status.DataAvailable)
+            {
+                break;
+            }
+        }
+
+        using var response = await client.GetAsync("/api/v1/rates?code=45378", ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "readiness and search agree on when data is available");
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        result.GetProperty("snapshot").GetProperty("isLatest").GetBoolean().Should().BeTrue();
+        result.GetProperty("rows").GetProperty("total").GetInt32().Should().BePositive();
+    }
 }
