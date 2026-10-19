@@ -16,14 +16,20 @@ internal static class ApiExtensions
             .AddJsonOptions(options =>
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
 
+        // Results written outside MVC (server-sent events) use the HTTP JSON options; keep enums as strings there too.
+        services.ConfigureHttpJsonOptions(options =>
+            options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)));
+
         services.AddProblemDetails();
         services.AddExceptionHandler<ExplorerExceptionHandler>();
         services.AddOpenApi();
 
+        // Order matters: bad input is a 400 even while data is still loading.
         services.AddMediatR(cfg =>
         {
             cfg.RegisterServicesFromAssemblyContaining<Program>();
             cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+            cfg.AddOpenBehavior(typeof(RequireDataBehavior<,>));
         });
         services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
 
