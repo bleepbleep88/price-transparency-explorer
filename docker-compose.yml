@@ -1,0 +1,25 @@
+name: price-transparency-explorer
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/PriceExplorer.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+    volumes:
+      # Downloaded rate files + DuckDB database survive restarts; delete the volume to start fresh.
+      - explorer-data:/data
+    ports:
+      - "5080:8080"
+
+  web:
+    build:
+      context: ./web
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  explorer-data:

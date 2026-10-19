@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PriceExplorer.Api/PriceExplorer.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PriceExplorer.Tests/PriceExplorer.Tests.csproj" />
+  </Folder>
+</Solution>
