@@ -1,0 +1,12 @@
+.git
+.github
+.vs
+.idea
+.vscode
+.data
+**/bin
+**/obj
+**/TestResults
+web
+tests
+*.md
