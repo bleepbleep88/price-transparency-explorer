@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
-import { money } from '@/lib/format'
+import { money, wholeDollars } from '@/lib/format'
 import type { CodeInfo, RateGroup, RateSearchResult } from '../../api/types'
 import { parseRouteQuery } from '../../lib/searchParams'
 import LensPanel from '../LensPanel.vue'
@@ -104,20 +104,38 @@ describe('LensPanel', () => {
     expect(wrapper.emitted('update')).toEqual([[{ sort: '-rate', page: 1 }]])
   })
 
-  it('employers: typical cost and gap, and cases a year become a yearly figure', async () => {
+  it('employers: median and gap, and cases a year become a yearly figure for one named group', async () => {
     const wrapper = mountPanel(result([group()]), { lens: 'employers', cases: '1200' })
     expect(wrapper.get('[data-testid="cost-line"]').text()).toContain(money(578.31))
-    expect(wrapper.get('[data-testid="yearly-gap"]').text()).toContain(money(123.86 * 1200))
-    expect(wrapper.text()).toContain("Negotiated rates aren't what members pay")
+    const yearly = wrapper.get('[data-testid="yearly-gap"]').text()
+    expect(yearly).toContain(`≈ ${wholeDollars(123.86 * 1200)} a year for Ambetter from Fidelis Care · Facility fee · Ambulatory surgery center`)
+    expect(yearly).toContain('the gap per case × your 1,200 cases, if they went to providers at the lower quartile instead of the median')
+    expect(wrapper.text()).toContain('These are individual-market plans (Ambetter, Essential Plan), not employer plans')
+    expect(wrapper.text()).not.toContain('≈ A year')
 
-    // A bigger fee-schedule group with no gap doesn't make the sentence say "$0.00 a year".
+    // A bigger fee-schedule group with no gap doesn't make the sentence say "$0 a year".
     const feeSchedule = group({ key: 'fee-schedule', providerCount: 51, lowerQuartileGap: 0 })
     const mixed = mountPanel(result([feeSchedule, group()]), { lens: 'employers', cases: '1200' })
-    expect(mixed.get('[data-testid="yearly-gap"]').text()).toContain(money(123.86 * 1200))
+    expect(mixed.get('[data-testid="yearly-gap"]').text()).toContain(wholeDollars(123.86 * 1200))
 
     await wrapper.get('[data-testid="cases-input"] input').setValue('300')
     const events = wrapper.emitted('cases') ?? []
     expect(events[events.length - 1]).toEqual([300])
+  })
+
+  it('employers: the picked group leads the yearly sentence', () => {
+    const essential = group({ key: 'essential-asc', productLabel: 'Essential Plan', providerCount: 27, lowerQuartileGap: 48 })
+    const wrapper = mountPanel(result([group(), essential]), { lens: 'employers', cases: '12', group: 'essential-asc' })
+    expect(wrapper.get('[data-testid="yearly-gap"]').text()).toContain(`≈ ${wholeDollars(576)} a year for Essential Plan`)
+  })
+
+  it('employers: per-unit prices say so and get no yearly figure', () => {
+    const anesthesia = group({ key: 'anesthesia', perUnit: true, unit: 'per anesthesia unit', providerCount: 13, lowerQuartileGap: 0.04 })
+    const wrapper = mountPanel(result([anesthesia]), { lens: 'employers', cases: '100' })
+    expect(wrapper.get('[data-testid="cost-line"]').text()).toContain(`${money(578.31)} per unit`)
+    expect(wrapper.get('[data-testid="per-unit-note"]').text()).toBe('Priced per unit; a case can use several units.')
+    expect(wrapper.find('[data-testid="cases-input"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="yearly-gap"]').exists()).toBe(false)
   })
 
   it('innovators: the clean-up numbers, the exact API request, and the API reference', () => {

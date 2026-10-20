@@ -15,7 +15,7 @@ test('a Start here card runs its search with the lens, and the lens explains the
   // Cases a year turn the per-case gap into a yearly figure, without a new search.
   await page.getByTestId('cases-input').locator('input').fill('1200')
   await expect(page).toHaveURL(/[?&]cases=1200(&|$)/)
-  await expect(panel.getByTestId('yearly-gap')).toContainText(/≈ \$[\d,]+\.\d{2} a year if those 1,200 cases went to/)
+  await expect(panel.getByTestId('yearly-gap')).toContainText(/≈ \$[\d,]+ a year for .+: the gap per case × your 1,200 cases/)
 
   // The lens survives a new search.
   await page.getByRole('combobox', { name: 'Billing code' }).fill('66984')

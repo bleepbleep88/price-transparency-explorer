@@ -182,9 +182,10 @@ export interface CostLine {
   group: string
   providers: number
   median: number
-  /** Gap to the lower quartile per case (full statistics only). */
+  /** Gap to the lower quartile (full statistics only): per case, or per unit when perUnit. */
   gap: number | null
-  /** gap × cases a year, when both are known. */
+  perUnit: boolean
+  /** gap × cases a year. Never for per-unit prices: a case can use several units. */
   yearly: number | null
 }
 
@@ -197,14 +198,27 @@ export function costLines(result: RateSearchResult, cases?: number | null): Cost
       providers: group.providerCount,
       median: group.stats.median!,
       gap: group.lowerQuartileGap,
-      yearly: group.lowerQuartileGap != null && cases ? group.lowerQuartileGap * cases : null,
+      perUnit: group.perUnit,
+      yearly: !group.perUnit && group.lowerQuartileGap != null && cases ? group.lowerQuartileGap * cases : null,
     }))
     .sort((a, b) => b.providers - a.providers)
 }
 
+/**
+ * The group the yearly sentence speaks for: the one the reader picked ("Show these providers") when it has a gap,
+ * else the largest group with a gap above zero. A zero gap has nothing to multiply.
+ */
+export function yearlyLead(lines: CostLine[], pickedGroup?: string | null): CostLine | null {
+  const hasYearly = (line: CostLine) => line.yearly != null && line.gap != null && line.gap > 0
+  const picked = pickedGroup ? lines.find((line) => line.groupKey === pickedGroup) : undefined
+  if (picked && hasYearly(picked)) return picked
+  return lines.find(hasYearly) ?? null
+}
+
 export const EMPLOYER_CAVEATS: readonly string[] = [
-  "Negotiated rates aren't what members pay: deductibles and coinsurance decide that.",
-  'The files have no claim volumes, so the case count is yours.',
+  "These are individual-market plans (Ambetter, Essential Plan), not employer plans; an employer's own rates can differ.",
+  "A negotiated rate isn't what a member pays; the plan's cost sharing decides that.",
+  'The files have no claim counts, so the case count is yours.',
   'Facility and professional fees are separate bills for the same visit.',
 ]
 

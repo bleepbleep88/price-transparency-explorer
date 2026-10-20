@@ -16,6 +16,7 @@ import {
   unitPriceLines,
   unitPriceText,
   widestSpread,
+  yearlyLead,
   yourRateLines,
 } from '../lenses'
 import { LENSES, parseRouteQuery } from '../searchParams'
@@ -179,6 +180,23 @@ describe('employers lens', () => {
     const [first, second] = costLines(makeResult([asc, essentialBasic]), 1200)
     expect(first!.yearly).toBeCloseTo(123.86 * 1200)
     expect(second!.yearly).toBeNull()
+  })
+
+  it('never multiplies a per-unit price by cases: a case can use several units', () => {
+    const contrast = { ...asc, key: 'contrast', perUnit: true, lowerQuartileGap: 0.04 }
+    const [line] = costLines(makeResult([contrast]), 100)
+    expect(line).toMatchObject({ perUnit: true, gap: 0.04, yearly: null })
+  })
+
+  it('speaks for the picked group when it has a gap, else the largest group with one', () => {
+    const essential = { ...asc, key: 'essential-asc', providerCount: 27, lowerQuartileGap: 48 }
+    const feeSchedule = { ...asc, key: 'fee-schedule', providerCount: 51, lowerQuartileGap: 0 }
+    const lines = costLines(makeResult([feeSchedule, asc, essential]), 12)
+    expect(yearlyLead(lines)?.groupKey).toBe('asc')
+    expect(yearlyLead(lines, 'essential-asc')?.groupKey).toBe('essential-asc')
+    // A picked group without a gap falls back to the largest one that has one.
+    expect(yearlyLead(lines, 'fee-schedule')?.groupKey).toBe('asc')
+    expect(yearlyLead(costLines(makeResult([feeSchedule]), 12))).toBeNull()
   })
 })
 

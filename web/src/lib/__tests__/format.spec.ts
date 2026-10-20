@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { megabytes, money, ordinal, plural, shortDate, times, wholeNumber } from '../format'
+import { megabytes, money, ordinal, plural, shortDate, times, wholeDollars, wholeNumber } from '../format'
 
 describe('format', () => {
   it('formats money with cents and a dash for missing values', () => {
@@ -37,5 +37,13 @@ describe('format', () => {
 
   it('shows file sizes in megabytes', () => {
     expect(megabytes(89_359_830)).toBe('85 MB')
+  })
+})
+
+describe('wholeDollars', () => {
+  it('rounds estimates to whole dollars', () => {
+    expect(wholeDollars(148632.0)).toBe('$148,632')
+    expect(wholeDollars(57599.6)).toBe('$57,600')
+    expect(wholeDollars(null)).toBe('—')
   })
 })

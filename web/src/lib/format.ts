@@ -1,11 +1,17 @@
 // Display formatting. All amounts are US dollars; dates in the data are calendar dates (no time zone).
 
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const usdWhole = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 const whole = new Intl.NumberFormat('en-US')
 const calendar = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 
 export function money(value: number | null | undefined): string {
   return value == null || Number.isNaN(value) ? '—' : usd.format(value)
+}
+
+/** Estimates (like a yearly figure) in whole dollars: cents would claim precision they don't have. */
+export function wholeDollars(value: number | null | undefined): string {
+  return value == null || Number.isNaN(value) ? '—' : usdWhole.format(value)
 }
 
 export function wholeNumber(value: number | null | undefined): string {
