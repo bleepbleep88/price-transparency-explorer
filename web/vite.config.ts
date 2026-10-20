@@ -19,8 +19,12 @@ export default defineConfig({
   server: {
     port: 5173,
     // Same-origin in dev: the .NET API runs on :5080 (see src/PriceExplorer.Api/Properties/launchSettings.json).
-    proxy: {
-      '/api': { target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:5080', changeOrigin: true },
-    },
+    // The API also serves its reference (OpenAPI document and Scalar UI); nginx forwards the same paths in the container.
+    proxy: Object.fromEntries(
+      ['/api', '/openapi', '/scalar'].map((path) => [
+        path,
+        { target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:5080', changeOrigin: true },
+      ]),
+    ),
   },
 })
