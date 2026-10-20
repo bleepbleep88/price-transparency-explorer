@@ -13,6 +13,9 @@ const routes = [
   '/?code=J0585&lens=life-sciences',
   // Has the out-of-network panel too.
   '/?code=97530',
+  // Specialty and location filters: who-lines, the lens note and the card headings.
+  '/?code=45378&county=Manhattan&lens=providers',
+  '/?code=45378&specialty=gastro&lens=employers',
 ]
 
 test('the home page uses no statistics words', async ({ page }) => {

@@ -197,12 +197,12 @@ describe('GroupCard', () => {
     const group = makeGroup({
       highlights: [{ providerKey: 'a', displayName: 'Carnegie Hill Endoscopy', rate: 367.1, percentile: 8, vsMedian: 0.63, aboveP25: -87.35, rateLow: 367.1, rateHigh: 367.1 }],
     })
-    const yours = mountCard(group, false, 'Where your provider sits', true)
+    const yours = mountCard(group, false, 'How your provider compares', true)
     expect(yours.get('[data-testid="group-highlights"]').classes()).toContain('yours-rule')
     expect(yours.get('[data-testid="your-rate"]').classes()).toContain('copper-mark')
     expect(yours.find('.range-bar__marker').exists()).toBe(true)
 
-    const matches = mountCard(group, false, 'Where providers in Manhattan sit', false)
+    const matches = mountCard(group, false, 'How providers in Manhattan compare', false)
     expect(matches.get('[data-testid="group-highlights"]').classes()).toContain('match-rule')
     expect(matches.find('.copper-mark').exists()).toBe(false)
     expect(matches.find('.yours-rule').exists()).toBe(false)

@@ -140,7 +140,7 @@ describe('LensPanel', () => {
     expect(wrapper.get('[data-testid="highlight-cap"]').text()).toBe('Showing 5 of 12 matching providers; the table lists them all.')
   })
 
-  it('providers: a location or specialty search names the filters and says the percentiles stay market-wide', () => {
+  it('providers: a location or specialty search names the filters and says typical prices count everyone', () => {
     const highlights = [{ providerKey: 'k', displayName: 'Yorkville Endoscopy, LLC', rate: 371.78, percentile: 10, vsMedian: 0.64, aboveP25: -82.67, rateLow: 371.78, rateHigh: 371.78 }]
     const filters = { specialty: 'ambulatory', county: 'Manhattan' }
     const wrapper = mountPanel(result([group({ matchedProviders: 1, highlights })], { ...filters, countyPlace: 'Manhattan' }), {
@@ -149,7 +149,7 @@ describe('LensPanel', () => {
     })
 
     expect(wrapper.get('[data-testid="lens-filtered"]').text()).toBe('Providers with a specialty matching "ambulatory" in Manhattan:')
-    expect(wrapper.get('[data-testid="your-rate-line"]').text()).toContain('Rate $371.78 is at the 10th percentile')
+    expect(wrapper.get('[data-testid="your-rate-line"]').text()).toContain('Price $371.78: lower than most')
     expect(wrapper.get('[data-testid="your-rate-line"]').classes()).toContain('match-rule')
     expect(wrapper.find('.yours-rule').exists()).toBe(false)
     expect(wrapper.get('[data-testid="lens-market-wide"]').text()).toBe(
@@ -162,7 +162,7 @@ describe('LensPanel', () => {
       county: 'Manhattan',
     })
     expect(pinned.find('[data-testid="lens-filtered"]').exists()).toBe(false)
-    expect(pinned.get('[data-testid="your-rate-line"]').text()).toContain('Your rate $371.78')
+    expect(pinned.get('[data-testid="your-rate-line"]').text()).toContain('Your price $371.78')
     expect(pinned.get('[data-testid="your-rate-line"]').classes()).toContain('yours-rule')
     expect(pinned.find('[data-testid="lens-market-wide"]').exists()).toBe(true)
   })

@@ -181,20 +181,20 @@ describe('providers lens', () => {
   })
 
   it('names the specialty and location as the API does, and says "your" only for an NPI or EIN', () => {
-    expect(highlightHeading(byDirectory([office], { county: 'Brooklyn' }))).toBe('Where providers in Brooklyn sit')
+    expect(highlightHeading(byDirectory([office], { county: 'Brooklyn' }))).toBe('How providers in Brooklyn compare')
     expect(highlightHeading(byDirectory([office], { specialty: 'podiatr', county: 'Brooklyn' }))).toBe(
-      'Where providers with a specialty matching "podiatr" in Brooklyn sit',
+      'How providers with a specialty matching "podiatr" in Brooklyn compare',
     )
     // The place as matched ("Delaware" is Delaware County, not the state); text that matched no place stays quoted.
     expect(highlightHeading(byDirectory([office], { county: 'Delaware', countyPlace: 'Delaware County' }))).toBe(
-      'Where providers in Delaware County sit',
+      'How providers in Delaware County compare',
     )
-    expect(highlightHeading(byDirectory([office], { county: 'Manhatan', countyPlace: null }))).toBe('Where providers in "Manhatan" sit')
-    expect(highlightHeading(byDirectory([office], { npi: '1801474036', county: 'Brooklyn' }))).toBe('Where your provider sits')
+    expect(highlightHeading(byDirectory([office], { county: 'Manhatan', countyPlace: null }))).toBe('How providers in "Manhatan" compare')
+    expect(highlightHeading(byDirectory([office], { npi: '1801474036', county: 'Brooklyn' }))).toBe('How your provider compares')
     expect(filteredProviders({ ...makeResult([]).query, provider: 'heel', specialty: 'podiatr' })).toBe(
       'providers whose name contains "heel" with a specialty matching "podiatr"',
     )
-    expect(yourRateLines(byDirectory([office], { county: 'Brooklyn' }))[0]!.text).toMatch(/^Rate \$80\.72/)
+    expect(yourRateLines(byDirectory([office], { county: 'Brooklyn' }))[0]!.text).toMatch(/^Price \$80\.72/)
   })
 
   it('marks only a provider searched by NPI, EIN or name as yours', () => {

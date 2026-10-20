@@ -132,7 +132,7 @@ export function hasProviderFilter(result: RateSearchResult): boolean {
   return Boolean(query.npi || query.ein || query.provider || query.specialty || query.county)
 }
 
-/** A specialty or location filter: it picks the rows, while percentiles still compare with every provider. */
+/** A specialty or location filter: it picks the rows, while typical prices still count every provider. */
 export function hasDirectoryFilter(result: RateSearchResult): boolean {
   return Boolean(result.query.specialty || result.query.county)
 }
