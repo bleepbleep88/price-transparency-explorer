@@ -40,3 +40,21 @@ test('a drug dose becomes whole units and a cost, kept in the URL', async ({ pag
   await expect(page).toHaveURL(/[?&]dose=45(&|$)/)
   await expect(calculator.getByTestId('dose-notes')).toContainText('modifier JW')
 })
+
+test("the ladder follows the search's plan, setting and fee type", async ({ page }) => {
+  await page.goto('/?code=99214&feeType=facility')
+  await expect(page.getByTestId('level-ladder').getByTestId('level-line')).toContainText('Facility fee')
+
+  await page.goto('/?code=99214&product=ambetter-from-fidelis-care')
+  await expect(page.getByTestId('level-ladder').getByTestId('level-line')).toContainText('Ambetter from Fidelis Care')
+})
+
+test('a drug priced only for discarded amounts gets no dose cost, and says why', async ({ page }) => {
+  await page.goto('/?code=J0585&dose=100')
+
+  const calculator = page.getByTestId('dose-calculator')
+  await expect(calculator.getByTestId('dose-reason')).toHaveText(
+    "This plan lists a price with 5 or more providers only for discarded drug (modifier JW), so we can't price a dose.",
+  )
+  await expect(calculator.getByTestId('dose-math')).toHaveCount(0)
+})

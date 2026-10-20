@@ -19,6 +19,7 @@ const routes = [
   // The level ladder and the dose calculator.
   '/?code=99214',
   '/?code=J3301&dose=45&lens=life-sciences',
+  '/?code=J0585&dose=100',
 ]
 
 test('the home page uses no statistics words', async ({ page }) => {

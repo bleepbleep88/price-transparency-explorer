@@ -40,6 +40,8 @@ const code: CodeInfo = {
   description: null,
   descriptionSource: 'payer_file',
   category: { key: 'surgery', label: 'Surgery & procedures', unit: 'per procedure', perUnit: false },
+  classification: { key: 'PG004', category: 'Procedures', subcategory: 'Digestive/Gastrointestinal', family: 'Lower GI Endoscopy - Other', source: 'cms_rbcs' },
+  doseUnit: null,
   levelFamily: null,
   foundVia: [],
 }
