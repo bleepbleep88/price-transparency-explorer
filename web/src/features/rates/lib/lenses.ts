@@ -114,7 +114,7 @@ export function modifierText(modifiers: readonly ModifierRef[]): string {
 }
 
 /** "Ambetter from Fidelis Care · Facility fee · Ambulatory surgery center · Technical component (modifier TC)" */
-export function groupName(group: RateGroup): string {
+export function groupName(group: Pick<RateGroup, 'productLabel' | 'feeTypeLabel' | 'settingLabel' | 'modifiers'>): string {
   const modifiers = group.modifiers.length ? ` · ${modifierText(group.modifiers)}` : ''
   return `${group.productLabel} · ${feeLabel(group.feeType)} · ${group.settingLabel}${modifiers}`
 }
