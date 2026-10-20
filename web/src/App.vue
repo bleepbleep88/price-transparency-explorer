@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ALWAYS_TRUE } from '@/lib/plainNumbers'
-import { mdiAccountSearchOutline, mdiChartBar, mdiCompareHorizontal, mdiDatabaseOutline, mdiMagnify, mdiMenu, mdiThemeLightDark } from '@mdi/js'
+import { mdiAccountSearchOutline, mdiChartBar, mdiCompareHorizontal, mdiDatabaseOutline, mdiHistory, mdiMagnify, mdiMenu, mdiThemeLightDark } from '@mdi/js'
 import { useRoute } from 'vue-router'
 import { useTheme } from 'vuetify'
 import DataStatusChip from '@/features/status/components/DataStatusChip.vue'
@@ -20,6 +20,7 @@ useDataStatus()
 const { carried } = useSnapshotChoice()
 const navItems = computed(() => [
   { title: 'Search', to: { name: 'search', query: carried.value }, icon: mdiMagnify, names: ['search'] },
+  { title: 'Changes', to: { name: 'changes', query: carried.value }, icon: mdiHistory, names: ['changes'] },
   { title: 'Price differences', to: { name: 'gaps', query: carried.value }, icon: mdiChartBar, names: ['gaps'] },
   { title: 'Plan comparison', to: { name: 'compare', query: carried.value }, icon: mdiCompareHorizontal, names: ['compare'] },
   { title: 'Provider scorecards', to: { name: 'providers', query: carried.value }, icon: mdiAccountSearchOutline, names: ['providers', 'scorecard'] },
