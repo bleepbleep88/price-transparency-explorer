@@ -262,8 +262,7 @@ public sealed class RateSearchAssemblerTests
 
         var notes = Assemble(facts).Groups.Single().Notes;
 
-        notes.Should().Contain("The 6 providers are split evenly between $10.00 and $12.00 (3 each): most likely two standard fee " +
-            "schedules rather than individually negotiated rates.");
+        notes.Should().Contain("The 6 providers are split evenly: 3 get exactly $10.00 and 3 get exactly $12.00.");
     }
 
     [Fact]
@@ -332,7 +331,7 @@ public sealed class RateSearchAssemblerTests
     {
         var facts = Enumerable.Range(1, 6).Select(i => Fact(provider: $"40000000{i}", rate: i <= 4 ? 167.09m : 200m)).ToList();
 
-        Assemble(facts).Groups.Single().Notes.Should().Contain(note => note.StartsWith("4 of 6 providers are paid exactly $167.09"));
+        Assemble(facts).Groups.Single().Notes.Should().Contain(note => note.StartsWith("4 of 6 providers get exactly the same price: $167.09"));
     }
 
     [Fact]

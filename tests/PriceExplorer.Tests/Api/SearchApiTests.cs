@@ -49,7 +49,7 @@ public sealed class SearchApiTests(ExplorerApiFactory factory) : IClassFixture<E
             && g.GetProperty("feeType").GetString() == "professional" && g.GetProperty("settingKey").GetString() == "asc");
         essentialAsc.GetProperty("statsLevel").GetString().Should().Be("full");
         essentialAsc.GetProperty("notes").EnumerateArray().Select(n => n.GetString())
-            .Should().Contain(n => n!.Contains("paid exactly $167.09"));
+            .Should().Contain(n => n!.Contains("get exactly the same price: $167.09"));
     }
 
     [Fact(Timeout = 60_000)]

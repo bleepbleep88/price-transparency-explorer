@@ -331,11 +331,9 @@ internal static class RateSearchAssembler
                 // Two amounts can each hold exactly half: name both.
                 var modes = counts.Where(amount => amount.Count == top).Select(amount => amount.Amount).Order().ToList();
                 notes.Add(modes.Count == 1
-                    ? $"{top} of {values.Count} providers are paid exactly {RateSearchFormat.Money(modes[0])}: " +
-                      "most likely a standard fee schedule rather than individually negotiated rates."
-                    : $"The {values.Count} providers are split evenly between {RateSearchFormat.Money(modes[0])} and " +
-                      $"{RateSearchFormat.Money(modes[1])} ({top} each): most likely two standard fee schedules rather than " +
-                      "individually negotiated rates.");
+                    ? $"{top} of {values.Count} providers get exactly the same price: {RateSearchFormat.Money(modes[0])}."
+                    : $"The {values.Count} providers are split evenly: {top} get exactly {RateSearchFormat.Money(modes[0])} " +
+                      $"and {top} get exactly {RateSearchFormat.Money(modes[1])}.");
             }
         }
 

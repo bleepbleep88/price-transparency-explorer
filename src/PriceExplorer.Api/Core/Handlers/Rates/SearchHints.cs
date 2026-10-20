@@ -55,7 +55,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             if (search.Group is { } group && assembled.Groups.All(shown => shown.Key != group))
             {
                 hints.Add(Hint("group_not_in_results", "info",
-                    $"The comparison group you picked has no rates {(search.ProviderFilterActive ? $"for {FilterLabel()} " : "")}" +
+                    $"The group you picked has no prices {(search.ProviderFilterActive ? $"for {FilterLabel()} " : "")}" +
                     $"under these filters. {Plural(assembled.Groups.Count, "other group")} {(assembled.Groups.Count == 1 ? "does" : "do")}.",
                     [Link("Show all groups", ("group", null))]));
             }
