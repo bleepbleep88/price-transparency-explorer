@@ -63,12 +63,20 @@ public sealed class FixtureHttpHandler : HttpMessageHandler
     /// <summary>Requests to this URL hang until the test ends, so the app stays in its "still loading" state.</summary>
     public void Hold(string url) => _held[url] = true;
 
+    /// <summary>Completes when the app first requests this URL, so a test can act at that point without polling.</summary>
+    public Task WhenRequested(string url) => Requested(url).Task;
+
     private readonly ConcurrentDictionary<string, bool> _held = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, TaskCompletionSource> _requested = new(StringComparer.OrdinalIgnoreCase);
+
+    private TaskCompletionSource Requested(string url) =>
+        _requested.GetOrAdd(url, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var url = request.RequestUri!.ToString();
         Requests.Enqueue((url, request.Headers.IfNoneMatch.Count > 0));
+        Requested(url).TrySetResult();
 
         if (_held.ContainsKey(url))
         {
