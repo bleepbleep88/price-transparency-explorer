@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupLine, pairWords, paysWords, position, rangeWords, shownDifference, unitSuffix } from '../plainWords'
+import { groupLine, pairWords, paysWords, position, rangeWords, unitSuffix } from '../plainWords'
 
 // Decision 89 on the insights pages: no statistics jargon, "about the same" within 5%, "times" only from twice, and the
 // position and the dollars on one row never contradict each other.
@@ -21,12 +21,18 @@ describe('position', () => {
   })
 
   it('says the share the lists are ranked by next to the dollars', () => {
-    expect(position('low', 31.81, 251.81)).toEqual({ label: 'Lower than most', difference: '$220 less than typical (about 87% less)' })
+    // $31.81 against a typical price shown as $252: $220.19 less, to the cent, as the shared helper writes differences.
+    expect(position('low', 31.81, 251.81)).toEqual({ label: 'Lower than most', difference: '$220.19 less than typical (about 87% less)' })
   })
 
   it('takes the dollars between the rate as shown and the typical price as shown', () => {
     // $1,404.32 against a typical $1,325 (1,324.60 unrounded) reads $79.32 more, not $79.72.
     expect(position('high', 1404.32, 1324.6).difference).toBe('$79.32 more than typical (about 6% more)')
+  })
+
+  it('leaves the label alone when rounding the typical price leaves the difference the wrong way', () => {
+    // $100.40 against a typical $100.45, which shows as $100.
+    expect(position('low', 100.4, 100.45)).toEqual({ label: 'Lower than most', difference: null })
   })
 
   it('puts the unit after the dollars, and says nothing without a typical price', () => {
@@ -42,6 +48,7 @@ describe('what one plan pays against the other', () => {
     expect(pairWords({ same: false, productValue: 395.22, versusValue: 393.81, ratio: 1 })).toBe('almost the same ($1.41 more)')
     expect(pairWords({ same: false, productValue: 90, versusValue: 100, ratio: 0.9 })).toBe('about 10% less')
     expect(pairWords({ same: false, productValue: 2665.574, versusValue: 2677.576, ratio: 1 })).toBe('almost the same ($12.01 less)')
+    expect(pairWords({ same: false, productValue: 603.821, versusValue: 603.824, ratio: 1 })).toBe('almost the same')
   })
 
   it('reads a rounded summary point as "about the same" and a big one in times', () => {
@@ -65,18 +72,6 @@ describe('rangeWords', () => {
 
   it('puts the unit after the dollars', () => {
     expect(rangeWords(0.1, 0.18, ' per unit')).toBe('the high end is $0.08 per unit more than the low end')
-  })
-})
-
-describe('shownDifference', () => {
-  it('subtracts the figures as shown, so a row adds up', () => {
-    expect(shownDifference(1414.6, 1293.4)).toBe(122)
-    expect(shownDifference(74.554, 51.451)).toBeCloseTo(23.1)
-    expect(shownDifference(1404.324, 1324.6, (v) => Math.round(v * 100) / 100)).toBeCloseTo(79.32)
-  })
-
-  it('falls back to the exact gap when rounding hides it', () => {
-    expect(shownDifference(100.4, 100.2)).toBeCloseTo(0.2)
   })
 })
 

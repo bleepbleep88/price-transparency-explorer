@@ -5,7 +5,7 @@ import { useDisplay } from 'vuetify'
 import { mdiMagnify, mdiRefresh } from '@mdi/js'
 import { ApiError } from '@/lib/apiClient'
 import { money, plural, wholeNumber } from '@/lib/format'
-import { dollars } from '@/lib/plainNumbers'
+import { differenceDollars, dollars, gapOf, minus, type PriceSummary } from '@/lib/plainNumbers'
 import LoadingPanel from '@/features/status/components/LoadingPanel.vue'
 import { useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import type { GapRow } from '@/features/insights/api/types'
@@ -15,7 +15,7 @@ import { useGapLeaderboard } from '@/features/insights/composables/useInsightQue
 import { searchLocation } from '@/features/insights/lib/insightLinks'
 import { INSIGHT_PAGE_SIZES, mergeInsightQuery, parseGapQuery, type InsightPatch } from '@/features/insights/lib/insightParams'
 import { serviceName } from '@/features/insights/lib/insightText'
-import { cents, groupLine, rangeWords, shown, shownDifference, unitSuffix } from '@/features/insights/lib/plainWords'
+import { cents, groupLine, rangeWords, unitSuffix } from '@/features/insights/lib/plainWords'
 
 const route = useRoute()
 const router = useRouter()
@@ -81,11 +81,12 @@ const headers = [
   { title: 'Search', key: 'actions', sortable: false, align: 'end' as const },
 ]
 
+const summaryOf = (row: GapRow): PriceSummary => ({ providers: row.providerCount, ...row.stats })
+
 // When whole dollars would show the typical price and the lower-priced quarter as the same ($269 and $269), the row
 // shows both to the cent so the difference beside them adds up.
 function toTheCent(row: GapRow): boolean {
-  const { median, p25 } = row.stats
-  return median != null && p25 != null && row.lowerQuartileGap > 0 && shown(median) === shown(p25)
+  return row.lowerQuartileGap > 0 && gapOf(summaryOf(row)) === 0
 }
 
 function figure(row: GapRow, value: number | null): string {
@@ -96,10 +97,9 @@ function figure(row: GapRow, value: number | null): string {
 function difference(row: GapRow): string {
   if (row.lowerQuartileGap <= 0) return 'None: the lower-priced quarter get the typical price'
   const { median, p25 } = row.stats
-  const show = toTheCent(row) ? cents : shown
-  // Between the two figures shown beside it, so the row adds up.
-  const gap = median != null && p25 != null ? shownDifference(median, p25, show, show) : row.lowerQuartileGap
-  return `${dollars(gap)}${unitSuffix(row)} less than typical`
+  // The search card's own figure for this group, taken between the figures shown, so both add up alike.
+  const gap = toTheCent(row) && median != null && p25 != null ? minus(cents(median), cents(p25)) : (gapOf(summaryOf(row)) ?? row.lowerQuartileGap)
+  return `${differenceDollars(gap)}${unitSuffix(row)} less than typical`
 }
 
 // One string, so the space after "ranked." survives the template's whitespace trimming.

@@ -59,13 +59,13 @@ function shownPrice(value: number): number {
 }
 
 /** A difference between shown figures, sign dropped, to the cent unless it's whole: "$76", "$30.47", "$136.50". */
-function differenceDollars(value: number): string {
+export function differenceDollars(value: number): string {
   const amount = Math.abs(value)
   return Math.round(amount * 100) % 100 === 0 ? wholeDollars(amount) : money(amount)
 }
 
 /** Shown figures subtracted, kept to the cent (no floating-point dust). */
-function minus(a: number, b: number): number {
+export function minus(a: number, b: number): number {
   return Math.round((a - b) * 100) / 100
 }
 

@@ -1,27 +1,13 @@
 import type { ModifierRef } from '@/features/rates/api/types'
 import { modifierText } from '@/features/rates/lib/lenses'
-import { ABOUT_THE_SAME, aboutTimes, differenceLine, dollars, feeLabel, positionLabel, TIMES_FROM } from '@/lib/plainNumbers'
+import { ABOUT_THE_SAME, aboutTimes, differenceDollars, differenceLine, feeLabel, minus, positionLabel, shownDollars, TIMES_FROM } from '@/lib/plainNumbers'
 
 // The insights pages' own plain words, built on the shared ones in web/src/lib/plainNumbers.ts (decision 89): the same
 // thresholds, so "about the same" means within 5% and "times" starts at twice, everywhere.
 
-/** A figure as dollars() shows it: whole dollars from $100, cents below. */
-export function shown(value: number): number {
-  return Math.abs(value) >= 100 ? Math.round(value) : Math.round(value * 100) / 100
-}
-
 /** A rate as money() shows it, to the cent. */
 export function cents(value: number): number {
   return Math.round(value * 100) / 100
-}
-
-/**
- * a minus b, taken between the figures as the page shows them so the sum adds up on screen ($1,415 and $1,293 differ
- * by $122, not the $121.40 between the unrounded figures). Rounding can hide a small gap; then the exact one.
- */
-export function shownDifference(a: number, b: number, showA = shown, showB = shown): number {
-  const difference = showA(a) - showB(b)
-  return difference !== 0 ? difference : a - b
 }
 
 /**
@@ -40,12 +26,14 @@ export function position(band: string | null | undefined, rate: number, typical:
   const label = band === 'typical' ? null : positionLabel(band)
   if (ratio >= TIMES_FROM) return { label, difference: `${aboutTimes(ratio)} the typical price` }
   if (within && band !== 'low' && band !== 'high') return { label, difference: differenceLine(rate, typical) }
-  // The rate shows to the cent, the typical price in whole dollars from $100.
-  const gap = shownDifference(rate, typical, cents)
+  // Between the figures as shown (the rate to the cent, the typical price as dollars() shows it), so they add up. If
+  // rounding leaves no difference, or one the wrong way, the label stands alone, as in the shared positionParts.
+  const gap = minus(cents(rate), shownDollars(typical))
+  if (gap === 0 || (band === 'low' && gap > 0) || (band === 'high' && gap < 0)) return { label, difference: null }
   const direction = gap < 0 ? 'less' : 'more'
   const percent = Math.round(Math.abs(ratio - 1) * 100)
   const share = percent >= ABOUT_THE_SAME * 100 ? ` (about ${percent}% ${direction})` : ''
-  return { label, difference: `${dollars(gap)}${unit} ${direction} than typical${share}` }
+  return { label, difference: `${differenceDollars(gap)}${unit} ${direction} than typical${share}` }
 }
 
 /**
@@ -64,8 +52,11 @@ export function paysWords(ratio: number | null | undefined): string | null {
 export function pairWords(pair: { same: boolean; productValue: number; versusValue: number; ratio: number }): string {
   if (pair.same) return 'the same'
   const ratio = pair.productValue / pair.versusValue
-  const gap = shownDifference(pair.productValue, pair.versusValue, cents, cents)
-  if (Math.abs(ratio - 1) < 0.01) return `almost the same (${dollars(gap)} ${gap < 0 ? 'less' : 'more'})`
+  if (Math.abs(ratio - 1) < 0.01) {
+    // Both rates show to the cent; the difference is between those.
+    const gap = minus(cents(pair.productValue), cents(pair.versusValue))
+    return gap === 0 ? 'almost the same' : `almost the same (${differenceDollars(gap)} ${gap < 0 ? 'less' : 'more'})`
+  }
   return paysWords(ratio) ?? '—'
 }
 
@@ -78,7 +69,11 @@ export function rangeWords(low: number | null, high: number | null, unit = ''): 
   if (high <= low) return 'most providers get the same price'
   const ratio = high / low
   if (ratio - 1 < ABOUT_THE_SAME) return 'most providers get about the same price'
-  if (ratio < TIMES_FROM) return `the high end is ${dollars(shownDifference(high, low))}${unit} more than the low end`
+  if (ratio < TIMES_FROM) {
+    // Between the two ends as shown beside it.
+    const difference = minus(shownDollars(high), shownDollars(low))
+    return difference > 0 ? `the high end is ${differenceDollars(difference)}${unit} more than the low end` : 'most providers get about the same price'
+  }
   return `the high end is ${aboutTimes(ratio)} the low end`
 }
 
