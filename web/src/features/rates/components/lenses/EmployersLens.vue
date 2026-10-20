@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useDisplay } from 'vuetify'
 import { plural, wholeNumber } from '@/lib/format'
 import { dollars, lessPerCase } from '@/lib/plainNumbers'
+import { gapsLink, hasRankedGroup } from '@/features/insights/lib/insightLinks'
 import type { RateSearchResult } from '../../api/types'
 import { costLines, EMPLOYER_CAVEATS, noYearlyReason, yearlyLead, yearlyText, type CostLine } from '../../lib/lenses'
 import { MAX_CASES, type SearchParams } from '../../lib/searchParams'
@@ -18,6 +19,7 @@ const anyPerUnit = computed(() => lines.value.some((line) => line.perUnit))
 // Cases a year only make sense for prices per case.
 const anyPerCase = computed(() => lines.value.some((line) => !line.perUnit))
 const lead = computed(() => yearlyLead(lines.value, props.params.group))
+const ranked = computed(() => hasRankedGroup(props.result))
 
 const headers = [
   { title: 'Plan, fee and setting', key: 'group', sortable: false },
@@ -88,5 +90,8 @@ function onCases(value: number | string | null) {
         <li v-for="caveat in EMPLOYER_CAVEATS" :key="caveat">{{ caveat }}</li>
       </ul>
     </template>
+    <v-btn :to="gapsLink(result, 'gap')" class="align-self-start px-1" variant="text" color="primary" data-testid="lens-gaps-link">
+      {{ ranked ? "Rank this code's groups by gap" : 'See the biggest gaps across services' }}
+    </v-btn>
   </div>
 </template>
