@@ -37,24 +37,25 @@ internal sealed class GetGroupStatsHandler(DuckDbConnectionFactory connections) 
             UtcTimestamps.From(builtAt),
             groups.Select(group => new GroupStats(
                 group.GroupKey, group.ProductKey, group.ProductLabel, group.CodeType, group.Code, group.FeeType, group.SettingKey,
-                group.Modifiers, group.NegotiatedType, group.ProviderCount, group.RateCount, group.StatsLevel,
+                group.Modifiers, group.NegotiatedType, group.Unit, group.PerUnit, group.ProviderCount, group.RateCount, group.StatsLevel,
                 new RateStats(group.Min, group.P10, group.P25, group.Median, group.P75, group.P90, group.Max, group.SpreadMultiple, group.P90ToP10),
                 group.LowerQuartileGap,
                 values is null
                     ? []
                     : values[group.GroupKey].Select(value => new ProviderValue(
                         value.ProviderKey, value.Ein, value.EinDisplay, value.EinMasked, value.EinLevel, value.BusinessName,
-                        value.Value, value.Low, value.High, value.RateCount, value.NpiWeight, value.FirstRateId)).ToList()))
+                        value.Value, value.Low, value.High, value.RateCount, value.NpiWeight, value.FirstRateId,
+                        value.WholeTaxIdRateId)).ToList()))
                 .ToList());
     }
 
     private sealed record GroupRow(
         string GroupKey, string ProductKey, string ProductLabel, string CodeType, string Code, string FeeType, string SettingKey,
-        string Modifiers, string NegotiatedType, int ProviderCount, int RateCount, string StatsLevel, decimal Min, decimal? P10,
-        decimal? P25, decimal? Median, decimal? P75, decimal? P90, decimal Max, decimal? SpreadMultiple, decimal? P90ToP10,
-        decimal? LowerQuartileGap);
+        string Modifiers, string NegotiatedType, string Unit, bool PerUnit, int ProviderCount, int RateCount, string StatsLevel,
+        decimal Min, decimal? P10, decimal? P25, decimal? Median, decimal? P75, decimal? P90, decimal Max, decimal? SpreadMultiple,
+        decimal? P90ToP10, decimal? LowerQuartileGap);
 
     private sealed record ValueRow(
         string GroupKey, string ProviderKey, string? Ein, string EinDisplay, bool EinMasked, bool EinLevel, string BusinessName,
-        decimal Value, decimal Low, decimal High, int RateCount, long NpiWeight, long FirstRateId);
+        decimal Value, decimal Low, decimal High, int RateCount, long NpiWeight, long FirstRateId, long? WholeTaxIdRateId);
 }

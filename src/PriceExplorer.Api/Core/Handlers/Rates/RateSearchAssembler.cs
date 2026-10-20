@@ -109,10 +109,11 @@ internal static class RateSearchAssembler
             .Select(group =>
             {
                 var distribution = Distribution.Of(group);
+                var (unit, perUnit) = PricingOf(group, ServiceCategories.Classify(group.CodeType, group.Code));
                 return new GroupStats(
                     group.Key, group.ProductKey, group.ProductLabel, group.CodeType, group.Code, group.FeeType, group.Setting.Key,
-                    group.Modifiers, group.NegotiatedType, distribution.Values.Count, group.RateIds.Count, distribution.Level,
-                    distribution.Stats, distribution.LowerQuartileGap,
+                    group.Modifiers, group.NegotiatedType, unit, perUnit, distribution.Values.Count, group.RateIds.Count,
+                    distribution.Level, distribution.Stats, distribution.LowerQuartileGap,
                     group.Providers.Values.OrderBy(provider => provider.Key, StringComparer.Ordinal).Select(ValueOf).ToList());
             })
             .ToList();
@@ -155,7 +156,7 @@ internal static class RateSearchAssembler
         return new ProviderValue(
             provider.Key, provider.VerifiedEin, provider.EinDisplay, provider.EinUnverified, view.WholeTaxId,
             provider.NameFor(view, filtered: false), view.Value, view.Low, view.High, view.RateIds.Count, view.NpiWeight,
-            view.SourceRateId);
+            view.SourceRateId, view.WholeTaxIdRateId);
     }
 
     private static RateGroup Build(GroupAccumulator group, Distribution distribution, ReferenceCatalog catalog, bool providerFilterActive)
@@ -165,13 +166,7 @@ internal static class RateSearchAssembler
         var p25 = distribution.Stats.P25;
 
         var category = ServiceCategories.Classify(group.CodeType, group.Code);
-        // A drug named in the notes of a surgery or room revenue code line is that facility's charge for the case, not a
-        // price per unit (J0585 under revenue code 0490 is a surgery center's charge, not Botox per unit). Pharmacy and
-        // clinic lines keep their per-unit price (J9190 at $2.01 under a clinic revenue code).
-        var perUnit = category.PerUnit && !group.FiledAsCaseRate;
-        var unit = category.PerUnit && !perUnit ? "per facility charge"
-            : group.Setting.Key is "fqhc" or "rhc" && !perUnit ? ServiceCategories.PerVisitAllInclusive
-            : category.Unit;
+        var (unit, perUnit) = PricingOf(group, category);
         var modifiers = group.Modifiers.Length == 0
             ? []
             : group.Modifiers.Split(',').Select(code => new ModifierRef(code, catalog.Modifier(code).Label)).ToList();
@@ -396,6 +391,21 @@ internal static class RateSearchAssembler
         BillingCodes.RevenueCode => $"Revenue code {billingCode} ({catalog.RevenueCodeLabel(billingCode)})",
         _ => $"{billingCodeType} {billingCode}",
     };
+
+    /// <summary>
+    /// What one of the group's rates pays for, and whether it's a price per unit. A drug named in the notes of a surgery
+    /// or room revenue code line is that facility's charge for the case, not a price per unit (J0585 under revenue code
+    /// 0490 is a surgery center's charge, not Botox per unit). Pharmacy and clinic lines keep their per-unit price
+    /// (J9190 at $2.01 under a clinic revenue code).
+    /// </summary>
+    private static (string Unit, bool PerUnit) PricingOf(GroupAccumulator group, ServiceCategory category)
+    {
+        var perUnit = category.PerUnit && !group.FiledAsCaseRate;
+        var unit = category.PerUnit && !perUnit ? "per facility charge"
+            : group.Setting.Key is "fqhc" or "rhc" && !perUnit ? ServiceCategories.PerVisitAllInclusive
+            : category.Unit;
+        return (unit, perUnit);
+    }
 
     /// <summary>A drug or supply priced per unit at a health center or rural clinic, where visits are paid all-inclusive.</summary>
     private static bool ClinicPerUnit(GroupAccumulator group, bool perUnit) => perUnit && group.Setting.Key is "fqhc" or "rhc";

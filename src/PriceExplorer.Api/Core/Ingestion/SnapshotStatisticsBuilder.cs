@@ -134,6 +134,8 @@ internal sealed class SnapshotStatisticsBuilder(DuckDbConnectionFactory connecti
                     .AppendValue(group.SettingKey)
                     .AppendValue(group.Modifiers)
                     .AppendValue(group.NegotiatedType)
+                    .AppendValue(group.Unit)
+                    .AppendValue(group.PerUnit)
                     .AppendValue(group.ProviderCount)
                     .AppendValue(group.RateCount)
                     .AppendValue(group.StatsLevel)
@@ -178,6 +180,7 @@ internal sealed class SnapshotStatisticsBuilder(DuckDbConnectionFactory connecti
                     .AppendValue(provider.RateCount)
                     .AppendValue(provider.NpiWeight)
                     .AppendValue(provider.FirstRateId)
+                    .AppendNumber(provider.WholeTaxIdRateId)
                     .EndRow();
             }
         }

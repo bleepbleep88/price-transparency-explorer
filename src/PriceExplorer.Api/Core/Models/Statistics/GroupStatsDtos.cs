@@ -12,6 +12,8 @@ internal sealed record GroupStatsResult(SnapshotRef Snapshot, DateTimeOffset? Bu
 /// </summary>
 /// <param name="Key">The search's group key (<see cref="RateGroup.Key"/>): the parts below joined with '|'.</param>
 /// <param name="Modifiers">Sorted, comma-separated modifier codes; "" = none.</param>
+/// <param name="Unit">What one rate pays for ("per procedure", "per facility charge", "per HCPCS unit …"), as the card says.</param>
+/// <param name="PerUnit">The rates are prices per unit (a drug or supply), not per visit or procedure.</param>
 /// <param name="Providers">Every provider in the group, by provider key (only the one asked for with a provider filter).</param>
 internal sealed record GroupStats(
     string Key,
@@ -23,6 +25,8 @@ internal sealed record GroupStats(
     string SettingKey,
     string Modifiers,
     string NegotiatedType,
+    string Unit,
+    bool PerUnit,
     int ProviderCount,
     int RateCount,
     string StatsLevel,
@@ -37,6 +41,8 @@ internal sealed record GroupStats(
 /// <param name="Value">The NPI-weighted (lower) median of its rates in the group: always a rate it is really paid.</param>
 /// <param name="NpiWeight">The total weight behind <paramref name="Value"/>: each rate's NPI count (at least 1), summed.</param>
 /// <param name="FirstRateId">The rate carrying <paramref name="Value"/> that lists the most NPIs (the row's source).</param>
+/// <param name="WholeTaxIdRateId">When <paramref name="EinLevel"/> comes from a whole-tax-ID contract other than
+/// <paramref name="FirstRateId"/>, that rate; null otherwise.</param>
 internal sealed record ProviderValue(
     string ProviderKey,
     string? Ein,
@@ -49,4 +55,5 @@ internal sealed record ProviderValue(
     decimal High,
     int RateCount,
     long NpiWeight,
-    long FirstRateId);
+    long FirstRateId,
+    long? WholeTaxIdRateId);

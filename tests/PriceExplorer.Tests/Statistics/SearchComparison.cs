@@ -59,13 +59,13 @@ internal static class SearchComparison
 
     private sealed record GroupFacts(
         string Key, string ProductKey, string ProductLabel, string CodeType, string Code, string FeeType, string SettingKey,
-        string Modifiers, string NegotiatedType, int ProviderCount, int RateCount, string StatsLevel, RateStats Stats,
-        decimal? LowerQuartileGap)
+        string Modifiers, string NegotiatedType, string Unit, bool PerUnit, int ProviderCount, int RateCount, string StatsLevel,
+        RateStats Stats, decimal? LowerQuartileGap)
     {
         public static GroupFacts Of(GroupStats group) => new(
             group.Key, group.ProductKey, group.ProductLabel, group.CodeType, group.Code, group.FeeType, group.SettingKey,
-            group.Modifiers, group.NegotiatedType, group.ProviderCount, group.RateCount, group.StatsLevel, group.Stats,
-            group.LowerQuartileGap);
+            group.Modifiers, group.NegotiatedType, group.Unit, group.PerUnit, group.ProviderCount, group.RateCount, group.StatsLevel,
+            group.Stats, group.LowerQuartileGap);
 
         public static GroupFacts Of(JsonElement group)
         {
@@ -80,6 +80,8 @@ internal static class SearchComparison
                 group.GetProperty("settingKey").GetString()!,
                 string.Join(',', group.GetProperty("modifiers").EnumerateArray().Select(modifier => modifier.GetProperty("code").GetString())),
                 group.GetProperty("negotiatedType").GetString()!,
+                group.GetProperty("unit").GetString()!,
+                group.GetProperty("perUnit").GetBoolean(),
                 group.GetProperty("providerCount").GetInt32(),
                 group.GetProperty("rateCount").GetInt32(),
                 group.GetProperty("statsLevel").GetString()!,
@@ -93,11 +95,11 @@ internal static class SearchComparison
 
     private sealed record RowFacts(
         string GroupKey, string ProviderKey, string? Ein, string EinDisplay, bool EinMasked, bool EinLevel, string BusinessName,
-        decimal Value, decimal Low, decimal High, int RateCount, long FirstRateId)
+        decimal Value, decimal Low, decimal High, int RateCount, long FirstRateId, long? WholeTaxIdRateId)
     {
         public static RowFacts Of(string groupKey, ProviderValue value) => new(
             groupKey, value.ProviderKey, value.Ein, value.EinDisplay, value.EinMasked, value.EinLevel, value.BusinessName,
-            value.Value, value.Low, value.High, value.RateCount, value.FirstRateId);
+            value.Value, value.Low, value.High, value.RateCount, value.FirstRateId, value.WholeTaxIdRateId);
 
         public static RowFacts Of(JsonElement row) => new(
             row.GetProperty("groupKey").GetString()!,
@@ -111,6 +113,7 @@ internal static class SearchComparison
             row.GetProperty("rateLow").GetDecimal(),
             row.GetProperty("rateHigh").GetDecimal(),
             row.GetProperty("rateCount").GetInt32(),
-            row.GetProperty("firstRateId").GetInt64());
+            row.GetProperty("firstRateId").GetInt64(),
+            row.GetProperty("wholeTaxIdRateId") is { ValueKind: JsonValueKind.Number } rate ? rate.GetInt64() : null);
     }
 }

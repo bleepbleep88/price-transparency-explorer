@@ -435,6 +435,9 @@ internal static class AppenderRowExtensions
 
     public static IDuckDBAppenderRow AppendNumber(this IDuckDBAppenderRow row, decimal? value) =>
         value is { } number ? row.AppendValue(number) : row.AppendNullValue();
+
+    public static IDuckDBAppenderRow AppendNumber(this IDuckDBAppenderRow row, long? value) =>
+        value is { } number ? row.AppendValue(number) : row.AppendNullValue();
 }
 
 internal sealed record SnapshotHeader(

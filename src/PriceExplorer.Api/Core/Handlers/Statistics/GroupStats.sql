@@ -10,6 +10,8 @@ SELECT
     g.setting_key        AS SettingKey,
     g.modifiers          AS Modifiers,
     g.negotiated_type    AS NegotiatedType,
+    g.unit               AS Unit,
+    g.per_unit           AS PerUnit,
     g.provider_count     AS ProviderCount,
     g.rate_count         AS RateCount,
     g.stats_level        AS StatsLevel,
