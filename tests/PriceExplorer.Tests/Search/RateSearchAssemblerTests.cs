@@ -256,14 +256,22 @@ public sealed class RateSearchAssemblerTests
     }
 
     [Fact]
+    public void A_visit_level_card_says_to_compare_level_to_level_and_leaves_billing_frequency_to_the_page_footer()
+    {
+        var notes = Assemble([Fact(code: "99214", billingClass: "professional", pos: "11")]).Groups.Single().Notes;
+
+        notes.Should().Contain("Office visit, established patient: compare level to level only.");
+        notes.Should().NotContain(note => note.Contains("how often", StringComparison.OrdinalIgnoreCase), "the footer says it once per page");
+    }
+
+    [Fact]
     public void Two_fee_schedules_splitting_the_providers_evenly_are_both_named()
     {
         var facts = Enumerable.Range(1, 6).Select(i => Fact(provider: $"30000000{i}", rate: i <= 3 ? 10m : 12m)).ToList();
 
         var notes = Assemble(facts).Groups.Single().Notes;
 
-        notes.Should().Contain("The 6 providers are split evenly between $10.00 and $12.00 (3 each): most likely two standard fee " +
-            "schedules rather than individually negotiated rates.");
+        notes.Should().Contain("The 6 providers are split evenly: 3 get exactly $10.00 and 3 get exactly $12.00.");
     }
 
     [Fact]
@@ -332,7 +340,7 @@ public sealed class RateSearchAssemblerTests
     {
         var facts = Enumerable.Range(1, 6).Select(i => Fact(provider: $"40000000{i}", rate: i <= 4 ? 167.09m : 200m)).ToList();
 
-        Assemble(facts).Groups.Single().Notes.Should().Contain(note => note.StartsWith("4 of 6 providers are paid exactly $167.09"));
+        Assemble(facts).Groups.Single().Notes.Should().Contain(note => note.StartsWith("4 of 6 providers get exactly the same price: $167.09"));
     }
 
     [Fact]

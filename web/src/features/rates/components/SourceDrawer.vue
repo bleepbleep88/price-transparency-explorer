@@ -109,7 +109,7 @@ const comparisons = computed(() => {
           <v-table density="compact" class="mt-1">
             <tbody>
               <tr>
-                <td>Index (snapshot) date</td>
+                <td>Date of the plan's list of files</td>
                 <td>{{ shortDate(data.snapshot.indexDate) }}</td>
               </tr>
               <tr>
@@ -123,7 +123,7 @@ const comparisons = computed(() => {
             </tbody>
           </v-table>
           <v-btn :href="data.snapshot.indexUrl" target="_blank" rel="noopener" variant="text" size="small" :append-icon="mdiOpenInNew" class="px-0">
-            Open the index file
+            Open the plan's list of files
           </v-btn>
         </section>
 
@@ -177,7 +177,7 @@ const comparisons = computed(() => {
         <section>
           <h3 class="text-title-small mb-1">Duplicates</h3>
           <p class="text-body-medium">
-            This exact rate is published {{ plural(data.occurrences, 'time') }}<template v-if="data.itemLabelCount > 1">,
+            This exact rate is published {{ data.occurrences === 1 ? 'once' : plural(data.occurrences, 'time') }}<template v-if="data.itemLabelCount > 1">,
               under {{ plural(data.itemLabelCount, 'different item name') }}</template>. It's counted once here.
           </p>
           <p v-if="data.codeSource === 'additional_information'" class="text-body-medium text-medium-emphasis mt-1">

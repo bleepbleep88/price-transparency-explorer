@@ -18,7 +18,7 @@ const headers = [
   { title: 'Site of care', key: 'site', sortable: false },
   { title: 'Product', key: 'product', sortable: false },
   { title: 'Providers', key: 'providers', sortable: false, align: 'end' as const },
-  { title: 'Rate per unit', key: 'rate', sortable: false, align: 'end' as const },
+  { title: 'Price per unit', key: 'rate', sortable: false, align: 'end' as const },
 ]
 </script>
 
@@ -41,7 +41,7 @@ const headers = [
           <template #[`item.rate`]="{ item }">{{ unitPriceText(item) }}</template>
         </v-data-table>
       </template>
-      <p v-else class="text-body-medium">No per-unit rates for this code here.</p>
+      <p v-else class="text-body-medium">No per-unit prices for this code here.</p>
       <p v-if="facilityCharges" class="text-body-small text-medium-emphasis" data-testid="facility-charges-note">
         Facility charges filed under revenue codes aren't per-unit prices; they're on the cards below.
       </p>

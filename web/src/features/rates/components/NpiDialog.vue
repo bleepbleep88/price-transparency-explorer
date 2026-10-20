@@ -58,9 +58,9 @@ function rateText(rate: number, rateHigh: number): string {
               :subtitle="showRates ? rateText(item.rate, item.rateHigh) : undefined"
             >
               <template v-if="!item.valid" #append>
-                <v-tooltip text="Fails the standard NPI check digit. Shown as the plan published it." location="top">
+                <v-tooltip text="This number fails the standard NPI check, so the plan's file may have a typo. Shown as published." location="top">
                   <template #activator="{ props: tip }">
-                    <v-chip v-bind="tip" size="x-small" color="warning" variant="tonal">Invalid check digit</v-chip>
+                    <v-chip v-bind="tip" size="x-small" color="warning" variant="tonal">Not a valid NPI</v-chip>
                   </template>
                 </v-tooltip>
               </template>

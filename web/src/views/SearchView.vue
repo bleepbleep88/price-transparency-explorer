@@ -16,7 +16,8 @@ import StartHere from '@/features/rates/components/StartHere.vue'
 import type { RateRow } from '@/features/rates/api/types'
 import { useRateSearch, useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import { useSearchRoute } from '@/features/rates/composables/useSearchRoute'
-import { highlightHeading } from '@/features/rates/lib/lenses'
+import { groupName, highlightHeading } from '@/features/rates/lib/lenses'
+import { LIKE_FOR_LIKE } from '@/lib/plainNumbers'
 import type { QueryPatch, SortKey } from '@/features/rates/lib/searchParams'
 
 const { params, hasCode, urlErrors, canSearch, update, replace, startOver } = useSearchRoute()
@@ -41,9 +42,15 @@ const result = computed(() => (search.isError.value ? undefined : search.data.va
 
 const announcement = computed(() =>
   result.value
-    ? `${plural(result.value.groups.length, 'comparison group')} and ${plural(result.value.rows.total, 'provider row')} for ${result.value.query.code}.`
+    ? `${plural(result.value.groups.length, 'card')} and ${plural(result.value.rows.total, 'provider row')} for ${result.value.query.code}.`
     : '',
 )
+
+// The card the table is narrowed to, named in full: "Ambetter from Fidelis Care · Doctor's fee · Doctor's office".
+const pickedGroup = computed(() => {
+  const group = result.value?.groups.find((candidate) => candidate.key === params.value.group)
+  return group ? groupName(group) : null
+})
 
 const sourceOpen = ref(false)
 const sourceRow = ref<RateRow | null>(null)
@@ -86,7 +93,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
   <v-container class="py-6" max-width="1280">
     <h1 class="text-headline-medium mb-1">Search negotiated rates</h1>
     <p class="text-body-medium text-medium-emphasis mb-4">
-      What the plan has agreed to pay each provider for a service. Add an NPI or EIN to see where one provider sits.
+      What the plan has agreed to pay each provider for a service. Add an NPI or EIN to see how one provider compares.
     </p>
 
     <SearchForm
@@ -145,7 +152,10 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
             @search="(code) => startOver(code)"
           />
 
-          <v-row v-if="result.groups.length" aria-label="Comparison groups">
+          <p v-if="result.groups.length" class="text-body-medium text-medium-emphasis" data-testid="like-for-like">
+            Each card compares like with like: {{ LIKE_FOR_LIKE.toLowerCase() }}.
+          </p>
+          <v-row v-if="result.groups.length" class="mt-n2" aria-label="Price cards">
             <v-col v-for="group in result.groups" :key="group.key" cols="12" md="6" lg="4">
               <GroupCard
                 :group="group"
@@ -160,9 +170,9 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
             <div class="d-flex flex-wrap align-center ga-2 mb-2">
               <h2 id="providers-heading" class="text-title-large">Providers</h2>
               <span class="text-body-medium text-medium-emphasis">
-                {{ plural(result.rows.total, 'row') }}<template v-if="params.group"> in one comparison group</template>
+                {{ plural(result.rows.total, 'row') }}<template v-if="params.group"> for {{ pickedGroup ?? 'one card' }}</template>
               </span>
-              <v-btn v-if="params.group" variant="text" size="small" @click="update({ group: null })">Show all groups</v-btn>
+              <v-btn v-if="params.group" variant="text" size="small" @click="update({ group: null })">Show all cards</v-btn>
             </div>
             <ProviderTable
               :rows="result.rows"
@@ -178,7 +188,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
 
           <v-empty-state
             v-else-if="!result.hints.length"
-            headline="No rates match"
+            headline="No prices match"
             text="Try removing a filter or searching another code."
           />
         </div>

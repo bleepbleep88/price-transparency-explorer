@@ -1,8 +1,22 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { mdiInformationOutline } from '@mdi/js'
-import { money, ordinal, plural, times } from '@/lib/format'
+import { money, plural } from '@/lib/format'
+import {
+  bandFor,
+  capitalize,
+  dollars,
+  feeLabel,
+  fewProvidersLine,
+  gapLine,
+  lowerFirst,
+  positionLine,
+  rangeLine,
+  typicalPrice,
+  type PriceSummary,
+} from '@/lib/plainNumbers'
 import type { ProviderPosition, RateGroup } from '../api/types'
+import { modifierText } from '../lib/lenses'
 import RangeBar from './RangeBar.vue'
 
 const props = withDefaults(
@@ -12,28 +26,19 @@ const props = withDefaults(
     /** Over the highlights: "your provider" only when an NPI or EIN pins one; a name filter names the filter. */
     highlightHeading?: string
   }>(),
-  { selected: false, highlightHeading: 'Where your provider sits' },
+  { selected: false, highlightHeading: 'How your provider compares' },
 )
 const emit = defineEmits<{ showProviders: [groupKey: string] }>()
 
 const showNotes = ref(false)
 
-const stats = computed(() => props.group.stats)
+const summary = computed<PriceSummary>(() => ({ ...props.group.stats, providers: props.group.providerCount }))
+const typical = computed(() => typicalPrice(summary.value))
 const facilityBilling = computed(() => props.group.billedAs.filter((billed) => billed.billingCodeType === 'RC'))
 
-/** Everything after the copper rate chip: percentile, multiple of the median, distance from the 25th percentile. */
-function positionText(position: ProviderPosition): string {
-  const parts: string[] = []
-  if (position.percentile != null) parts.push(`${ordinal(position.percentile)} percentile`)
-  if (position.vsMedian != null) parts.push(`${times(position.vsMedian)} the median`)
-  if (position.aboveP25 != null) {
-    parts.push(
-      position.aboveP25 === 0
-        ? 'at the 25th percentile'
-        : `${money(Math.abs(position.aboveP25))} ${position.aboveP25 > 0 ? 'above' : 'below'} the 25th percentile`,
-    )
-  }
-  return parts.join(' · ')
+/** After the copper price chip: "Lower than most · $23 less than typical". Nothing under 5 providers. */
+function positionText(position: ProviderPosition): string | null {
+  return positionLine(bandFor(position.rate, summary.value), position.rate, typical.value)
 }
 </script>
 
@@ -46,7 +51,7 @@ function positionText(position: ProviderPosition): string {
   >
     <v-card-item>
       <v-card-title class="text-wrap">
-        {{ group.feeTypeLabel }} · {{ group.settingLabel }}
+        {{ feeLabel(group.feeType) }} · {{ group.settingLabel }}
       </v-card-title>
       <v-card-subtitle class="text-wrap">
         {{ group.productLabel }} · {{ plural(group.providerCount, 'provider') }} · {{ group.unit }}
@@ -61,69 +66,46 @@ function positionText(position: ProviderPosition): string {
     </v-card-item>
 
     <v-card-text class="flex-grow-1 d-flex flex-column ga-3">
-      <div v-if="group.modifiers.length || facilityBilling.length" class="d-flex flex-wrap ga-1">
-        <v-tooltip v-for="modifier in group.modifiers" :key="modifier.code" :text="modifier.label" location="top">
-          <template #activator="{ props: tip }">
-            <v-chip v-bind="tip" variant="outlined" label>Modifier {{ modifier.code }}</v-chip>
-          </template>
-        </v-tooltip>
-        <v-chip v-for="billed in facilityBilling" :key="billed.billingCode" variant="outlined" label>{{ billed.label }}</v-chip>
+      <div v-if="group.modifiers.length || facilityBilling.length" class="text-body-medium" data-testid="group-billing">
+        <p v-if="group.modifiers.length">{{ capitalize(modifierText(group.modifiers)) }}</p>
+        <p v-for="billed in facilityBilling" :key="billed.billingCode">Filed under {{ lowerFirst(billed.label) }}</p>
       </div>
 
-      <!-- Fewer than 5 providers: list the rates, no statistics. -->
-      <div v-if="group.statsLevel === 'list'" data-testid="stats-list">
-        <p class="text-body-medium text-medium-emphasis mb-1">Too few providers for statistics. Rates:</p>
+      <!-- Under 5 providers: just the prices, nothing to compare. -->
+      <div v-if="typical == null" data-testid="stats-list">
+        <p class="text-body-medium text-medium-emphasis mb-1">
+          {{ fewProvidersLine(group.providerCount) }} {{ group.providerCount === 1 ? 'Its price:' : 'Their prices:' }}
+        </p>
         <div class="d-flex flex-wrap ga-1">
           <v-chip v-for="(rate, index) in group.listedRates" :key="index" variant="tonal">{{ money(rate) }}</v-chip>
         </div>
       </div>
 
-      <!-- 5 to 9 providers: median and range. -->
-      <div v-else-if="group.statsLevel === 'basic'" data-testid="stats-basic">
-        <p class="text-title-large stat-figure">{{ money(stats.median) }} <span class="text-body-medium text-medium-emphasis">median</span></p>
-        <p class="text-body-medium text-medium-emphasis">Range {{ money(stats.min) }} to {{ money(stats.max) }}</p>
-        <RangeBar :stats="stats" :marker="group.highlights[0]?.rate" class="mt-1" />
-      </div>
-
-      <!-- 10+ providers: full statistics and the gap to the lower quartile. -->
-      <div v-else data-testid="stats-full" class="d-flex flex-column ga-2">
-        <div class="d-flex justify-space-between text-center">
-          <div>
-            <div class="text-body-small text-medium-emphasis">25th percentile</div>
-            <div class="text-title-medium">{{ money(stats.p25) }}</div>
-          </div>
-          <div>
-            <div class="text-body-small text-medium-emphasis">Median</div>
-            <div class="text-title-large stat-figure">{{ money(stats.median) }}</div>
-          </div>
-          <div>
-            <div class="text-body-small text-medium-emphasis">75th percentile</div>
-            <div class="text-title-medium">{{ money(stats.p75) }}</div>
-          </div>
+      <!-- 5 or more: the typical price and how far prices run; from 10, the lower-priced quarter. "Most providers get
+           between" already says how much prices vary, so the card doesn't say it again as "about N times". -->
+      <div v-else :data-testid="group.statsLevel === 'full' ? 'stats-full' : 'stats-basic'" class="d-flex flex-column ga-2">
+        <div>
+          <div class="text-body-small text-medium-emphasis">Typical price</div>
+          <div class="text-title-large stat-figure" data-testid="typical-price">{{ dollars(typical) }}</div>
         </div>
-        <RangeBar :stats="stats" :marker="group.highlights[0]?.rate" />
-        <p class="text-body-medium text-medium-emphasis">
-          Highest is {{ times(stats.spreadMultiple) }} the lowest<template v-if="stats.p90ToP10 != null">
-            · 90th to 10th percentile: {{ times(stats.p90ToP10) }}</template
-          >
-        </p>
-        <p v-if="group.lowerQuartileGap === 0" class="text-body-medium text-medium-emphasis" data-testid="no-gap">
-          No gap: the 25th percentile and the median are the same rate.
-        </p>
-        <v-sheet v-else-if="group.lowerQuartileGap != null" rounded class="quartile-gap pa-3" data-testid="quartile-gap">
-          <p class="text-body-medium">
-            <strong>{{ money(group.lowerQuartileGap) }}</strong> gap to the lower quartile: the median minus the 25th
-            percentile.
-          </p>
+        <p class="text-body-medium" data-testid="range-line">{{ rangeLine(summary) }}</p>
+        <RangeBar :summary="summary" :marker="group.highlights[0]?.rate" :marker-label="group.highlights[0]?.displayName" />
+        <v-sheet v-if="gapLine(summary)" rounded class="quartile-gap pa-3" data-testid="quartile-gap">
+          <p class="text-body-medium">{{ gapLine(summary) }}</p>
         </v-sheet>
       </div>
 
       <div v-if="group.highlights.length" class="yours-rule d-flex flex-column ga-1" data-testid="group-highlights">
         <p class="text-body-small font-weight-medium">{{ highlightHeading }}</p>
-        <div v-for="position in group.highlights" :key="position.providerKey" class="d-flex flex-wrap align-center ga-1 text-body-medium">
+        <div
+          v-for="position in group.highlights"
+          :key="position.providerKey"
+          class="d-flex flex-wrap align-center ga-1 text-body-medium"
+          data-testid="highlight-line"
+        >
           <v-chip class="copper-mark" variant="outlined" data-testid="your-rate">{{ money(position.rate) }}</v-chip>
           <strong>{{ position.displayName }}</strong>
-          <span>{{ positionText(position) }}</span>
+          <span v-if="positionText(position)" data-testid="highlight-position">{{ positionText(position) }}</span>
         </div>
       </div>
 

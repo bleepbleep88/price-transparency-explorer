@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { megabytes, money, ordinal, plural, shortDate, times, wholeDollars, wholeNumber } from '../format'
+import { megabytes, money, plural, shortDate, wholeDollars, wholeNumber } from '../format'
 
 describe('format', () => {
   it('formats money with cents and a dash for missing values', () => {
@@ -8,25 +8,10 @@ describe('format', () => {
     expect(money(null)).toBe('—')
   })
 
-  it('formats counts, plurals and multiples', () => {
+  it('formats counts and plurals', () => {
     expect(wholeNumber(179948)).toBe('179,948')
     expect(plural(1, 'provider')).toBe('1 provider')
     expect(plural(31, 'provider')).toBe('31 providers')
-    expect(times(0.6312)).toBe('0.63×')
-    expect(times(null)).toBe('—')
-  })
-
-  it.each([
-    [1, '1st'],
-    [2, '2nd'],
-    [3, '3rd'],
-    [7, '7th'],
-    [11, '11th'],
-    [13, '13th'],
-    [21, '21st'],
-    [100, '100th'],
-  ])('ordinal(%i) = %s', (value, expected) => {
-    expect(ordinal(value)).toBe(expected)
   })
 
   it('formats calendar dates without shifting the day', () => {

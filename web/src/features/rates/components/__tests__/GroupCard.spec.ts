@@ -52,8 +52,10 @@ function mountCard(group: RateGroup, selected = false, highlightHeading?: string
   return mount(GroupCard, { props: { group, selected, highlightHeading }, global: { plugins: [vuetify] } })
 }
 
+const BANNED = /percentile|median|quartile|×|spread|index/i
+
 describe('GroupCard', () => {
-  it('lists the rates without statistics when fewer than 5 providers', () => {
+  it('lists the prices with nothing to compare when fewer than 5 providers', () => {
     const wrapper = mountCard(
       makeGroup({
         statsLevel: 'list',
@@ -66,66 +68,116 @@ describe('GroupCard', () => {
     )
 
     const list = wrapper.get('[data-testid="stats-list"]')
+    expect(list.text()).toContain('Only 3 providers: too few to compare. Their prices:')
     for (const rate of [180.5, 212, 260.75]) expect(list.text()).toContain(money(rate))
-    expect(wrapper.find('[data-testid="stats-basic"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="stats-full"]').exists()).toBe(false)
-    expect(wrapper.text()).not.toContain('Median')
+    expect(wrapper.find('[data-testid="typical-price"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toMatch(/typical/i)
   })
 
-  it('shows median and range for 5 to 9 providers, without the quartile gap', () => {
+  it('says "its price" for a single provider', () => {
+    const wrapper = mountCard(
+      makeGroup({
+        statsLevel: 'list',
+        providerCount: 1,
+        rateCount: 1,
+        listedRates: [1209.45],
+        stats: { min: 1209.45, p10: null, p25: null, median: null, p75: null, p90: null, max: 1209.45, spreadMultiple: null, p90ToP10: null },
+        lowerQuartileGap: null,
+      }),
+    )
+
+    expect(wrapper.get('[data-testid="stats-list"]').text()).toContain('Only 1 provider: too few to compare. Its price:')
+  })
+
+  it('gives the typical price and the full run of prices for 5 to 9 providers, nothing more', () => {
     const wrapper = mountCard(
       makeGroup({
         statsLevel: 'basic',
         providerCount: 6,
         rateCount: 6,
-        stats: { min: 150, p10: null, p25: null, median: 205.4, p75: null, p90: null, max: 320, spreadMultiple: 2.13, p90ToP10: null },
+        stats: { min: 150, p10: null, p25: 180, median: 205.4, p75: 260, p90: null, max: 320, spreadMultiple: null, p90ToP10: null },
         lowerQuartileGap: null,
       }),
     )
 
     const basic = wrapper.get('[data-testid="stats-basic"]')
-    expect(basic.text()).toContain(money(205.4))
-    expect(basic.text()).toContain(`Range ${money(150)} to ${money(320)}`)
-    expect(wrapper.find('[data-testid="stats-full"]').exists()).toBe(false)
+    expect(basic.get('[data-testid="typical-price"]').text()).toBe('$205')
+    expect(basic.get('[data-testid="range-line"]').text()).toBe('Prices run from $150 to $320.')
     expect(wrapper.find('[data-testid="quartile-gap"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="spread-line"]').exists()).toBe(false)
+    // No "most providers" band on the bar: that needs 10 providers.
+    expect(wrapper.find('.range-bar__band').exists()).toBe(false)
   })
 
-  it('shows full statistics and the gap to the lower quartile for 10+ providers', () => {
+  it('adds where most providers are and the lower-priced quarter from 10 providers, saying the range once', () => {
     const wrapper = mountCard(makeGroup())
 
     const full = wrapper.get('[data-testid="stats-full"]')
-    for (const value of [454.44, 578.31, 627.5]) expect(full.text()).toContain(money(value))
-    // Defines the term once instead of repeating the numbers printed just above it.
+    expect(full.get('[data-testid="typical-price"]').text()).toBe('$578')
+    expect(full.get('[data-testid="range-line"]').text()).toBe('Most providers get between $372 and $664.')
+    // "Most providers get between $372 and $664" already says how much prices vary; no "about 1.8 times" after it.
+    expect(full.find('[data-testid="spread-line"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="quartile-gap"]').text()).toBe(
-      `${money(123.87)} gap to the lower quartile: the median minus the 25th percentile.`,
+      'The lower-priced quarter of providers get $454 or less: $124 less than typical.',
+    )
+    expect(wrapper.get('[role="img"]').attributes('aria-label')).toBe(
+      'Lowest $227, highest $1,154. Most providers get between $372 and $664. Typical price: $578.',
     )
   })
 
-  it('says there is no gap when the 25th percentile equals the median', () => {
-    const wrapper = mountCard(makeGroup({ lowerQuartileGap: 0 }))
+  it('says one price once when most providers get it', () => {
+    const flat = { min: 143.75, p10: 167.09, p25: 167.09, median: 167.09, p75: 167.09, p90: 167.09, max: 185.4, spreadMultiple: 1.29, p90ToP10: 1 }
+    const wrapper = mountCard(makeGroup({ providerCount: 51, stats: flat, lowerQuartileGap: 0 }))
 
-    expect(wrapper.get('[data-testid="no-gap"]').text()).toBe('No gap: the 25th percentile and the median are the same rate.')
+    expect(wrapper.get('[data-testid="range-line"]').text()).toBe('Most providers get $167.')
+    expect(wrapper.find('[data-testid="spread-line"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="quartile-gap"]').exists()).toBe(false)
   })
 
-  it('describes the gap in neutral words', () => {
-    expect(mountCard(makeGroup()).text().toLowerCase()).not.toMatch(/sav(e|ed|ing|ings)/)
+  it("calls the fee a doctor's fee or a facility fee, and names what it's filed under", () => {
+    const facility = mountCard(makeGroup())
+    expect(facility.get('.v-card-title').text()).toBe('Facility fee · Ambulatory surgery center')
+    expect(facility.get('[data-testid="group-billing"]').text()).toBe('Filed under revenue code 0490 (Ambulatory surgery)')
+
+    const doctor = mountCard(
+      makeGroup({ feeType: 'professional', billedAs: [], modifiers: [{ code: '33', label: 'Preventive service' }] }),
+    )
+    expect(doctor.get('.v-card-title').text()).toBe("Doctor's fee · Ambulatory surgery center")
+    expect(doctor.get('[data-testid="group-billing"]').text()).toBe('Preventive service (modifier 33)')
   })
 
-  it("shows where the searched provider sits and emits the group key", async () => {
+  it('uses no statistics words and no savings claims', () => {
+    const highlights = [
+      { providerKey: 'a', displayName: 'A', rate: 627.5, percentile: 75, vsMedian: 1.09, aboveP25: 173.06, rateLow: 627.5, rateHigh: 627.5 },
+    ]
+    for (const group of [makeGroup({ highlights }), makeGroup({ statsLevel: 'basic', providerCount: 6, lowerQuartileGap: null })]) {
+      const text = mountCard(group).text()
+      expect(text).not.toMatch(BANNED)
+      expect(text.toLowerCase()).not.toMatch(/sav(e|ed|ing|ings)/)
+    }
+  })
+
+  it('says how the searched provider compares, in words and dollars, and emits the group key', async () => {
     const group = makeGroup({
       highlights: [
         { providerKey: '113466729', displayName: 'Example Surgery Center', rate: 627.5, percentile: 75, vsMedian: 1.09, aboveP25: 173.06, rateLow: 627.5, rateHigh: 627.5 },
+        { providerKey: '2', displayName: 'Example Endoscopy', rate: 578.31, percentile: 50, vsMedian: 1, aboveP25: 123.87, rateLow: 578.31, rateHigh: 578.31 },
       ],
     })
     const wrapper = mountCard(group)
 
     const highlights = wrapper.get('[data-testid="group-highlights"]')
-    expect(highlights.text()).toContain('Example Surgery Center')
-    expect(highlights.text()).toContain('75th percentile')
-    expect(highlights.text()).toContain(`${money(173.06)} above the 25th percentile`)
-    // The provider's own rate is the copper chip.
+    expect(highlights.text()).toContain('How your provider compares')
+    const lines = highlights.findAll('[data-testid="highlight-line"]')
+    expect(lines.map((line) => [line.get('strong').text(), line.get('[data-testid="highlight-position"]').text()])).toEqual([
+      // $627.50 against the "$578" the card shows: $49.50 more.
+      ['Example Surgery Center', 'Higher than most · $49.50 more than typical'],
+      ['Example Endoscopy', 'About typical'],
+    ])
+    // The provider's own price is the copper chip, to the cent.
     expect(highlights.get('[data-testid="your-rate"]').text()).toBe(money(627.5))
+    // Screen readers hear whose price the copper dot marks.
+    expect(wrapper.get('[role="img"]').attributes('aria-label')).toContain('Marked: Example Surgery Center, $627.50.')
 
     await wrapper.findAll('button').find((button) => button.text() === 'Show these providers')!.trigger('click')
     expect(wrapper.emitted('showProviders')).toEqual([[group.key]])
@@ -135,7 +187,7 @@ describe('GroupCard', () => {
     const group = makeGroup({
       highlights: [{ providerKey: 'a', displayName: 'Hudson Valley Gastroenterology PC', rate: 627.5, percentile: 75, vsMedian: 1.09, aboveP25: 173.06, rateLow: 627.5, rateHigh: 627.5 }],
     })
-    const heading = 'Where providers whose name contains "gastro" sit'
+    const heading = 'How providers whose name contains "gastro" compare'
     const highlights = mountCard(group, false, heading).get('[data-testid="group-highlights"]')
     expect(highlights.text()).toContain(heading)
     expect(highlights.text()).not.toContain('your provider')

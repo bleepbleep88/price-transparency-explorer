@@ -31,7 +31,7 @@ async function copyUrl() {
 <template>
   <div class="d-flex flex-column ga-3" data-testid="lens-innovators">
     <div>
-      <p class="text-body-medium">Across the comparison groups shown:</p>
+      <p class="text-body-medium">In these results:</p>
       <ul class="text-body-medium ps-4">
         <li v-for="line in lines" :key="line">{{ line }}</li>
       </ul>
