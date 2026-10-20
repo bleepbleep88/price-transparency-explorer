@@ -254,12 +254,14 @@ describe('employers lens', () => {
 })
 
 describe('innovators lens', () => {
-  it('puts the clean-up numbers in plain words', () => {
-    expect(qualityLines(makeResult([]).quality)).toEqual([
-      '6,642 published rows became 28 unique rates.',
-      '6,614 exact duplicates collapsed.',
-      '0 tax IDs masked: prefixes the IRS never issues.',
-      '0 whole-tax-ID contracts: no individual NPIs listed.',
+  it('puts the clean-up numbers in plain words, leaving out counts of zero', () => {
+    expect(qualityLines(makeResult([]).quality)).toEqual(['6,642 published rows became 28 unique rates.', '6,614 exact duplicates collapsed.'])
+    const quality = { publishedRows: 22193, uniqueRates: 549, duplicatesCollapsed: 21644, providersWithMultipleRates: 31, maskedTaxIds: 24, wholeTaxIdContracts: 1 }
+    expect(qualityLines(quality)).toEqual([
+      '22,193 published rows became 549 unique rates.',
+      '21,644 exact duplicates collapsed.',
+      '24 tax IDs masked: prefixes the IRS never issues.',
+      '1 whole-tax-ID contract: no individual NPIs listed.',
     ])
   })
 

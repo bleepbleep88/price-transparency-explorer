@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import { money, wholeDollars } from '@/lib/format'
 import type { CodeInfo, RateGroup, RateSearchResult } from '../../api/types'
@@ -157,14 +157,28 @@ describe('LensPanel', () => {
     expect(wrapper.find('[data-testid="yearly-gap"]').exists()).toBe(false)
   })
 
-  it('innovators: the clean-up numbers, the exact API request, and the API reference', () => {
+  it('innovators: the clean-up numbers, the exact API request, and the API reference', async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     const wrapper = mountPanel(result([group()]), { lens: 'innovators' })
+    expect(wrapper.text()).toContain('Across the comparison groups shown:')
     expect(wrapper.text()).toContain('13,789 published rows became 77 unique rates.')
-    expect(wrapper.get('[data-testid="api-url"]').text()).toBe(
-      `${window.location.origin}/api/v1/rates?code=45378&sort=rate&page=1&pageSize=25`,
-    )
+    const url = `${window.location.origin}/api/v1/rates?code=45378&sort=rate&page=1&pageSize=25`
+    expect(wrapper.get('[data-testid="api-url"]').text()).toBe(url)
     const hrefs = wrapper.findAll('a').map((link) => link.attributes('href'))
     expect(hrefs).toEqual(expect.arrayContaining(['/scalar/v1', '/openapi/v1.json']))
+
+    // Copying confirms with a check and a live-region message, and nothing clears it until the URL changes.
+    const status = wrapper.get('[data-testid="copy-status"]')
+    expect(status.text()).toBe('')
+    await wrapper.get('[data-testid="copy-api-url"]').trigger('click')
+    await flushPromises()
+    expect(writeText).toHaveBeenCalledWith(url)
+    expect(status.text()).toBe('Copied the API request')
+    expect(wrapper.get('[data-testid="copy-api-url"]').attributes('aria-label')).toBe('Copied the API request')
+    await wrapper.setProps({ params: parseRouteQuery({ code: '45378', lens: 'innovators', page: '2' }) })
+    expect(status.text()).toBe('')
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })
   })
 
   it('life sciences: unit prices by site for a drug, the facility-charge note, examples for anything else', async () => {

@@ -258,13 +258,13 @@ export const EMPLOYER_CAVEATS: readonly string[] = [
 
 // ---- Innovators ----
 
+/** The clean-up behind the statistics, in plain words; counts of zero are left out. */
 export function qualityLines(quality: SearchQuality): string[] {
-  return [
-    `${wholeNumber(quality.publishedRows)} published rows became ${plural(quality.uniqueRates, 'unique rate')}.`,
-    `${plural(quality.duplicatesCollapsed, 'exact duplicate')} collapsed.`,
-    `${plural(quality.maskedTaxIds, 'tax ID')} masked: prefixes the IRS never issues.`,
-    `${plural(quality.wholeTaxIdContracts, 'whole-tax-ID contract')}: no individual NPIs listed.`,
-  ]
+  const lines = [`${wholeNumber(quality.publishedRows)} published rows became ${plural(quality.uniqueRates, 'unique rate')}.`]
+  if (quality.duplicatesCollapsed) lines.push(`${plural(quality.duplicatesCollapsed, 'exact duplicate')} collapsed.`)
+  if (quality.maskedTaxIds) lines.push(`${plural(quality.maskedTaxIds, 'tax ID')} masked: prefixes the IRS never issues.`)
+  if (quality.wholeTaxIdContracts) lines.push(`${plural(quality.wholeTaxIdContracts, 'whole-tax-ID contract')}: no individual NPIs listed.`)
+  return lines
 }
 
 /** The API request behind this exact search, as an absolute URL to paste into a terminal or notebook. */

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'
-import { useClipboard } from '@vueuse/core'
-import { mdiClose, mdiContentCopy, mdiOpenInNew } from '@mdi/js'
+import { mdiCheck, mdiClose, mdiContentCopy, mdiOpenInNew } from '@mdi/js'
+import { copyText } from '@/lib/clipboard'
 import { megabytes, money, plural, shortDate } from '@/lib/format'
 import { ApiError } from '@/lib/apiClient'
 import { useRateSource } from '../composables/useRateQueries'
@@ -11,7 +11,18 @@ const open = defineModel<boolean>({ required: true })
 const props = defineProps<{ rateId: number | null; providerName?: string; providerKey?: string | null }>()
 
 const { smAndDown } = useDisplay()
-const { copy, copied } = useClipboard({ legacy: true, copiedDuring: 1500 })
+// Which value was copied last; the check mark stays until another rate opens or the drawer closes (no timer).
+const copied = ref<'JSON path' | 'SHA-256' | null>(null)
+watch([() => props.rateId, open], () => {
+  copied.value = null
+})
+
+async function copyValue(value: string, what: 'JSON path' | 'SHA-256') {
+  // Empty, then filled, so a second copy is announced again.
+  copied.value = null
+  await nextTick()
+  if (await copyText(value)) copied.value = what
+}
 // The row's provider is listed first, so it's visible even when a rate covers hundreds of provider groups.
 const source = useRateSource(
   () => (open.value ? props.rateId : null),
@@ -94,13 +105,27 @@ const comparisons = computed(() => {
           <h3 class="text-title-small mb-1">Exact spot in the file</h3>
           <div class="d-flex align-center ga-1">
             <code class="text-body-medium text-break flex-grow-1" data-testid="source-json-path">{{ data.jsonPath }}</code>
-            <v-btn :icon="mdiContentCopy" variant="text" size="small" aria-label="Copy JSON path" @click="copy(data.jsonPath)" />
+            <v-btn
+              :icon="copied === 'JSON path' ? mdiCheck : mdiContentCopy"
+              :color="copied === 'JSON path' ? 'success' : undefined"
+              variant="text"
+              size="small"
+              :aria-label="copied === 'JSON path' ? 'Copied the JSON path' : 'Copy the JSON path'"
+              @click="copyValue(data.jsonPath, 'JSON path')"
+            />
           </div>
           <div v-if="data.file.sha256" class="d-flex align-center ga-1 mt-1">
             <code class="text-body-small text-break flex-grow-1">SHA-256 {{ data.file.sha256 }}</code>
-            <v-btn :icon="mdiContentCopy" variant="text" size="small" aria-label="Copy SHA-256" @click="copy(data.file.sha256)" />
+            <v-btn
+              :icon="copied === 'SHA-256' ? mdiCheck : mdiContentCopy"
+              :color="copied === 'SHA-256' ? 'success' : undefined"
+              variant="text"
+              size="small"
+              :aria-label="copied === 'SHA-256' ? 'Copied the SHA-256' : 'Copy the SHA-256'"
+              @click="copyValue(data.file.sha256, 'SHA-256')"
+            />
           </div>
-          <p v-if="copied" class="text-body-small text-success" role="status">Copied</p>
+          <p class="d-sr-only" role="status">{{ copied ? `Copied the ${copied}` : '' }}</p>
         </section>
 
         <section>
