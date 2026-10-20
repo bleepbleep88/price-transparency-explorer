@@ -1,0 +1,111 @@
+/*
+ * Vuetify 4's reset keeps the browser's default margins on text blocks, and those margins don't collapse inside the
+ * flex columns used across the app. Spacing comes from Vuetify's spacing utilities and flex gaps instead.
+ * The rule sits in Vuetify's own reset layer so the utilities (later layers, not !important) still win.
+ */
+@layer vuetify-core.reset {
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  ul,
+  ol,
+  figure,
+  blockquote {
+    margin: 0;
+  }
+}
+
+/* Text that explains itself in a tooltip. */
+.has-tooltip {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+/* ---- Ledger type: Fraunces for headings, IBM Plex Sans for everything else, figures that line up. ---- */
+:root {
+  --v-font-body: 'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, sans-serif;
+  --v-font-heading: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+}
+
+body,
+.v-application {
+  font-family: var(--v-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+/* App title, page and section titles, card titles. */
+h1,
+h2,
+.v-toolbar-title,
+.v-card-title {
+  font-family: var(--v-font-heading);
+  font-optical-sizing: auto;
+  letter-spacing: 0;
+}
+
+.v-card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+/* Big numbers stay in the body face so every figure in the app shares one set of digits. */
+.stat-figure {
+  font-family: var(--v-font-body);
+  font-weight: 600;
+}
+
+/* ---- Copper marks the provider you searched: rows, the range-bar marker, and its rate chips. ---- */
+
+/* Copper fill with ink text and a copper border (copper text would be too faint on paper). */
+.v-chip.copper-mark {
+  color: rgb(var(--v-theme-on-surface));
+  border-color: rgb(var(--v-theme-copper));
+  background-color: rgba(var(--v-theme-copper), 0.22);
+  font-weight: 600;
+}
+
+.yours-rule {
+  border-left: 3px solid rgb(var(--v-theme-copper));
+  padding-left: 10px;
+}
+
+.v-table tr.row-yours > td:first-child {
+  box-shadow: inset 3px 0 0 rgb(var(--v-theme-copper));
+}
+
+/* ---- Ledger rules ---- */
+
+/* A firmer rule under table headers; rows keep Vuetify's hairline. */
+.v-table > .v-table__wrapper > table > thead > tr > th {
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.45);
+}
+
+/* Keyboard focus a reader can see: Vuetify's focus tint on lists, chips and buttons is about 1.3:1. Primary is 5.8:1 or
+   more against paper and cards in both themes. */
+.v-list-item:focus-visible,
+.v-chip:focus-visible,
+.v-btn:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+/* Placeholders carry real hints (the example codes, "All products"), so they need 4.5:1; Vuetify draws them at the
+   disabled opacity (about 1.9:1 on paper). Only where Vuetify shows them, so a resting label never sits on one. */
+.v-field--active input::placeholder,
+.v-field--no-label input::placeholder {
+  opacity: 1;
+  color: rgba(var(--v-theme-on-surface), 0.8);
+}
+
+/* Field outlines at rest meet 3:1 against the page (Vuetify's 0.38 is about 2.4:1). Hover, focus and error keep
+   Vuetify's own stronger values because this rule stops matching in those states. */
+.v-input:not(.v-input--error) .v-field:not(:hover):not(.v-field--focused) .v-field__outline {
+  --v-field-border-opacity: 0.5;
+}

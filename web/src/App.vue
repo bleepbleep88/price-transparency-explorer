@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { mdiMagnify, mdiThemeLightDark } from '@mdi/js'
 import { useTheme } from 'vuetify'
+import DataStatusChip from '@/features/status/components/DataStatusChip.vue'
+import { useDataStatus } from '@/features/status/useDataStatus'
 
 const theme = useTheme()
+
+// Start the live status stream once for the whole app.
+useDataStatus()
 
 const navItems = [{ title: 'Search', to: { name: 'search' }, icon: mdiMagnify }]
 </script>
@@ -21,6 +26,7 @@ const navItems = [{ title: 'Search', to: { name: 'search' }, icon: mdiMagnify }]
       </nav>
 
       <template #append>
+        <DataStatusChip class="me-2" />
         <v-btn
           :icon="mdiThemeLightDark"
           variant="text"
@@ -34,7 +40,7 @@ const navItems = [{ title: 'Search', to: { name: 'search' }, icon: mdiMagnify }]
       <router-view />
     </v-main>
 
-    <v-footer class="text-caption text-medium-emphasis justify-center text-center px-4">
+    <v-footer color="background" border="t" class="text-body-small text-medium-emphasis justify-center text-center px-4">
       Negotiated rates as published by the plan in its Transparency in Coverage files. A negotiated rate is not your
       out-of-pocket cost. CPT® is a registered trademark of the American Medical Association; descriptions are shown as
       published by the payer.

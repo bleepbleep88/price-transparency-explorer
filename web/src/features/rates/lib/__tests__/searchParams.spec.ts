@@ -1,0 +1,143 @@
+import { describe, expect, it } from 'vitest'
+import {
+  formValuesFrom,
+  mergeQuery,
+  npiCheckDigitWarning,
+  parseRouteQuery,
+  toApiQuery,
+  validateSearchForm,
+} from '../searchParams'
+
+describe('parseRouteQuery', () => {
+  it('reads every search parameter and trims values', () => {
+    const params = parseRouteQuery({
+      code: ' 45378 ',
+      npi: '1396747861',
+      ein: '11-3471596',
+      setting: 'asc',
+      feeType: 'facility',
+      provider: 'nyu',
+      group: 'g1',
+      sort: '-rate',
+      page: '3',
+      pageSize: '50',
+      snapshot: '2',
+    })
+    expect(params).toEqual({
+      code: '45378',
+      codeType: undefined,
+      npi: '1396747861',
+      ein: '11-3471596',
+      product: undefined,
+      setting: 'asc',
+      feeType: 'facility',
+      provider: 'nyu',
+      group: 'g1',
+      sort: '-rate',
+      page: 3,
+      pageSize: 50,
+      snapshot: 2,
+    })
+  })
+
+  it('falls back to defaults for unknown or malformed values', () => {
+    const params = parseRouteQuery({ code: ['29881', 'x'], sort: 'price', page: '-2', pageSize: '1000', feeType: 'both', snapshot: 'x' })
+    expect(params.code).toBe('29881')
+    expect(params.sort).toBe('rate')
+    expect(params.page).toBe(1)
+    expect(params.pageSize).toBe(25)
+    expect(params.feeType).toBeUndefined()
+    expect(params.snapshot).toBeUndefined()
+  })
+})
+
+describe('mergeQuery', () => {
+  it('applies a patch, removes nulls, and drops defaults', () => {
+    const next = mergeQuery({ code: '45378', ein: '113471596', page: '4' }, { ein: null, setting: 'asc', page: 1, sort: 'rate' })
+    expect(next).toEqual({ code: '45378', setting: 'asc' })
+  })
+
+  it('leaves keys alone when the patch value is undefined', () => {
+    expect(mergeQuery({ code: '45378', npi: '1' }, { npi: undefined })).toEqual({ code: '45378', npi: '1' })
+  })
+})
+
+describe('lens and cases', () => {
+  it('reads a known lens and a case count, and drops anything else', () => {
+    expect(parseRouteQuery({ code: '45378', lens: 'employers', cases: '1200' })).toMatchObject({ lens: 'employers', cases: 1200 })
+    expect(parseRouteQuery({ code: '45378', lens: 'life-sciences' }).lens).toBe('life-sciences')
+    const bad = parseRouteQuery({ code: '45378', lens: 'payers', cases: '-3' })
+    expect(bad.lens).toBeUndefined()
+    expect(bad.cases).toBeUndefined()
+    expect(parseRouteQuery({ code: '45378', cases: '2000000' }).cases).toBeUndefined()
+  })
+
+  it('never sends the lens or the case count to the API', () => {
+    const query = toApiQuery(parseRouteQuery({ code: '45378', lens: 'plans', cases: '10' }))
+    expect(query).not.toHaveProperty('lens')
+    expect(query).not.toHaveProperty('cases')
+  })
+
+  it('drops the case count for a different code, and keeps it otherwise', () => {
+    expect(mergeQuery({ code: '45378', lens: 'employers', cases: '1200' }, { code: '66984', page: null })).toEqual({ code: '66984', lens: 'employers' })
+    expect(mergeQuery({ code: '45378', cases: '1200' }, { code: '45378', npi: '1396747861' })).toMatchObject({ cases: '1200' })
+    expect(mergeQuery({ code: '45378', cases: '1200' }, { lens: 'plans' })).toMatchObject({ cases: '1200' })
+    expect(mergeQuery({ code: '45378', cases: '1200' }, { code: '66984', cases: 10 })).toMatchObject({ code: '66984', cases: '10' })
+  })
+
+  it('keeps the lens when a new search replaces the code', () => {
+    const next = mergeQuery({ code: '45378', lens: 'plans', npi: '1396747861' }, { code: '99213', npi: null, page: null })
+    expect(next).toEqual({ code: '99213', lens: 'plans' })
+  })
+})
+
+describe('toApiQuery', () => {
+  it('sends only what the API understands', () => {
+    const query = toApiQuery(parseRouteQuery({ code: '45378', page: '2' }))
+    expect(query).toMatchObject({ code: '45378', page: 2, pageSize: 25, sort: 'rate' })
+  })
+})
+
+describe('validateSearchForm', () => {
+  const valid = { code: '45378', npi: '', ein: '', provider: '' }
+
+  it('accepts a code alone', () => {
+    expect(validateSearchForm(valid)).toEqual({})
+  })
+
+  it('requires a code with a helpful message', () => {
+    expect(validateSearchForm({ ...valid, code: '  ' }).code).toMatch(/Enter a billing code/)
+  })
+
+  it.each([
+    ['code', '!!!', /only letters and digits/],
+    ['code', '123456789', /up to 8/],
+    ['npi', '12345', /10 digits/],
+    ['npi', '13967478AB', /10 digits/],
+    ['ein', '1234', /9 digits/],
+    ['provider', 'a', /at least 2/],
+  ] as const)('rejects %s = %s', (field, value, message) => {
+    expect(validateSearchForm({ ...valid, [field]: value })[field]).toMatch(message)
+  })
+
+  it.each(['11-3471596', '113471596', 'u0123456789ab'])('accepts EIN or provider key %s', (ein) => {
+    expect(validateSearchForm({ ...valid, ein })).toEqual({})
+  })
+
+  it('round-trips params into form values', () => {
+    expect(formValuesFrom(parseRouteQuery({ code: '45378', npi: '1396747861' }))).toEqual({
+      code: '45378',
+      npi: '1396747861',
+      ein: '',
+      provider: '',
+    })
+  })
+})
+
+describe('npiCheckDigitWarning', () => {
+  it('warns (without blocking) on a 10-digit NPI that fails the check digit', () => {
+    expect(npiCheckDigitWarning('1861171663')).toMatch(/fails the standard check-digit test/)
+    expect(npiCheckDigitWarning('1396747861')).toBeNull()
+    expect(npiCheckDigitWarning('123')).toBeNull()
+  })
+})

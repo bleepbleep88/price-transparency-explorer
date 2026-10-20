@@ -13,11 +13,18 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // The Vuetify plugin adds component imports while transforming .vue files, so Vite's dependency scan can't see them.
+  // Pre-bundling Vuetify would then re-bundle and reload the page mid-navigation on a cold start.
+  optimizeDeps: { exclude: ['vuetify'] },
   server: {
     port: 5173,
     // Same-origin in dev: the .NET API runs on :5080 (see src/PriceExplorer.Api/Properties/launchSettings.json).
-    proxy: {
-      '/api': { target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:5080', changeOrigin: true },
-    },
+    // The API also serves its reference (OpenAPI document and Scalar UI); nginx forwards the same paths in the container.
+    proxy: Object.fromEntries(
+      ['/api', '/openapi', '/scalar'].map((path) => [
+        path,
+        { target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:5080', changeOrigin: true },
+      ]),
+    ),
   },
 })
