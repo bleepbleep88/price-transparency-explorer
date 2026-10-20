@@ -38,7 +38,7 @@ function makeGroup(overrides: Partial<RateGroup> = {}): RateGroup {
       spreadMultiple: 5.1,
       p90ToP10: 1.79,
     },
-    savingsPerCase: 123.87,
+    lowerQuartileGap: 123.87,
     listedRates: [],
     highlights: [],
     notes: ['The plan files these facility rates under revenue code 0490 (Ambulatory surgery).'],
@@ -60,7 +60,7 @@ describe('GroupCard', () => {
         rateCount: 3,
         listedRates: [180.5, 212, 260.75],
         stats: { min: 180.5, p10: null, p25: null, median: null, p75: null, p90: null, max: 260.75, spreadMultiple: null, p90ToP10: null },
-        savingsPerCase: null,
+        lowerQuartileGap: null,
       }),
     )
 
@@ -71,14 +71,14 @@ describe('GroupCard', () => {
     expect(wrapper.text()).not.toContain('Median')
   })
 
-  it('shows median and range for 5 to 9 providers, without savings', () => {
+  it('shows median and range for 5 to 9 providers, without the quartile gap', () => {
     const wrapper = mountCard(
       makeGroup({
         statsLevel: 'basic',
         providerCount: 6,
         rateCount: 6,
         stats: { min: 150, p10: null, p25: null, median: 205.4, p75: null, p90: null, max: 320, spreadMultiple: 2.13, p90ToP10: null },
-        savingsPerCase: null,
+        lowerQuartileGap: null,
       }),
     )
 
@@ -86,27 +86,29 @@ describe('GroupCard', () => {
     expect(basic.text()).toContain(money(205.4))
     expect(basic.text()).toContain(`Range ${money(150)} to ${money(320)}`)
     expect(wrapper.find('[data-testid="stats-full"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="savings"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="quartile-gap"]').exists()).toBe(false)
   })
 
-  it('shows full statistics and turns cases a year into annual savings for 10+ providers', async () => {
+  it('shows full statistics and the gap to the lower quartile for 10+ providers', () => {
     const wrapper = mountCard(makeGroup())
 
     const full = wrapper.get('[data-testid="stats-full"]')
     for (const value of [454.44, 578.31, 627.5]) expect(full.text()).toContain(money(value))
-    expect(wrapper.get('[data-testid="savings"]').text()).toContain(`${money(123.87)} per case`)
-    expect(wrapper.find('[data-testid="annual-savings"]').exists()).toBe(false)
-
-    await wrapper.get('[data-testid="annual-cases"] input').setValue('12')
-
-    expect(wrapper.get('[data-testid="annual-savings"]').text()).toContain(money(123.87 * 12))
+    const gap = wrapper.get('[data-testid="quartile-gap"]').text()
+    expect(gap).toContain(`${money(123.87)} gap to the lower quartile`)
+    expect(gap).toContain(`the median rate is ${money(578.31)}`)
+    expect(gap).toContain(`a quarter of providers are paid ${money(454.44)} or less`)
   })
 
-  it('says there is no saving when the 25th percentile equals the median', () => {
-    const wrapper = mountCard(makeGroup({ savingsPerCase: 0 }))
+  it('says there is no gap when the 25th percentile equals the median', () => {
+    const wrapper = mountCard(makeGroup({ lowerQuartileGap: 0 }))
 
-    expect(wrapper.find('[data-testid="no-savings"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="savings"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="no-gap"]').text()).toBe('No gap: the 25th percentile and the median are the same rate.')
+    expect(wrapper.find('[data-testid="quartile-gap"]').exists()).toBe(false)
+  })
+
+  it('describes the gap in neutral words', () => {
+    expect(mountCard(makeGroup()).text().toLowerCase()).not.toMatch(/sav(e|ed|ing|ings)/)
   })
 
   it("shows where the searched provider sits and emits the group key", async () => {

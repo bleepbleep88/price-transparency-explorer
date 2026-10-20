@@ -155,7 +155,8 @@ export interface RateGroup {
   rateCount: number
   statsLevel: StatsLevel
   stats: RateStats
-  savingsPerCase: number | null
+  /** Median minus the 25th percentile (full stats only): how far a typical rate sits above the lower quartile. */
+  lowerQuartileGap: number | null
   listedRates: number[]
   highlights: ProviderPosition[]
   notes: string[]

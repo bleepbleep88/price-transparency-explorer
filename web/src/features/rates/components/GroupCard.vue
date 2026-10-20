@@ -8,13 +8,9 @@ import RangeBar from './RangeBar.vue'
 const props = defineProps<{ group: RateGroup; selected?: boolean }>()
 const emit = defineEmits<{ showProviders: [groupKey: string] }>()
 
-const annualCases = ref<number | null>(null)
 const showNotes = ref(false)
 
 const stats = computed(() => props.group.stats)
-const annualSavings = computed(() =>
-  props.group.savingsPerCase != null && annualCases.value ? props.group.savingsPerCase * annualCases.value : null,
-)
 const facilityBilling = computed(() => props.group.billedAs.filter((billed) => billed.billingCodeType === 'RC'))
 
 function positionText(position: ProviderPosition): string {
@@ -80,7 +76,7 @@ function positionText(position: ProviderPosition): string {
         <RangeBar :stats="stats" :marker="group.highlights[0]?.rate" class="mt-1" />
       </div>
 
-      <!-- 10+ providers: full statistics and savings. -->
+      <!-- 10+ providers: full statistics and the gap to the lower quartile. -->
       <div v-else data-testid="stats-full" class="d-flex flex-column ga-2">
         <div class="d-flex justify-space-between text-center">
           <div>
@@ -102,30 +98,14 @@ function positionText(position: ProviderPosition): string {
             · 90th to 10th percentile: {{ times(stats.p90ToP10) }}</template
           >
         </p>
-        <p v-if="group.savingsPerCase === 0" class="text-body-2 text-medium-emphasis" data-testid="no-savings">
-          No saving from switching providers: the 25th percentile and the median are the same rate.
+        <p v-if="group.lowerQuartileGap === 0" class="text-body-2 text-medium-emphasis" data-testid="no-gap">
+          No gap: the 25th percentile and the median are the same rate.
         </p>
-        <v-sheet v-else-if="group.savingsPerCase != null" rounded="lg" class="savings pa-3 d-flex flex-column ga-2" data-testid="savings">
+        <v-sheet v-else-if="group.lowerQuartileGap != null" rounded class="quartile-gap pa-3" data-testid="quartile-gap">
           <p class="text-body-2">
-            <strong>{{ money(group.savingsPerCase) }} per case</strong> saved by moving care from a typical (median)
-            provider to one at the 25th percentile.
+            <strong>{{ money(group.lowerQuartileGap) }}</strong> gap to the lower quartile: the median rate is
+            {{ money(stats.median) }}; a quarter of providers are paid {{ money(stats.p25) }} or less.
           </p>
-          <div class="d-flex align-center ga-3 flex-wrap">
-            <v-number-input
-              v-model="annualCases"
-              label="Cases a year"
-              :min="0"
-              :max="1000000"
-              control-variant="hidden"
-              density="compact"
-              hide-details
-              style="max-width: 150px"
-              data-testid="annual-cases"
-            />
-            <span v-if="annualSavings != null" class="text-body-2" data-testid="annual-savings">
-              ≈ <strong>{{ money(annualSavings) }}</strong> a year
-            </span>
-          </div>
         </v-sheet>
       </div>
 
@@ -157,7 +137,7 @@ function positionText(position: ProviderPosition): string {
 </template>
 
 <style scoped>
-.savings {
+.quartile-gap {
   background: rgba(var(--v-theme-primary), 0.08);
 }
 </style>
