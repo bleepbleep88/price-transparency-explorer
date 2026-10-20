@@ -13,7 +13,8 @@ SELECT
     v.rate_count           AS RateCount,
     v.npi_weight           AS NpiWeight,
     v.first_rate_id        AS FirstRateId,
-    v.whole_tax_id_rate_id AS WholeTaxIdRateId
+    v.whole_tax_id_rate_id AS WholeTaxIdRateId,
+    v.rate_set             AS RateSet
 FROM provider_values v
 WHERE v.snapshot_id = $snapshotId
   AND ($codes::VARCHAR IS NULL OR list_contains(string_split($codes::VARCHAR, ','), v.code))

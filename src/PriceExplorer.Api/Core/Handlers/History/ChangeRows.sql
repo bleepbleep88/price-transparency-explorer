@@ -1,5 +1,4 @@
--- Follows ChangePairs.sql: one page of changed, new and dropped pairs ($kind: one of them, increased or decreased for
--- changed ones by direction, or NULL for all), with the
+-- Follows ChangePairs.sql: one page of the included changed, new and dropped pairs of $kind (of_kind), with the
 -- group's product label and unit from the snapshot that has the provider. Every sort ends on group and provider, so pages
 -- never overlap. Column order matches ChangeRow.
 SELECT
@@ -31,14 +30,10 @@ SELECT
 FROM shown s
 LEFT JOIN group_stats g
     ON g.snapshot_id = CASE WHEN s.kind = 'dropped' THEN $from ELSE $to END AND g.group_key = s.group_key
-WHERE s.kind <> 'unchanged'
-  AND ($kind::VARCHAR IS NULL
-       OR s.kind = $kind::VARCHAR
-       OR ($kind::VARCHAR = 'increased' AND s.kind = 'changed' AND s.to_value > s.from_value)
-       OR ($kind::VARCHAR = 'decreased' AND s.kind = 'changed' AND s.to_value < s.from_value))
+WHERE s.kind <> 'unchanged' AND s.of_kind AND s.included
 ORDER BY
-    -- largest: rates under a procedure code before facility charges filed under a revenue code alone (they state no unit,
-    -- so they aren't ranked with the rest); within each, the biggest moves first, then new and dropped rates, highest first.
+    -- largest: the biggest moves first, then new and dropped rates, highest first. Revenue-code-only facility charges,
+    -- when included, come after the rest: they state no unit, so they aren't ranked with them.
     CASE WHEN $sort = 'largest' THEN s.code_type = 'RC' END ASC,
     CASE WHEN $sort = 'largest' THEN abs(s.change_pct) END DESC NULLS LAST,
     CASE WHEN $sort = 'largest' THEN coalesce(s.to_value, s.from_value) END DESC,

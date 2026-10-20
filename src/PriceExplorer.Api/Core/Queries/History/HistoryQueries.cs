@@ -23,6 +23,8 @@ namespace PriceExplorer.Api.Core.Queries.History;
 /// <param name="ListedElsewhere">false leaves out new and dropped rates whose provider the other file lists for the same
 /// code under other modifiers or another setting; true keeps only those.</param>
 /// <param name="Sort">largest (biggest moves first) | -changePct | changePct | code | -code | provider | -provider.</param>
+/// <param name="IncludeRevenueCodeOnly">true adds facility charges filed only under a revenue code. They state no unit, so
+/// by default they're left out of the rows and counts (decision 89); counts.revenueCodeOnly says how many there are.</param>
 public sealed record GetChangesQuery(
     int? From = null,
     int? To = null,
@@ -33,7 +35,8 @@ public sealed record GetChangesQuery(
     bool? ListedElsewhere = null,
     string? Sort = null,
     int Page = 1,
-    int PageSize = 25) : IRequest<ChangesResult>, IRequiresData;
+    int PageSize = 25,
+    bool IncludeRevenueCodeOnly = false) : IRequest<ChangesResult>, IRequiresData;
 
 public sealed class GetChangesQueryValidator : AbstractValidator<GetChangesQuery>
 {

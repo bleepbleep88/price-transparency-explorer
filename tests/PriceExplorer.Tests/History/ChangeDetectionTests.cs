@@ -4,7 +4,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using PriceExplorer.Api.Configuration;
 using PriceExplorer.Api.Core.Data;
-using PriceExplorer.Api.Core.Exceptions;
 using PriceExplorer.Api.Core.Handlers.History;
 using PriceExplorer.Api.Core.Ingestion;
 using PriceExplorer.Api.Core.Models.History;
@@ -42,7 +41,7 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
             """);
         await FileAsync(August, Ambetter);
         await FileAsync(September, Ambetter);
-        // Both snapshots' statistics are built from these files; files a test adds later leave them built, not current.
+        // Both snapshots' statistics are built from these files; a test that adds files marks them rebuilt (RebuiltAsync).
         await MarkStatisticsCurrentAsync(August);
         await MarkStatisticsCurrentAsync(September);
     }
@@ -67,7 +66,8 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
         var result = await ChangesAsync(new GetChangesQuery());
 
         result.Counts.Should().Be(new ChangeCounts(
-            Changed: 1, Increased: 1, Decreased: 0, New: 1, NewListedElsewhere: 0, Dropped: 1, DroppedListedElsewhere: 0, Unchanged: 1));
+            Changed: 1, Increased: 1, Decreased: 0, New: 1, NewListedElsewhere: 0, Dropped: 1, DroppedListedElsewhere: 0, Unchanged: 1,
+            RevenueCodeOnly: 0));
         result.Rows.Items.Select(row => (row.Kind, row.ProviderKey, row.From, row.To, row.Change, row.ChangePct)).Should().Equal(
             ("changed", "111111111", 600m, 660m, 60m, 10m),
             ("new", "444444444", null, 750m, null, null),
@@ -85,7 +85,7 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
         var big = await ChangesAsync(new GetChangesQuery(MinChangePct: 1));
 
         all.Rows.Items.Should().ContainSingle().Which.Should().Match<RateChange>(row => row.Change == 50m && row.ChangePct == null);
-        big.Counts.Changed.Should().Be(0);
+        big.Counts!.Changed.Should().Be(0);
         big.Rows.Items.Should().BeEmpty();
     }
 
@@ -99,7 +99,7 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
 
         var result = await ChangesAsync(new GetChangesQuery(MinChangePct: (decimal)minimum));
 
-        result.Counts.Changed.Should().Be(changed);
+        result.Counts!.Changed.Should().Be(changed);
         result.Rows.Items.Select(row => row.ChangePct).Should().Equal(changed == 1 ? [-5.0m] : []);
     }
 
@@ -113,7 +113,7 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
         await PairAsync("ambetter|RC|0490|facility|asc||negotiated", "111111111", 900m, 990m);
         await PairAsync("ambetter|CPT|00490|professional|asc||negotiated", "111111111", 9m, 10m);
 
-        var result = await ChangesAsync(new GetChangesQuery(Code: code));
+        var result = await ChangesAsync(new GetChangesQuery(Code: code, IncludeRevenueCodeOnly: true));
 
         result.Rows.Items.Select(row => row.Code).Should().BeEquivalentTo(matched);
     }
@@ -157,6 +157,7 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
     {
         await FileAsync(August, Essential);
         await FileAsync(September, Essential);
+        await RebuiltAsync();
         await ValueAsync(August, Colonoscopy, "111111111", 600m);
         await ValueAsync(September, "essential|CPT|45378|facility|asc||negotiated", "111111111", 600m);
 
@@ -169,72 +170,104 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
     public async Task A_product_only_one_snapshot_has_is_listed_but_not_compared()
     {
         await FileAsync(September, Essential);
+        await RebuiltAsync();
         await ValueAsync(September, "essential|CPT|45378|facility|asc||negotiated", "111111111", 600m);
 
         var result = await ChangesAsync(new GetChangesQuery(Product: Essential));
 
         result.Products.Should().ContainEquivalentOf(new ChangesProduct(Essential, "essential label", false, "Not in the 2026-08-31 snapshot."));
         result.Products.Should().ContainEquivalentOf(new ChangesProduct(Ambetter, "ambetter label", true, null));
-        result.Counts.Should().Be(new ChangeCounts(0, 0, 0, 0, 0, 0, 0, 0), "the provider isn't new: the product wasn't in the older snapshot at all");
+        result.Counts.Should().Be(new ChangeCounts(0, 0, 0, 0, 0, 0, 0, 0, 0), "the provider isn't new: the product wasn't in the older snapshot at all");
     }
 
-    [Fact]
-    public async Task Rate_ids_are_given_only_for_snapshots_whose_saved_statistics_are_current()
+    [Theory]
+    [InlineData("built but out of date", "The numbers for 2026-08-31 are being updated. Changes show once loading finishes.")]
+    [InlineData("not built", "The numbers for 2026-08-31 are still being saved. Changes show once loading finishes.")]
+    public async Task Until_both_snapshots_statistics_are_built_and_current_there_are_no_counts_or_rows_only_a_message(
+        string august, string message)
     {
         await PairAsync(Colonoscopy, "111111111", 600m, 660m);
-
         var current = await ChangesAsync(new GetChangesQuery());
-        // As if the app was rebuilt since August's statistics: still built, no longer current.
-        await ExecuteAsync("UPDATE stats_builds SET code_version = 'an-older-app' WHERE snapshot_id = 1");
-        var halfCurrent = await ChangesAsync(new GetChangesQuery());
 
-        current.Current.Should().BeTrue();
+        // As if the app was rebuilt since August's statistics (still built, no longer current), or they're being built:
+        // its saved values would read as changes nobody made, or as every September rate new.
+        await ExecuteAsync(august == "not built"
+            ? "DELETE FROM stats_builds WHERE snapshot_id = 1"
+            : "UPDATE stats_builds SET code_version = 'an-older-app' WHERE snapshot_id = 1");
+        var waiting = await ChangesAsync(new GetChangesQuery());
+
+        current.Should().Match<ChangesResult>(result => result.Current && result.Message == null && result.Counts!.Changed == 1);
         current.Rows.Items.Single().Should().Match<RateChange>(row => row.FromRateId != null && row.ToRateId != null);
-        halfCurrent.Current.Should().BeFalse("the older snapshot's statistics aren't current");
-        halfCurrent.To.StatisticsCurrent.Should().BeTrue();
-        halfCurrent.From.StatisticsCurrent.Should().BeFalse();
-        halfCurrent.Rows.Items.Single().Should().Match<RateChange>(row => row.FromRateId == null && row.ToRateId != null);
+        waiting.Current.Should().BeFalse();
+        waiting.Message.Should().Be(message);
+        waiting.Counts.Should().BeNull();
+        waiting.Rows.Should().Be(new RateChangesPage(0, 1, 25, []));
+        waiting.To.StatisticsCurrent.Should().BeTrue();
+        waiting.From.StatisticsCurrent.Should().BeFalse();
+        waiting.Products.Should().ContainSingle(product => product.ProductKey == Ambetter && product.Compared);
     }
 
     [Fact]
-    public async Task Until_both_snapshots_statistics_are_built_there_are_no_counts_only_a_503_to_try_later()
+    public async Task Facility_charges_filed_only_under_a_revenue_code_are_left_out_unless_asked_for_and_their_count_follows_the_filters()
     {
-        // While August's statistics are built, its saved values are empty: every September rate would read as new.
-        await ValueAsync(September, Colonoscopy, "111111111", 660m);
-        await ExecuteAsync("DELETE FROM stats_builds WHERE snapshot_id = 1");
-
-        var changes = () => ChangesAsync(new GetChangesQuery());
-
-        var problem = (await changes.Should().ThrowAsync<StatisticsNotReadyException>()).Which;
-        problem.Code.Should().Be("statistics_building");
-        problem.StatusCode.Should().Be(503);
-        problem.Message.Should().Be("The saved statistics for 2026-08-31 aren't built yet. They're built once loading finishes.");
-    }
-
-    [Fact]
-    public async Task The_biggest_moves_lead_with_procedure_codes_and_revenue_code_only_charges_follow()
-    {
-        // A facility charge filed under a revenue code alone states no unit, so it isn't ranked with procedure codes.
-        await PairAsync("ambetter|RC|0301|facility|hospital-outpatient||negotiated", "rc-only", 20m, 1667m, name: "RC only");
+        // A facility charge filed under a revenue code alone states no unit, so it isn't ranked with the rest (decision 89).
+        await PairAsync("ambetter|RC|0301|facility|hospital-outpatient||negotiated", "rc-up", 20m, 1667m, name: "RC up");
+        await PairAsync("ambetter|RC|0450|facility|hospital-outpatient||negotiated", "rc-down", 500m, 490m, name: "RC down");
         await PairAsync("ambetter|CPT|45378|facility|asc||negotiated", "cpt-small", 100m, 101m, name: "CPT small");
         await PairAsync("ambetter|CPT|99213|professional|office||negotiated", "cpt-big", 100m, 150m, name: "CPT big");
 
         var largest = await ChangesAsync(new GetChangesQuery());
-        var byPercent = await ChangesAsync(new GetChangesQuery(Sort: "-changePct"));
+        var included = await ChangesAsync(new GetChangesQuery(IncludeRevenueCodeOnly: true));
+        var byPercent = await ChangesAsync(new GetChangesQuery(Sort: "-changePct", IncludeRevenueCodeOnly: true));
+        var down = await ChangesAsync(new GetChangesQuery(Kind: "decreased"));
+        var big = await ChangesAsync(new GetChangesQuery(MinChangePct: 10));
 
-        largest.Rows.Items.Select(row => row.ProviderKey).Should().Equal("cpt-big", "cpt-small", "rc-only");
-        byPercent.Rows.Items.Select(row => row.ProviderKey).Should().Equal(["rc-only", "cpt-big", "cpt-small"], "only the default order sets them apart");
-        largest.Counts.Changed.Should().Be(3, "revenue-code rows still count");
+        largest.Rows.Items.Select(row => row.ProviderKey).Should().Equal("cpt-big", "cpt-small");
+        largest.Counts.Should().Match<ChangeCounts>(counts => counts.Changed == 2 && counts.Increased == 2 && counts.RevenueCodeOnly == 2);
+        included.Rows.Items.Select(row => row.ProviderKey).Should().Equal(["cpt-big", "cpt-small", "rc-up", "rc-down"], "they follow the rest");
+        included.Counts.Should().Match<ChangeCounts>(counts => counts.Changed == 4 && counts.Decreased == 1 && counts.RevenueCodeOnly == 2);
+        byPercent.Rows.Items.Select(row => row.ProviderKey).Should().Equal(["rc-up", "cpt-big", "cpt-small", "rc-down"], "only the default order sets them apart");
+        down.Counts!.RevenueCodeOnly.Should().Be(1, "the switch's count follows the kind asked for");
+        down.Rows.Items.Should().BeEmpty();
+        big.Counts!.RevenueCodeOnly.Should().Be(1, "and the minimum change");
+    }
+
+    [Fact]
+    public async Task A_rate_is_changed_only_when_the_file_lists_a_different_rate()
+    {
+        // Same two rates in both files; only the NPI counts behind them moved, so the provider's value moved too.
+        await ValueAsync(August, Colonoscopy, "same-rates", 234.83m, rateSet: "66.0900,234.8300");
+        await ValueAsync(September, Colonoscopy, "same-rates", 66.09m, rateSet: "66.0900,234.8300");
+        // A rate added at the top: different rates, same value.
+        await ValueAsync(August, Colonoscopy, "same-value", 100m, rateSet: "100.0000");
+        await ValueAsync(September, Colonoscopy, "same-value", 100m, rateSet: "100.0000,300.0000");
+        // A rate replaced: a change.
+        await ValueAsync(August, Colonoscopy, "new-rate", 100m, rateSet: "100.0000,110.0000");
+        await ValueAsync(September, Colonoscopy, "new-rate", 120m, rateSet: "110.0000,120.0000");
+
+        var result = await ChangesAsync(new GetChangesQuery());
+
+        result.Rows.Items.Should().ContainSingle().Which.Should().Match<RateChange>(row => row.ProviderKey == "new-rate" && row.Change == 20m);
+        result.Counts.Should().Match<ChangeCounts>(counts => counts.Changed == 1 && counts.Unchanged == 2);
     }
 
     [Fact]
     public void A_trend_step_counts_who_stayed_who_moved_and_who_came_or_went()
     {
-        var before = new Dictionary<string, decimal> { ["a"] = 100m, ["b"] = 100m, ["c"] = 50m, ["gone"] = 10m };
-        var after = new Dictionary<string, decimal> { ["a"] = 110m, ["b"] = 100m, ["c"] = 40m, ["new1"] = 300m, ["new2"] = 300m };
+        static ProviderRates Rate(decimal value, string? rates = null) => new(value, rates ?? value.ToString("0.0000", System.Globalization.CultureInfo.InvariantCulture));
+        var before = new Dictionary<string, ProviderRates>
+        {
+            ["a"] = Rate(100m), ["b"] = Rate(100m), ["c"] = Rate(50m), ["moved"] = Rate(80m, "60.0000,80.0000"), ["gone"] = Rate(10m),
+        };
+        var after = new Dictionary<string, ProviderRates>
+        {
+            ["a"] = Rate(110m), ["b"] = Rate(100m), ["c"] = Rate(40m), ["moved"] = Rate(60m, "60.0000,80.0000"), ["new1"] = Rate(300m),
+            ["new2"] = Rate(300m),
+        };
 
-        GetRateTrendHandler.Step(7, before, after).Should().Be(new TrendStep(7, Stayed: 3, Raised: 1, Lowered: 1, Left: 1, Joined: 2));
-        GetRateTrendHandler.Step(7, before, before).Should().Be(new TrendStep(7, Stayed: 4, Raised: 0, Lowered: 0, Left: 0, Joined: 0));
+        GetRateTrendHandler.Step(7, before, after).Should().Be(
+            new TrendStep(7, Stayed: 4, Raised: 1, Lowered: 1, Reweighted: 1, Left: 1, Joined: 2), "the same rates with clinicians moved between them aren't a lower rate");
+        GetRateTrendHandler.Step(7, before, before).Should().Be(new TrendStep(7, Stayed: 5, Raised: 0, Lowered: 0, Reweighted: 0, Left: 0, Joined: 0));
     }
 
     [Theory]
@@ -268,19 +301,22 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
         await ValueAsync(September, groupKey, provider, to, name);
     }
 
-    /// <summary>One provider's saved value in a group, and the group's own row if it has none yet.</summary>
-    private async Task ValueAsync(int snapshot, string groupKey, string provider, decimal value, string? name = null)
+    /// <summary>One provider's saved value in a group (one rate unless <paramref name="rateSet"/> says), and the group's own
+    /// row if it has none yet.</summary>
+    private async Task ValueAsync(int snapshot, string groupKey, string provider, decimal value, string? name = null, string? rateSet = null)
     {
         var parts = groupKey.Split('|');
         var args = new
         {
             snapshot, groupKey, product = parts[0], codeType = parts[1], code = parts[2], feeType = parts[3], setting = parts[4],
             modifiers = parts[5], negotiatedType = parts[6], provider, value, name = name ?? $"Provider {provider}", rateId = _nextRateId++,
+            rateSet = rateSet ?? value.ToString("0.0000", System.Globalization.CultureInfo.InvariantCulture),
         };
         await ExecuteAsync(
             """
             INSERT INTO provider_values VALUES ($snapshot, $groupKey, $product, $codeType, $code, $feeType, $setting, $modifiers,
-                $negotiatedType, $provider, $provider, $provider, false, false, $name, $value, $value, $value, 1, 1, $rateId, NULL)
+                $negotiatedType, $provider, $provider, $provider, false, false, $name, $value, $value, $value, 1, 1, $rateId, NULL,
+                $rateSet)
             """, args);
         await ExecuteAsync(
             """
@@ -300,6 +336,14 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
                concat('https://fixtures.test/', $snapshot, '-', $product, '.json'), 'loaded', 100, 50, TIMESTAMP '2026-10-01 12:00:00'
         FROM source_files
         """, new { snapshot, product });
+
+    /// <summary>As after a rebuild of both snapshots' statistics from their files as they are now.</summary>
+    private async Task RebuiltAsync()
+    {
+        await ExecuteAsync("DELETE FROM stats_builds");
+        await MarkStatisticsCurrentAsync(August);
+        await MarkStatisticsCurrentAsync(September);
+    }
 
     /// <summary>Records a build of the snapshot's statistics from its files as they are, by this build of the app.</summary>
     private Task MarkStatisticsCurrentAsync(int snapshot) => ExecuteAsync(

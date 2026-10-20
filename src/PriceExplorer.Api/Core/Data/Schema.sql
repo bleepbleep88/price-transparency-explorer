@@ -264,7 +264,8 @@ CREATE TABLE IF NOT EXISTS provider_values (
     rate_count           INTEGER NOT NULL,
     npi_weight           BIGINT NOT NULL,          -- the weight behind value: each rate's NPI count (at least 1), summed
     first_rate_id        BIGINT NOT NULL,          -- the rate carrying value that lists the most NPIs (the row's source)
-    whole_tax_id_rate_id BIGINT                    -- a whole-tax-ID rate behind ein_level, when first_rate_id isn't one
+    whole_tax_id_rate_id BIGINT,                   -- a whole-tax-ID rate behind ein_level, when first_rate_id isn't one
+    rate_set             VARCHAR NOT NULL          -- its distinct rates in the group, ascending, '0.0000' each, comma-separated
 );
 
 -- One row per snapshot with saved statistics: what they were built from. They stay current (SavedStatistics.sql) until

@@ -30,7 +30,7 @@ internal sealed class GetRateTrendHandler(DuckDbConnectionFactory connections, R
             .ToList();
         var completeness = await Completeness.ReadAsync(connection);
 
-        var groupsBySnapshot = new List<(ResolvedSnapshot Snapshot, Dictionary<string, RateGroup> Groups, Dictionary<string, Dictionary<string, decimal>> Values)>();
+        var groupsBySnapshot = new List<(ResolvedSnapshot Snapshot, Dictionary<string, RateGroup> Groups, Dictionary<string, Dictionary<string, ProviderRates>> Values)>();
         IReadOnlyList<RateGroup> shown = [];
         foreach (var snapshot in snapshots)
         {
@@ -39,7 +39,8 @@ internal sealed class GetRateTrendHandler(DuckDbConnectionFactory connections, R
             // Every provider's value per group, as the statistics count it (the same summary the saved statistics hold).
             var values = RateSearchAssembler.Summarize(facts, catalog).ToDictionary(
                 group => group.Key,
-                group => group.Providers.ToDictionary(provider => provider.ProviderKey, provider => provider.Value, StringComparer.Ordinal),
+                group => group.Providers.ToDictionary(
+                    provider => provider.ProviderKey, provider => new ProviderRates(provider.Value, provider.RateSet), StringComparer.Ordinal),
                 StringComparer.Ordinal);
             groupsBySnapshot.Add((snapshot, assembled.AllGroups.ToDictionary(group => group.Key, StringComparer.Ordinal), values));
             if (snapshot.SnapshotId == selected.SnapshotId)
@@ -57,11 +58,11 @@ internal sealed class GetRateTrendHandler(DuckDbConnectionFactory connections, R
     /// <summary>The group in every snapshot that has it, each complete point with how its providers moved since the last.</summary>
     private static List<TrendPoint> Points(
         string key,
-        IEnumerable<(ResolvedSnapshot Snapshot, Dictionary<string, RateGroup> Groups, Dictionary<string, Dictionary<string, decimal>> Values)> snapshots,
+        IEnumerable<(ResolvedSnapshot Snapshot, Dictionary<string, RateGroup> Groups, Dictionary<string, Dictionary<string, ProviderRates>> Values)> snapshots,
         IReadOnlyDictionary<(int SnapshotId, string ProductKey), ProductCompleteness> completeness)
     {
         var points = new List<TrendPoint>();
-        (int SnapshotId, Dictionary<string, decimal> Values)? previous = null;
+        (int SnapshotId, Dictionary<string, ProviderRates> Values)? previous = null;
         foreach (var (snapshot, groups, values) in snapshots)
         {
             if (!groups.TryGetValue(key, out var group))
@@ -84,14 +85,21 @@ internal sealed class GetRateTrendHandler(DuckDbConnectionFactory connections, R
         return points;
     }
 
-    internal static TrendStep Step(int sinceSnapshotId, IReadOnlyDictionary<string, decimal> before, IReadOnlyDictionary<string, decimal> after)
+    /// <summary>
+    /// Who stayed, who moved and who came or went, counting a rate as changed only when the file lists a different one (as
+    /// ChangePairs.sql does): the same rates with another value only mean the NPI counts behind them moved.
+    /// </summary>
+    internal static TrendStep Step(
+        int sinceSnapshotId, IReadOnlyDictionary<string, ProviderRates> before, IReadOnlyDictionary<string, ProviderRates> after)
     {
-        var stayed = before.Keys.Where(after.ContainsKey).ToList();
+        var stayed = before.Keys.Where(after.ContainsKey).Select(provider => (Before: before[provider], After: after[provider])).ToList();
+        var repriced = stayed.Where(pair => pair.After.RateSet != pair.Before.RateSet).ToList();
         return new TrendStep(
             sinceSnapshotId,
             stayed.Count,
-            stayed.Count(provider => after[provider] > before[provider]),
-            stayed.Count(provider => after[provider] < before[provider]),
+            repriced.Count(pair => pair.After.Value > pair.Before.Value),
+            repriced.Count(pair => pair.After.Value < pair.Before.Value),
+            stayed.Count(pair => pair.After.RateSet == pair.Before.RateSet && pair.After.Value != pair.Before.Value),
             before.Count - stayed.Count,
             after.Count - stayed.Count);
     }
@@ -117,3 +125,6 @@ internal sealed class GetRateTrendHandler(DuckDbConnectionFactory connections, R
 
     private sealed record SnapshotRow(int SnapshotId, DateOnly? IndexDate);
 }
+
+/// <summary>A provider's value in a group and the set of rates behind it (provider_values.rate_set).</summary>
+internal readonly record struct ProviderRates(decimal Value, string RateSet);

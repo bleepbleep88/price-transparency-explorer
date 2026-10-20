@@ -294,9 +294,9 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
 
         // Who stayed, moved, left and joined from each complete file to the next (July's Essential Plan file is partial).
         Points(trend, AmbetterColonoscopyAsc).Select(Step).Should().Equal(
-            "none", $"{ids[July]}: 6 stayed, 0 up, 0 down, 0 left, 0 joined", $"{ids[August]}: 4 stayed, 2 up, 1 down, 2 left, 1 joined");
+            "none", $"{ids[July]}: 6 stayed, 0 up, 0 down, 0 reweighted, 0 left, 0 joined", $"{ids[August]}: 4 stayed, 2 up, 1 down, 0 reweighted, 2 left, 1 joined");
         Points(trend, EssentialColonoscopyAsc).Select(Step).Should().Equal(
-            "none", "none", $"{ids[August]}: 5 stayed, 1 up, 0 down, 0 left, 0 joined");
+            "none", "none", $"{ids[August]}: 5 stayed, 1 up, 0 down, 0 reweighted, 0 left, 0 joined");
     }
 
     [Theory(Timeout = 60_000)]
@@ -401,7 +401,8 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
         return step.ValueKind == JsonValueKind.Null
             ? "none"
             : $"{step.GetProperty("sinceSnapshotId").GetInt32()}: {step.GetProperty("stayed").GetInt32()} stayed, {step.GetProperty("raised").GetInt32()} up, " +
-              $"{step.GetProperty("lowered").GetInt32()} down, {step.GetProperty("left").GetInt32()} left, {step.GetProperty("joined").GetInt32()} joined";
+              $"{step.GetProperty("lowered").GetInt32()} down, {step.GetProperty("reweighted").GetInt32()} reweighted, " +
+              $"{step.GetProperty("left").GetInt32()} left, {step.GetProperty("joined").GetInt32()} joined";
     }
 
     /// <summary>The provider's EIN as shown, or "masked".</summary>

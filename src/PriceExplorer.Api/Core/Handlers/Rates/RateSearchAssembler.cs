@@ -172,7 +172,7 @@ internal static class RateSearchAssembler
         return new ProviderValue(
             provider.Key, provider.VerifiedEin, provider.EinDisplay, provider.EinUnverified, view.WholeTaxId,
             provider.NameFor(view, filtered: false), view.Value, view.Low, view.High, view.RateIds.Count, view.NpiWeight,
-            view.SourceRateId, view.WholeTaxIdRateId);
+            view.SourceRateId, view.WholeTaxIdRateId, view.RateSet);
     }
 
     private static RateGroup Build(GroupAccumulator group, Distribution distribution, ReferenceCatalog catalog, bool providerFilterActive)
@@ -627,9 +627,11 @@ internal static class RateSearchAssembler
     /// <param name="WholeTaxId">At least one of the rates comes from a contract with the whole tax ID (npi [0]).</param>
     /// <param name="WholeTaxIdRateId">Such a whole-tax-ID rate, when <paramref name="SourceRateId"/> isn't one.</param>
     /// <param name="NpiWeight">The total weight the weighted median used: each rate's NPI count, at least 1, summed.</param>
+    /// <param name="RateSet">The distinct rates, ascending, as "0.0000" joined by commas: two files list the same rates
+    /// exactly when these match, whatever the NPI counts behind them.</param>
     private sealed record RateView(
         decimal Value, decimal Low, decimal High, long SourceRateId, IReadOnlyList<long> RateIds, int Occurrences, int LargestNpiCount,
-        bool WholeTaxId, long? WholeTaxIdRateId, long NpiWeight)
+        bool WholeTaxId, long? WholeTaxIdRateId, long NpiWeight, string RateSet)
     {
         public static RateView Of(IEnumerable<RateEntry> entries)
         {
@@ -646,7 +648,9 @@ internal static class RateSearchAssembler
                 list.Max(entry => entry.NpiCount),
                 list.Any(entry => entry.WholeTaxId),
                 source.WholeTaxId ? null : list.FirstOrDefault(entry => entry.WholeTaxId)?.RateId,
-                list.Sum(entry => RateStatistics.MedianWeight(entry.NpiCount)));
+                list.Sum(entry => RateStatistics.MedianWeight(entry.NpiCount)),
+                string.Join(',', list.Select(entry => entry.Rate).Distinct().Order()
+                    .Select(rate => rate.ToString("0.0000", CultureInfo.InvariantCulture))));
         }
     }
 }

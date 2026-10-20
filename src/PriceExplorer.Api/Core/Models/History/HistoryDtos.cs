@@ -15,29 +15,34 @@ public sealed record HistorySnapshot(int SnapshotId, DateOnly? IndexDate, bool I
 /// Negotiated rates that differ between two snapshots' files, for one provider (tax ID) in one comparison group. A change
 /// means the file says something different; it isn't a claim, and the files say nothing about how often a service is used.
 /// </summary>
-/// <param name="Current">Both snapshots' saved statistics are current. When false, say the changes may be out of date.</param>
+/// <param name="Current">Both snapshots' saved statistics are built and current. Until then there are no counts and no
+/// rows: values still being saved or updated would read as rates that are new, gone or changed.</param>
+/// <param name="Message">Why there are no counts or rows yet, in plain words; null when current.</param>
 /// <param name="Products">Every product in either snapshot, and whether it was compared.</param>
-/// <param name="Counts">Counts under every filter except <c>kind</c> and paging.</param>
+/// <param name="Counts">Counts under every filter except <c>kind</c> and paging; null until current.</param>
+/// <param name="Rows">One page of changes; empty until current.</param>
 public sealed record ChangesResult(
     ChangesEcho Query,
     HistorySnapshot From,
     HistorySnapshot To,
     bool Current,
+    string? Message,
     IReadOnlyList<ChangesProduct> Products,
-    ChangeCounts Counts,
+    ChangeCounts? Counts,
     RateChangesPage Rows);
 
 /// <summary>The request as the server ran it, with the snapshots it picked.</summary>
 public sealed record ChangesEcho(
     int From, int To, string? Product, string? Code, string? CodeType, string? Kind, decimal? MinChangePct, bool? ListedElsewhere,
-    string Sort, int Page, int PageSize);
+    string Sort, int Page, int PageSize, bool IncludeRevenueCodeOnly);
 
 /// <param name="Compared">Both snapshots have the product, and neither file looks partial: its rates are in the counts and rows.</param>
 /// <param name="NotComparedBecause">Why it wasn't compared, in plain words; null when it was.</param>
 public sealed record ChangesProduct(string ProductKey, string ProductLabel, bool Compared, string? NotComparedBecause);
 
-/// <param name="Changed">Same provider and comparison group in both files with a different value (by at least the minimum
-/// change, when one is set).</param>
+/// <param name="Changed">Same provider and comparison group in both files with a different rate: another value and another
+/// set of rates (by at least the minimum change, when one is set). The same rates with another value (only the NPI counts
+/// behind them moved) count as unchanged.</param>
 /// <param name="Increased">Changed values that went up.</param>
 /// <param name="Decreased">Changed values that went down.</param>
 /// <param name="New">In the newer file only.</param>
@@ -46,9 +51,12 @@ public sealed record ChangesProduct(string ProductKey, string ProductLabel, bool
 /// <param name="Dropped">In the older file only.</param>
 /// <param name="DroppedListedElsewhere">Of the dropped ones, providers the newer file lists for the same code under other
 /// modifiers or another setting.</param>
-/// <param name="Unchanged">In both files with the same value.</param>
+/// <param name="Unchanged">In both files with the same value, or with the same rates.</param>
+/// <param name="RevenueCodeOnly">Facility charges filed only under a revenue code that match every other filter, kind
+/// included: what <c>includeRevenueCodeOnly</c> adds to the rows. The other counts include them only when it's set.</param>
 public sealed record ChangeCounts(
-    int Changed, int Increased, int Decreased, int New, int NewListedElsewhere, int Dropped, int DroppedListedElsewhere, int Unchanged);
+    int Changed, int Increased, int Decreased, int New, int NewListedElsewhere, int Dropped, int DroppedListedElsewhere, int Unchanged,
+    int RevenueCodeOnly);
 
 public sealed record RateChangesPage(int Total, int Page, int PageSize, IReadOnlyList<RateChange> Items);
 
@@ -61,8 +69,7 @@ public sealed record RateChangesPage(int Total, int Page, int PageSize, IReadOnl
 /// <param name="To">The provider's value in the newer file. Null when dropped.</param>
 /// <param name="Change">To minus From, when changed.</param>
 /// <param name="ChangePct">Change ÷ From × 100, rounded to 0.1. Null unless changed from an amount above zero.</param>
-/// <param name="FromRateId">The older file's rate carrying From (for the source drawer). Null when new, or when that
-/// snapshot's saved statistics aren't current (rate ids change when a file is saved again).</param>
+/// <param name="FromRateId">The older file's rate carrying From (for the source drawer). Null when new.</param>
 /// <param name="ToRateId">The newer file's rate carrying To, on the same terms.</param>
 /// <param name="FromRates">How many rates the provider has in the group in the older file. With more than one, its value
 /// is their NPI-weighted median, which can move when a rate is added or removed.</param>
@@ -136,15 +143,18 @@ public sealed record TrendPoint(
 
 /// <summary>
 /// The providers behind a group's move from the previous complete file (<paramref name="SinceSnapshotId"/>) to this one,
-/// one value per provider as the cards count them. When Raised and Lowered are 0, a move in the typical price comes only
-/// from which providers are listed.
+/// one value per provider as the cards count them, and a rate counted as changed only when the file lists a different one
+/// (as the changes feed counts it). When Raised and Lowered are 0, every provider in both files kept its rates, and a move
+/// in the typical price comes from which providers are listed (and from <paramref name="Reweighted"/>).
 /// </summary>
 /// <param name="Stayed">Providers in both files.</param>
-/// <param name="Raised">Of those, the ones with a higher rate here.</param>
-/// <param name="Lowered">Of those, the ones with a lower rate here.</param>
+/// <param name="Raised">Of those, the ones with different rates and a higher value here.</param>
+/// <param name="Lowered">Of those, the ones with different rates and a lower value here.</param>
+/// <param name="Reweighted">Of those, the ones with the same rates but another value: their clinicians (NPIs) moved between
+/// those rates.</param>
 /// <param name="Left">Providers only in the previous file.</param>
 /// <param name="Joined">Providers only in this file.</param>
-public sealed record TrendStep(int SinceSnapshotId, int Stayed, int Raised, int Lowered, int Left, int Joined);
+public sealed record TrendStep(int SinceSnapshotId, int Stayed, int Raised, int Lowered, int Reweighted, int Left, int Joined);
 
 /// <param name="Rate">The provider's rate in the group: an NPI's own rate with an NPI filter, as its search row shows.</param>
 public sealed record TrendProvider(string ProviderKey, string DisplayName, decimal Rate);

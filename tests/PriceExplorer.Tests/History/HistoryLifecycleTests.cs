@@ -40,7 +40,7 @@ public sealed class HistoryLifecycleTests
     }
 
     [Fact(Timeout = 60_000)]
-    public async Task While_a_snapshots_saved_statistics_are_out_of_date_changes_say_so_and_give_none_of_its_rate_ids()
+    public async Task While_a_snapshots_saved_statistics_are_out_of_date_changes_say_so_and_show_none()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var factory = Factory();
@@ -55,20 +55,20 @@ public sealed class HistoryLifecycleTests
         }
 
         var result = await client.GetFromJsonAsync<JsonElement>("/api/v1/changes", ct);
-        var rows = result.GetProperty("rows").GetProperty("items").EnumerateArray().ToList();
 
+        // Values search no longer shows would read as changes nobody made: none until they're rebuilt.
         result.GetProperty("current").GetBoolean().Should().BeFalse();
+        result.GetProperty("message").GetString().Should().Be(
+            "The numbers for 2026-09-28 are being updated. Changes show once loading finishes.");
         result.GetProperty("to").GetProperty("statisticsCurrent").GetBoolean().Should().BeFalse();
-        result.GetProperty("to").GetProperty("statisticsBuiltAt").ValueKind.Should().Be(JsonValueKind.String, "the last build is still readable");
+        result.GetProperty("to").GetProperty("statisticsBuiltAt").ValueKind.Should().Be(JsonValueKind.String, "the last build is still recorded");
         result.GetProperty("from").GetProperty("statisticsCurrent").GetBoolean().Should().BeTrue();
-        rows.Should().HaveCount(9);
-        rows.Should().OnlyContain(row => row.GetProperty("toRateId").ValueKind == JsonValueKind.Null);
-        rows.Where(row => row.GetProperty("kind").GetString() != "new")
-            .Should().OnlyContain(row => row.GetProperty("fromRateId").ValueKind == JsonValueKind.Number);
+        result.GetProperty("counts").ValueKind.Should().Be(JsonValueKind.Null);
+        result.GetProperty("rows").GetProperty("items").GetArrayLength().Should().Be(0);
     }
 
     [Fact(Timeout = 60_000)]
-    public async Task Changes_wait_for_both_snapshots_statistics_with_a_503_to_try_later()
+    public async Task Changes_wait_for_both_snapshots_statistics_with_no_counts_or_rows_and_a_message()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var factory = Factory();
@@ -85,12 +85,16 @@ public sealed class HistoryLifecycleTests
         }
 
         using var response = await client.GetAsync("/api/v1/changes", ct);
-        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
 
-        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
-        response.Headers.RetryAfter.Should().NotBeNull();
-        problem.GetProperty("code").GetString().Should().Be("statistics_building");
-        problem.GetRawText().Should().NotContain("\"counts\"", "no counts from empty tables");
+        // Not a confident "every September rate is new" from empty tables: no counts, no rows, and why.
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        result.GetProperty("current").GetBoolean().Should().BeFalse();
+        result.GetProperty("message").GetString().Should().Be(
+            "The numbers for 2026-08-31 are still being saved. Changes show once loading finishes.");
+        result.GetProperty("counts").ValueKind.Should().Be(JsonValueKind.Null);
+        result.GetProperty("rows").GetProperty("total").GetInt32().Should().Be(0);
+        result.GetProperty("rows").GetProperty("items").GetArrayLength().Should().Be(0);
     }
 
     [Fact(Timeout = 60_000)]

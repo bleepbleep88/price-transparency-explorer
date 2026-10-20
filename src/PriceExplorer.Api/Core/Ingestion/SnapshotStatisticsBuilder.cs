@@ -177,6 +177,7 @@ internal sealed class SnapshotStatisticsBuilder(DuckDbConnectionFactory connecti
                     .AppendValue(provider.NpiWeight)
                     .AppendValue(provider.FirstRateId)
                     .AppendNumber(provider.WholeTaxIdRateId)
+                    .AppendValue(provider.RateSet)
                     .EndRow();
             }
         }

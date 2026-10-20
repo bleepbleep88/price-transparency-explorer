@@ -15,7 +15,9 @@ namespace PriceExplorer.Api.Core.Handlers.History;
 
 /// <summary>
 /// Compares two snapshots' saved provider values (ChangePairs.sql): per comparison group and provider, changed, new,
-/// dropped or unchanged. A product is compared only when both snapshots have it and neither file looks partial.
+/// dropped or unchanged. A product is compared only when both snapshots have it and neither file looks partial. Until
+/// both snapshots' saved statistics are built and current there are no counts or rows, only a message: values still
+/// being saved would read as every rate new or gone, and values being updated as changes nobody made.
 /// </summary>
 internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog)
     : IRequestHandler<GetChangesQuery, ChangesResult>
@@ -45,15 +47,16 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var fromState = (await SavedStatistics.StateAsync(connection, from.SnapshotId, transaction)).SingleOrDefault();
         var toState = (await SavedStatistics.StateAsync(connection, to.SnapshotId, transaction)).SingleOrDefault();
-
-        // Before a snapshot's first build its saved values are empty, which would read as every rate new or dropped.
-        var unbuilt = new[] { (from, fromState), (to, toState) }.Where(pair => pair.Item2?.BuiltAt is null).Select(pair => Name(pair.Item1)).ToList();
-        if (unbuilt.Count > 0)
-        {
-            throw new StatisticsNotReadyException(
-                $"The saved statistics for {string.Join(" and ", unbuilt)} aren't built yet. They're built once loading finishes.");
-        }
         var products = await ProductsAsync(connection, from, to, transaction);
+        var echo = new ChangesEcho(from.SnapshotId, to.SnapshotId, product, code.Length == 0 ? null : code, codeType, request.Kind,
+            request.MinChangePct, request.ListedElsewhere, sort, request.Page, request.PageSize, request.IncludeRevenueCodeOnly);
+        var notCurrent = NotCurrentMessage((from, fromState), (to, toState));
+        if (notCurrent is not null)
+        {
+            return new ChangesResult(echo, Snapshot(from, fromState), Snapshot(to, toState), false, notCurrent,
+                products.Select(entry => entry.ToDto()).ToList(), null, new RateChangesPage(0, request.Page, request.PageSize, []));
+        }
+
         var compared = products
             .Where(entry => entry.Compared && (product is null || entry.ProductKey == product))
             .Select(entry => entry.ProductKey)
@@ -69,22 +72,20 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
             kind = request.Kind,
             minChangePct = (double?)request.MinChangePct,
             listedElsewhere = request.ListedElsewhere,
+            includeRevenueCodeOnly = request.IncludeRevenueCodeOnly,
             sort,
             limit = request.PageSize,
             offset = (request.Page - 1) * request.PageSize,
         };
         var pairs = SqlFile.For<GetChangesHandler>("ChangePairs.sql");
         var counts = compared.Count == 0
-            ? new ChangeCounts(0, 0, 0, 0, 0, 0, 0, 0)
+            ? new ChangeCounts(0, 0, 0, 0, 0, 0, 0, 0, 0)
             : await connection.QuerySingleAsync<ChangeCounts>(pairs + SqlFile.For<GetChangesHandler>("ChangeCounts.sql"), args, transaction);
         var rows = compared.Count == 0
             ? []
             : (await connection.QueryAsync<ChangeRow>(pairs + SqlFile.For<GetChangesHandler>("ChangeRows.sql"), args, transaction)).ToList();
         var names = await CodeNamesAsync(connection, to, rows, transaction);
 
-        // Rate ids point at the rates they describe only while their snapshot's saved statistics are current.
-        var fromCurrent = fromState?.Current ?? false;
-        var toCurrent = toState?.Current ?? false;
         var total = request.Kind switch
         {
             "changed" => counts.Changed,
@@ -96,11 +97,11 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
         };
 
         return new ChangesResult(
-            new ChangesEcho(from.SnapshotId, to.SnapshotId, product, code.Length == 0 ? null : code, codeType, request.Kind,
-                request.MinChangePct, request.ListedElsewhere, sort, request.Page, request.PageSize),
+            echo,
             Snapshot(from, fromState),
             Snapshot(to, toState),
-            fromCurrent && toCurrent,
+            true,
+            null,
             products.Select(entry => entry.ToDto()).ToList(),
             counts,
             new RateChangesPage(total, request.Page, request.PageSize, rows.Select(row => new RateChange(
@@ -114,9 +115,27 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
                 row.NegotiatedType, row.Unit,
                 row.ProviderKey, row.Ein, row.EinDisplay, row.EinMasked, row.BusinessName,
                 row.FromValue, row.ToValue, row.Change, row.ChangePct is { } pct ? (decimal)pct : null,
-                fromCurrent ? row.FromRateId : null,
-                toCurrent ? row.ToRateId : null,
+                row.FromRateId,
+                row.ToRateId,
                 row.FromRates, row.ToRates, row.ListedElsewhere)).ToList()));
+    }
+
+    /// <summary>
+    /// Why the snapshots can't be compared yet, naming them; null when both snapshots' saved statistics are built and current.
+    /// They're built after loading, and rebuilt when a file is saved again, the app changes or a rate in them expires.
+    /// </summary>
+    internal static string? NotCurrentMessage(params (ResolvedSnapshot Snapshot, StatisticsState? State)[] sides)
+    {
+        var unbuilt = sides.Where(side => side.State?.BuiltAt is null).Select(side => Name(side.Snapshot)).ToList();
+        if (unbuilt.Count > 0)
+        {
+            return $"The numbers for {string.Join(" and ", unbuilt)} are still being saved. Changes show once loading finishes.";
+        }
+
+        var outOfDate = sides.Where(side => side.State is { Current: false }).Select(side => Name(side.Snapshot)).ToList();
+        return outOfDate.Count > 0
+            ? $"The numbers for {string.Join(" and ", outOfDate)} are being updated. Changes show once loading finishes."
+            : null;
     }
 
     private static async Task<ResolvedSnapshot?> PreviousAsync(DuckDBConnection connection, ResolvedSnapshot to)
