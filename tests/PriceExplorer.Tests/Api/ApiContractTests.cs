@@ -91,11 +91,19 @@ public sealed class ApiContractTests(ExplorerApiFactory factory) : IClassFixture
             .Should().Equal("application/problem+json");
         search.GetProperty("responses").GetProperty("200").GetProperty("content").EnumerateObject().Select(c => c.Name)
             .Should().Equal("application/json");
-        foreach (var typeahead in new[] { "/api/v1/codes", "/api/v1/providers", "/api/v1/specialties" })
+        foreach (var typeahead in new[] { "/api/v1/providers", "/api/v1/specialties" })
         {
             document.GetProperty("paths").GetProperty(typeahead).GetProperty("get").GetProperty("parameters").EnumerateArray()
                 .Single(p => p.GetProperty("name").GetString() == "q").GetProperty("required").GetBoolean().Should().BeTrue(typeahead);
         }
+
+        // The code typeahead needs text unless a category stands in for it, which OpenAPI can't say; the description does.
+        var codesParameters = document.GetProperty("paths").GetProperty("/api/v1/codes").GetProperty("get").GetProperty("parameters").EnumerateArray().ToList();
+        codesParameters.Select(p => p.GetProperty("name").GetString()).Should().Contain(["q", "category"]);
+        codesParameters.Single(p => p.GetProperty("name").GetString() == "q").GetProperty("description").GetString().Should().Contain("Required unless a category");
+        document.GetProperty("paths").GetProperty("/api/v1/rates/levels").GetProperty("get").GetProperty("parameters").EnumerateArray()
+            .Single(p => p.GetProperty("name").GetString() == "code").GetProperty("required").GetBoolean().Should().BeTrue();
+        document.GetProperty("paths").TryGetProperty("/api/v1/categories", out _).Should().BeTrue();
 
         var linkValues = document.GetProperty("components").GetProperty("schemas").GetProperty("HintLink")
             .GetProperty("properties").GetProperty("query").GetProperty("additionalProperties").GetProperty("type");

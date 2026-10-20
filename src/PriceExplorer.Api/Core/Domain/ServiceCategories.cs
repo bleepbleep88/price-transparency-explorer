@@ -21,7 +21,8 @@ internal static class ServiceCategories
     private static readonly ServiceCategory Medicine = new("medicine", "Medicine, therapy & tests", "per service", false);
     private static readonly ServiceCategory QualityMeasure = new("quality-measure", "Quality reporting (CPT Category II)", "per report", false);
     private static readonly ServiceCategory EmergingTech = new("emerging-tech", "Emerging technology (CPT Category III)", "per service", false);
-    private static readonly ServiceCategory Drugs = new("drugs", "Drugs & biologicals", "per HCPCS unit (see the code's description)", true);
+    public const string DrugsKey = "drugs";
+    private static readonly ServiceCategory Drugs = new(DrugsKey, "Drugs & biologicals", "per HCPCS unit (see the code's description)", true);
     private static readonly ServiceCategory Supplies = new("supplies", "Supplies & equipment", "per item or unit", true);
     private static readonly ServiceCategory Other = new("other", "Other services", "per service", false);
 
@@ -112,12 +113,24 @@ internal static class ServiceCategories
         };
     }
 
+    /// <summary>Visit codes billed in levels, lowest first. 99201 (new patient, level 1) was deleted in 2021.</summary>
+    private static readonly LevelFamilyInfo[] LevelFamilies =
+    [
+        new("Emergency room visit", ["99281", "99282", "99283", "99284", "99285"], FirstLevel: 1),
+        new("Office visit, new patient", ["99202", "99203", "99204", "99205"], FirstLevel: 2),
+        new("Office visit, established patient", ["99211", "99212", "99213", "99214", "99215"], FirstLevel: 1),
+    ];
+
     /// <summary>Codes billed in levels (ER and office visits). Rates are only compared level to level.</summary>
-    public static string? LevelFamily(string codeType, string code) => (codeType, code) switch
-    {
-        (BillingCodes.Cpt, "99281" or "99282" or "99283" or "99284" or "99285") => "Emergency room visit",
-        (BillingCodes.Cpt, "99202" or "99203" or "99204" or "99205") => "Office visit, new patient",
-        (BillingCodes.Cpt, "99211" or "99212" or "99213" or "99214" or "99215") => "Office visit, established patient",
-        _ => null,
-    };
+    public static string? LevelFamily(string codeType, string code) => FamilyOf(codeType, code)?.Name;
+
+    /// <summary>The level family a CPT code belongs to, with all its codes; null for other codes.</summary>
+    public static LevelFamilyInfo? FamilyOf(string codeType, string code) =>
+        codeType == BillingCodes.Cpt ? LevelFamilies.FirstOrDefault(family => family.Codes.Contains(code)) : null;
+}
+
+/// <summary>A family of visit codes billed in levels: "Office visit, established patient" is 99211 (level 1) to 99215 (level 5).</summary>
+public sealed record LevelFamilyInfo(string Name, IReadOnlyList<string> Codes, int FirstLevel)
+{
+    public int LevelOf(string code) => FirstLevel + Codes.ToList().IndexOf(code);
 }

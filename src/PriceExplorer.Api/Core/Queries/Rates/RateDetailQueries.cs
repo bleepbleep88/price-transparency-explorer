@@ -19,8 +19,35 @@ public sealed record GetRateSourceQuery(long RateId, string? Provider = null) : 
 public sealed record ListRateNpisQuery(long RateId, string? Provider = null, int Page = 1, int PageSize = 50, IReadOnlyList<long>? AlsoRateIds = null)
     : IRequest<RateNpisPage>, IRequiresData;
 
-/// <summary>Typeahead: codes in the snapshot whose code or published name matches what's typed.</summary>
-public sealed record SuggestCodesQuery(string? Q, int? Snapshot = null, int Limit = 10)
+/// <summary>
+/// The level ladder for an ER or office visit code: every level of its family, like for like.
+/// </summary>
+/// <param name="Code">A level code: 99281–99285 (ER), 99202–99205 (office, new patient) or 99211–99215 (office, established).</param>
+/// <param name="Snapshot">Snapshot id; defaults to the newest loaded snapshot.</param>
+public sealed record GetLevelLadderQuery(string? Code, int? Snapshot = null) : IRequest<LevelLadder>, IRequiresData
+{
+    /// <summary>The code as typed, without a "CPT" word or spaces.</summary>
+    public static string CodeOf(string? code) => CodeInput.Parse(code, null).Code;
+}
+
+public sealed class GetLevelLadderQueryValidator : AbstractValidator<GetLevelLadderQuery>
+{
+    public GetLevelLadderQueryValidator()
+    {
+        RuleFor(query => query.Code)
+            .Must(code => !string.IsNullOrWhiteSpace(code) && !InputRules.HasControlCharacters(code)
+                && ServiceCategories.FamilyOf(BillingCodes.Cpt, GetLevelLadderQuery.CodeOf(code)) is not null)
+            .WithMessage("Levels are for ER and office visit codes: 99281 to 99285, 99202 to 99205, or 99211 to 99215.");
+        RuleFor(query => query.Snapshot).GreaterThan(0).When(query => query.Snapshot is not null).WithMessage("Snapshot id must be a positive number.");
+    }
+}
+
+/// <summary>
+/// Typeahead: codes in the snapshot whose code or name (the plan's, else CMS's HCPCS name) matches what's typed,
+/// optionally only codes in one category (a key from GET /api/v1/categories). With a category, the text may be left out
+/// to list the category's codes, most rates first.
+/// </summary>
+public sealed record SuggestCodesQuery(string? Q, int? Snapshot = null, int Limit = 10, string? Category = null)
     : IRequest<IReadOnlyList<CodeSuggestion>>, IRequiresData;
 
 /// <summary>Typeahead: providers whose business name (or EIN) matches what's typed.</summary>
@@ -83,11 +110,16 @@ public sealed class SuggestCodesQueryValidator : AbstractValidator<SuggestCodesQ
     {
         RuleFor(query => query.Q)
             .Must(q => q is not null && q.Trim().Length is >= 1 and <= 60)
+            .When(query => query.Category is null || query.Q is not null)
             .WithMessage("Type 1 to 60 characters: a code (45378, 0490, J0585) or words from its name (colonoscopy).");
         RuleFor(query => query.Q)
             .Must(q => !InputRules.HasControlCharacters(q!))
             .When(query => query.Q is not null)
             .WithMessage("Search text can't contain control characters.");
+        RuleFor(query => query.Category)
+            .Must(category => category is { Length: >= 1 and <= 40 } && category.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'))
+            .When(query => query.Category is not null)
+            .WithMessage("Category is a key from /api/v1/categories, for example PG or PG004 (letters, digits and hyphens).");
         RuleFor(query => query.Limit).InclusiveBetween(1, 50).WithMessage("Limit is between 1 and 50.");
         RuleFor(query => query.Snapshot).GreaterThan(0).When(query => query.Snapshot is not null).WithMessage("Snapshot id must be a positive number.");
     }

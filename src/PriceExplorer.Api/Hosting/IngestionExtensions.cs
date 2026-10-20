@@ -35,6 +35,7 @@ internal static class IngestionExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
         services.AddSingleton<ProviderDirectoryInfo>();
+        services.AddSingleton<CodeReference>();
         services.AddSingleton<ReferenceDataLoader>();
 
         // Large bodies are streamed with our own stall watchdog, so the client-wide timeout is off.
