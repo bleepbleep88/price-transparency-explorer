@@ -39,7 +39,7 @@ const typical = computed(() => {
   for (const line of costLines(props.result)) {
     const trend = trendFor(props.trend, line.groupKey)
     const text = hasHistory(trend) ? typicalTrendText(trend) : null
-    if (text) return { groupKey: line.groupKey, text: `For the setting and plan with the most providers, ${lowerFirst(text)}` }
+    if (text) return { groupKey: line.groupKey, text: `On the card with the most providers, ${lowerFirst(text)}` }
   }
   return null
 })

@@ -5,31 +5,38 @@ import { point, trend } from './fixtures'
 const yours = (rate: number) => ({ providerKey: '061036715', displayName: 'PM Pediatrics', rate })
 
 describe('trend readings', () => {
-  it('says how the typical price moved from the first file to the last, in dollars and percent', () => {
+  it('says how the typical price moved from the first file to the last, as the cards show it', () => {
     const text = typicalTrendText(
       trend([point(3, '2026-07-27', { median: 51.45 }), point(2, '2026-08-31', { median: 51.45 }), point(1, '2026-09-28', { median: 113.59 })]),
     )
-    expect(text).toBe('The typical price went from $51.45 (Jul 27) to $113.59 (Sep 28): up $62.14 (about 2.2 times as much).')
+    // Cards show $113.59 as "$114", so the change is worked out from $114.
+    expect(text).toBe('The typical price went from $51.45 (Jul 27) to $114 (Sep 28): up $62.55 (about 2.2 times as much).')
   })
 
-  it('names the files when the price never moves, and keeps whole dollars whole', () => {
+  it('names the files when the price never moves, and shows rates to the cent', () => {
     expect(movementText('Your rate', [{ date: '2026-08-31', value: 80.72 }, { date: '2026-09-28', value: 80.72 }])).toBe(
       'Your rate was $80.72 in the Aug 31 and Sep 28 files.',
     )
     expect(movementText('Your rate', [{ date: '2026-08-31', value: 600 }, { date: '2026-09-28', value: 660 }])).toBe(
-      'Your rate went from $600 (Aug 31) to $660 (Sep 28): up $60 (10%).',
+      'Your rate went from $600.00 (Aug 31) to $660.00 (Sep 28): up $60 (10%).',
     )
     const months = ['2026-06-29', '2026-07-27', '2026-08-31', '2026-09-28'].map((date) => ({ date, value: 100 }))
-    expect(movementText('The typical price', months)).toBe('The typical price was $100 in all 4 files.')
+    expect(movementText('The typical price', months, 'typical')).toBe('The typical price was $100 in all 4 files.')
+    expect(movementText('The typical price', [{ date: '2026-08-31', value: 113.4 }, { date: '2026-09-28', value: 113.01 }], 'typical')).toBe(
+      'The typical price was $113 in the Aug 31 and Sep 28 files.',
+    )
     expect(movementText('The typical price', [{ date: '2026-09-28', value: 1 }])).toBeNull()
   })
 
   it('says small moves plainly', () => {
-    expect(movementText('The typical price', [{ date: '2026-07-27', value: 113.01 }, { date: '2026-09-28', value: 113.59 }])).toBe(
-      'The typical price went from $113.01 (Jul 27) to $113.59 (Sep 28): up $0.58 (under 1%).',
+    expect(movementText('The typical price', [{ date: '2026-07-27', value: 113.01 }, { date: '2026-09-28', value: 113.59 }], 'typical')).toBe(
+      'The typical price went from $113 (Jul 27) to $114 (Sep 28): up $1 (under 1%).',
     )
-    expect(movementText('The typical price', [{ date: '2026-07-27', value: 573.48 }, { date: '2026-09-28', value: 568.65 }])).toBe(
-      'The typical price went from $573.48 (Jul 27) to $568.65 (Sep 28): down $4.83 (under 1%).',
+    expect(movementText('The typical price', [{ date: '2026-07-27', value: 573.48 }, { date: '2026-09-28', value: 568.65 }], 'typical')).toBe(
+      'The typical price went from $573 (Jul 27) to $569 (Sep 28): down $4 (under 1%).',
+    )
+    expect(movementText('Your rate', [{ date: '2026-07-27', value: 113.01 }, { date: '2026-09-28', value: 113.59 }])).toBe(
+      'Your rate went from $113.01 (Jul 27) to $113.59 (Sep 28): up $0.58 (under 1%).',
     )
   })
 

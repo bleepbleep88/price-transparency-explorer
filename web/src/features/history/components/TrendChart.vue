@@ -7,6 +7,7 @@ import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/compon
 import { SVGRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { money, plural, shortDate } from '@/lib/format'
+import { dollars } from '@/lib/plainNumbers'
 import type { GroupTrend } from '../api/types'
 import { trendSeries } from '../lib/trend'
 
@@ -37,8 +38,9 @@ function tooltip(index: number): string {
   if (!point) return ''
   const lines = [`<strong>${shortDate(point.indexDate)}</strong>`]
   if (point.partial) lines.push('This file looks incomplete')
-  lines.push(point.median != null ? `${TYPICAL}: ${money(point.median)}` : 'Too few providers for a typical price')
-  if (point.p10 != null && point.p90 != null) lines.push(`${MOST} get ${money(point.p10)} to ${money(point.p90)}`)
+  // Typical prices and ranges as the cards show them; a provider's rate to the cent, as its chip does.
+  lines.push(point.median != null ? `${TYPICAL}: ${dollars(point.median)}` : 'Too few providers for a typical price')
+  if (point.p10 != null && point.p90 != null) lines.push(`${MOST} get ${dollars(point.p10)} to ${dollars(point.p90)}`)
   lines.push(plural(point.providerCount, 'provider'))
   if (props.showProvider && point.provider) lines.push(`${YOURS}: ${money(point.provider.rate)}`)
   return lines.join('<br>')

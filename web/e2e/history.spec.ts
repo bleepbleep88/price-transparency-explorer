@@ -60,3 +60,19 @@ test("the changes page compares the newest file with the one before, narrows to 
   await expect(page.getByTestId('provider-row').first()).toBeVisible()
   await expect(page.getByTestId('trend-provider').first()).toContainText(/^Your rate( went from|:| was) \$[\d,.]+/)
 })
+
+// Decision 89, as plain.spec.ts checks the search pages: history speaks in plain words too.
+test('the changes page, the trends and the history lens lines use no statistics words', async ({ page }) => {
+  const banned = /percentile|median|quartile|×|p90|p10|spread multiple|\bindex\b|comparison group/i
+
+  await page.goto('/changes?minChangePct=5')
+  await expect(page.getByTestId('change-row').first()).toBeVisible()
+  expect(await page.locator('body').innerText()).not.toMatch(banned)
+
+  for (const route of ['/?code=99213&ein=061036715&lens=providers', '/?code=45378&lens=employers', '/?code=45378&lens=plans']) {
+    await page.goto(route)
+    await expect(page.getByTestId('trend-line').first()).toBeVisible()
+    await expect(page.getByTestId('lens-history')).toBeVisible()
+    expect(await page.locator('body').innerText()).not.toMatch(banned)
+  }
+})

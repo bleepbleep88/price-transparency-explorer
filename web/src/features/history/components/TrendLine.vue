@@ -30,6 +30,6 @@ const drawable = computed(() => drawableSeries(props.trend, props.showProvider))
     <p v-if="partial" class="text-body-small text-medium-emphasis">{{ partial }}</p>
   </div>
   <p v-else-if="!hasHistory(trend)" class="text-body-small text-medium-emphasis" data-testid="trend-only-here">
-    No other loaded file has this service in this setting and plan.
+    No other loaded file has prices for this card.
   </p>
 </template>

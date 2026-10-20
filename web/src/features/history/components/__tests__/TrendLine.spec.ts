@@ -37,7 +37,7 @@ describe('TrendLine', () => {
 
     expect(line.find('[data-testid="trend-chart-stub"]').exists()).toBe(true)
     expect(line.get('[data-testid="trend-typical"]').text()).toBe(
-      'The typical price went from $113.01 (Jul 27) to $113.59 (Sep 28): up $0.58 (under 1%).',
+      'The typical price went from $113 (Jul 27) to $114 (Sep 28): up $1 (under 1%).',
     )
     expect(line.text().toLowerCase()).not.toMatch(/median|percentile|quartile/)
     expect(line.find('[data-testid="trend-provider"]').exists()).toBe(false)
@@ -60,7 +60,7 @@ describe('TrendLine', () => {
   it('says when no other loaded file has the group', async () => {
     const line = await mountLine(trend([point(1, '2026-09-28')]))
 
-    expect(line.get('[data-testid="trend-only-here"]').text()).toBe('No other loaded file has this service in this setting and plan.')
+    expect(line.get('[data-testid="trend-only-here"]').text()).toBe('No other loaded file has prices for this card.')
   })
 
   it('leaves an incomplete file out and says so', async () => {

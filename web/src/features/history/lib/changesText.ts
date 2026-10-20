@@ -1,5 +1,5 @@
-import { money, plural, wholeNumber } from '@/lib/format'
-import { aboutTimes, capitalize, dollars, TIMES_FROM } from '@/lib/plainNumbers'
+import { money, plural, wholeDollars, wholeNumber } from '@/lib/format'
+import { aboutTimes, capitalize, dollars, shownDollars, TIMES_FROM } from '@/lib/plainNumbers'
 import type { ChangeCounts, RateChange } from '../api/types'
 
 // Plain words for the changes feed (decision 89): a rate went up, went down, is new or is gone, in dollars and percent.
@@ -18,21 +18,40 @@ function share(from: number, to: number): string | null {
   return percent < 1 ? 'under 1%' : `${Math.round(percent)}%`
 }
 
+/** How an amount is shown: a provider's rate to the cent, as tables and chips show it; a typical price as cards do. */
+export type Shown = 'rate' | 'typical'
+
+const SHOWN: Record<Shown, { value: (amount: number) => number; text: (amount: number) => string }> = {
+  rate: { value: (amount) => Math.round(amount * 100) / 100, text: (amount) => money(amount) },
+  typical: { value: shownDollars, text: dollars },
+}
+
+/** A difference between shown figures: "$60", "$17.41". */
+function differenceText(amount: number): string {
+  const value = Math.abs(amount)
+  return Math.round(value * 100) % 100 === 0 ? wholeDollars(value) : money(value)
+}
+
 /**
- * Both amounts and the change between them, in one precision so they add up: whole dollars when both are ("$600",
- * "$660", "up $60 (10%)"), cents otherwise ("$100.36", "$117.77", "up $17.41 (17%)").
+ * Both amounts as shown and the change between them, worked out from the shown figures so they add up beside the card:
+ * rates to the cent ("$100.36" to "$117.77": "up $17.41 (17%)"), typical prices as cards show them ("$113" to "$114":
+ * "up $1 (under 1%)").
  */
-export function changeAmounts(from: number, to: number): { from: string; to: string; change: string } {
-  const whole = [from, to].every((value) => Math.round(value * 100) % 100 === 0)
-  const format = (value: number) => (whole ? dollars(value) : money(Math.abs(value)))
-  const difference = to - from
-  const direction = difference > 0 ? 'up' : 'down'
-  const portion = share(from, to)
+export function changeAmounts(from: number, to: number, shown: Shown = 'rate'): { from: string; to: string; change: string } {
+  const { value, text } = SHOWN[shown]
+  const [before, after] = [value(from), value(to)]
+  const difference = Math.round((after - before) * 100) / 100
+  const portion = share(before, after)
   return {
-    from: format(from),
-    to: format(to),
-    change: difference === 0 ? 'no change' : `${direction} ${format(difference)}${portion ? ` (${portion})` : ''}`,
+    from: text(from),
+    to: text(to),
+    change: difference === 0 ? 'no change' : `${difference > 0 ? 'up' : 'down'} ${differenceText(difference)}${portion ? ` (${portion})` : ''}`,
   }
+}
+
+/** Whether two amounts look the same as shown. */
+export function sameAsShown(a: number, b: number, shown: Shown = 'rate'): boolean {
+  return SHOWN[shown].value(a) === SHOWN[shown].value(b)
 }
 
 /** The change column: "Up $60 (10%)", "Down $50 (10%)", "Up $50" from $0, "New" or "Gone". */

@@ -1,6 +1,6 @@
 import { monthDay } from '@/lib/format'
 import type { GroupTrend, RateTrendResult, TrendPoint } from '../api/types'
-import { changeAmounts } from './changesText'
+import { changeAmounts, sameAsShown, type Shown } from './changesText'
 
 // Plain readings of a group's trend across the plan's monthly files (decision 89: "typical price", never "median").
 // Every number comes from the trend response, which is each file's own search; nothing is estimated.
@@ -23,17 +23,17 @@ function fileList(values: readonly Value[]): string {
 }
 
 /**
- * "The typical price went from $573.48 (Jul 27) to $568.65 (Sep 28): down $4.83 (1%)." The same amount in every file
- * reads "The typical price was $51.45 in the Jul 27, Aug 31 and Sep 28 files."
+ * "The typical price went from $573 (Jul 27) to $569 (Sep 28): down $4 (under 1%)." The same amount (as shown) in every
+ * file reads "The typical price was $51.45 in the Jul 27, Aug 31 and Sep 28 files."
  */
-export function movementText(subject: string, values: readonly Value[]): string | null {
+export function movementText(subject: string, values: readonly Value[], shown: Shown = 'rate'): string | null {
   if (values.length < 2) return null
   const first = values[0]!
   const last = values[values.length - 1]!
-  if (values.every((entry) => entry.value === first.value)) {
-    return `${subject} was ${changeAmounts(first.value, first.value).from} in ${fileList(values)}.`
+  if (values.every((entry) => sameAsShown(entry.value, first.value, shown))) {
+    return `${subject} was ${changeAmounts(first.value, first.value, shown).from} in ${fileList(values)}.`
   }
-  const amounts = changeAmounts(first.value, last.value)
+  const amounts = changeAmounts(first.value, last.value, shown)
   return `${subject} went from ${amounts.from} (${monthDay(first.date)}) to ${amounts.to} (${monthDay(last.date)}): ${amounts.change}.`
 }
 
@@ -42,7 +42,7 @@ export function typicalTrendText(trend: GroupTrend): string | null {
   const values = comparablePoints(trend)
     .filter((point) => point.median != null)
     .map((point) => ({ date: point.indexDate, value: point.median! }))
-  return movementText('The typical price', values)
+  return movementText('The typical price', values, 'typical')
 }
 
 /** The searched provider's rate over the complete files, naming the files where it has none. */

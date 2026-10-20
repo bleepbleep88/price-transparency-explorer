@@ -54,9 +54,12 @@ describe('changes in words', () => {
     expect(changeText(change({ kind: 'dropped', to: null, change: null, changePct: null }))).toBe('Gone')
   })
 
-  it('keeps both amounts and the change in one precision, so they add up', () => {
+  it('works the change out from the amounts as shown, so they add up', () => {
     expect(changeAmounts(100.36, 117.77)).toEqual({ from: '$100.36', to: '$117.77', change: 'up $17.41 (17%)' })
     expect(changeAmounts(113.01, 113.59)).toEqual({ from: '$113.01', to: '$113.59', change: 'up $0.58 (under 1%)' })
-    expect(changeAmounts(1500, 1200)).toEqual({ from: '$1,500', to: '$1,200', change: 'down $300 (20%)' })
+    expect(changeAmounts(1500, 1200)).toEqual({ from: '$1,500.00', to: '$1,200.00', change: 'down $300 (20%)' })
+    // Typical prices as cards show them: whole dollars from $100, and the change from those figures.
+    expect(changeAmounts(113.01, 113.59, 'typical')).toEqual({ from: '$113', to: '$114', change: 'up $1 (under 1%)' })
+    expect(changeAmounts(51.45, 51.45, 'typical').change).toBe('no change')
   })
 })

@@ -125,7 +125,7 @@ describe('LensHistoryLine', () => {
     await mountLine('employers', result([group(OFFICE, 114), group(ASC, 200)]))
 
     expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain(
-      'For the setting and plan with the most providers, the typical price went from $70 (Jul 27) to $77 (Sep 28): up $7 (10%).',
+      'On the card with the most providers, the typical price went from $70 (Jul 27) to $77 (Sep 28): up $7 (10%).',
     )
     await wrapper!.get('[data-testid="show-trend"]').trigger('click')
     expect(wrapper!.emitted('showTrend')).toEqual([[ASC]])
