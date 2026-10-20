@@ -1,6 +1,6 @@
 // Types mirroring the API's C# records (src/PriceExplorer.Api/Core/Models). JSON is camelCase; dates are ISO strings.
 
-export type IngestionPhase = 'starting' | 'downloading' | 'parsing' | 'saving' | 'ready' | 'failed'
+export type IngestionPhase = 'starting' | 'downloading' | 'parsing' | 'saving' | 'buildingStatistics' | 'ready' | 'failed'
 
 export interface IngestionIssue {
   severity: 'info' | 'warning' | 'error' | string
