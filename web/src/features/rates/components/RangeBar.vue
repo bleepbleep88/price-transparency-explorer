@@ -29,7 +29,7 @@ const label = computed(() => {
       <div v-if="stats.median != null" class="range-bar__median" :style="{ left: position(stats.median) }" />
       <div v-if="marker != null" class="range-bar__marker" :style="{ left: position(marker) }" />
     </div>
-    <div class="d-flex justify-space-between text-caption text-medium-emphasis">
+    <div class="d-flex justify-space-between text-body-small text-medium-emphasis">
       <span>{{ money(stats.min) }}</span>
       <span>{{ money(stats.max) }}</span>
     </div>

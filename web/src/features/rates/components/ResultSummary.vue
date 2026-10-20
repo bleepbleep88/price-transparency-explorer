@@ -64,15 +64,15 @@ const qualityChips = computed(() => {
 <template>
   <section class="d-flex flex-column ga-3" aria-labelledby="result-heading">
     <div class="d-flex flex-wrap align-center ga-2">
-      <h2 id="result-heading" class="text-h5">
+      <h2 id="result-heading" class="text-headline-small">
         {{ code ? `${code.codeType} ${code.code}` : result.query.code }}
       </h2>
-      <span v-if="code" class="text-h6 font-weight-regular text-medium-emphasis">
+      <span v-if="code" class="text-title-large font-weight-regular text-medium-emphasis">
         {{ code.name ?? 'No description published by the plan' }}
       </span>
     </div>
 
-    <div v-if="code" class="d-flex flex-wrap align-center ga-2 text-body-2">
+    <div v-if="code" class="d-flex flex-wrap align-center ga-2 text-body-medium">
       <v-chip variant="tonal" color="primary">{{ code.category.label }}</v-chip>
       <span>Priced {{ code.category.unit }}</span>
       <span class="text-medium-emphasis">
@@ -85,7 +85,7 @@ const qualityChips = computed(() => {
       </span>
       <span class="text-medium-emphasis">· Snapshot {{ shortDate(result.snapshot.indexDate) }}</span>
     </div>
-    <p v-if="code?.levelFamily" class="text-body-2 text-medium-emphasis">
+    <p v-if="code?.levelFamily" class="text-body-medium text-medium-emphasis">
       {{ code.levelFamily }} codes come in levels. Compare level to level; how often each level is billed isn't in these files.
     </p>
 

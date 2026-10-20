@@ -171,7 +171,7 @@ function onSubmit() {
 
     <v-expansion-panels v-model="filtersOpen" multiple variant="accordion" flat class="mt-1">
       <v-expansion-panel>
-        <v-expansion-panel-title class="text-body-2">More filters (product, setting, fee type, provider name)</v-expansion-panel-title>
+        <v-expansion-panel-title class="text-body-medium">More filters (product, setting, fee type, provider name)</v-expansion-panel-title>
         <v-expansion-panel-text>
           <v-row density="compact">
             <v-col cols="12" sm="6" md="3">

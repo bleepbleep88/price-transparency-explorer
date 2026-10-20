@@ -38,21 +38,21 @@ const view = computed(() => {
 
     <v-card max-width="440" title="Data loading">
       <v-card-text class="d-flex flex-column ga-2">
-        <p class="text-body-2">{{ status?.message ?? 'Waiting for the server…' }}</p>
+        <p class="text-body-medium">{{ status?.message ?? 'Waiting for the server…' }}</p>
         <v-progress-linear v-if="progress != null" :model-value="progress * 100" color="info" rounded height="6" />
-        <p v-if="status && status.filesTotal > 0" class="text-caption text-medium-emphasis">
+        <p v-if="status && status.filesTotal > 0" class="text-body-small text-medium-emphasis">
           {{ status.filesDone }} of {{ status.filesTotal }} rate files processed
         </p>
         <template v-if="status?.issues.length">
           <v-divider />
-          <p class="text-caption font-weight-medium">Notes from loading</p>
+          <p class="text-body-small font-weight-medium">Notes from loading</p>
           <v-alert
             v-for="(issue, index) in status.issues"
             :key="index"
             :type="issue.severity === 'error' ? 'error' : 'warning'"
             variant="tonal"
             density="compact"
-            class="text-caption"
+            class="text-body-small"
           >
             {{ issue.message }}
           </v-alert>

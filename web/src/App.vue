@@ -40,7 +40,7 @@ const navItems = [{ title: 'Search', to: { name: 'search' }, icon: mdiMagnify }]
       <router-view />
     </v-main>
 
-    <v-footer class="text-caption text-medium-emphasis justify-center text-center px-4">
+    <v-footer class="text-body-small text-medium-emphasis justify-center text-center px-4">
       Negotiated rates as published by the plan in its Transparency in Coverage files. A negotiated rate is not your
       out-of-pocket cost. CPT® is a registered trademark of the American Medical Association; descriptions are shown as
       published by the payer.

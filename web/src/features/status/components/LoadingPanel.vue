@@ -11,7 +11,7 @@ const { status, progress } = useDataStatus()
       <v-card-subtitle class="text-wrap">Results will appear here on their own as soon as loading finishes.</v-card-subtitle>
     </v-card-item>
     <v-card-text class="d-flex flex-column ga-2">
-      <p class="text-body-2" aria-live="polite">{{ status?.message ?? 'Waiting for the server…' }}</p>
+      <p class="text-body-medium" aria-live="polite">{{ status?.message ?? 'Waiting for the server…' }}</p>
       <v-progress-linear
         :model-value="progress == null ? undefined : progress * 100"
         :indeterminate="progress == null"

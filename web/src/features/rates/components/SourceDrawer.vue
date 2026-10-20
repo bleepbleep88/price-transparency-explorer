@@ -49,8 +49,8 @@ const comparisons = computed(() => {
   <v-navigation-drawer v-model="open" location="right" temporary :width="smAndDown ? 340 : 540" data-testid="source-drawer">
     <div class="d-flex align-center pa-4 pb-2">
       <div class="flex-grow-1">
-        <h2 class="text-h6">Where this rate comes from</h2>
-        <p v-if="providerName" class="text-body-2 text-medium-emphasis">{{ providerName }}</p>
+        <h2 class="text-title-large">Where this rate comes from</h2>
+        <p v-if="providerName" class="text-body-medium text-medium-emphasis">{{ providerName }}</p>
       </div>
       <v-btn :icon="mdiClose" variant="text" aria-label="Close" @click="open = false" />
     </div>
@@ -61,8 +61,8 @@ const comparisons = computed(() => {
 
       <template v-else-if="data">
         <section>
-          <h3 class="text-subtitle-2 mb-1">File</h3>
-          <p class="text-body-2">
+          <h3 class="text-title-small mb-1">File</h3>
+          <p class="text-body-medium">
             {{ data.file.productLabel }} in-network rates from {{ data.file.reportingEntityName ?? 'the plan' }}
             ({{ megabytes(data.file.contentLength) }}, schema {{ data.file.schemaVersion ?? 'unknown' }})
           </p>
@@ -91,20 +91,20 @@ const comparisons = computed(() => {
         </section>
 
         <section>
-          <h3 class="text-subtitle-2 mb-1">Exact spot in the file</h3>
+          <h3 class="text-title-small mb-1">Exact spot in the file</h3>
           <div class="d-flex align-center ga-1">
-            <code class="text-body-2 text-break flex-grow-1" data-testid="source-json-path">{{ data.jsonPath }}</code>
+            <code class="text-body-medium text-break flex-grow-1" data-testid="source-json-path">{{ data.jsonPath }}</code>
             <v-btn :icon="mdiContentCopy" variant="text" size="small" aria-label="Copy JSON path" @click="copy(data.jsonPath)" />
           </div>
           <div v-if="data.file.sha256" class="d-flex align-center ga-1 mt-1">
-            <code class="text-caption text-break flex-grow-1">SHA-256 {{ data.file.sha256 }}</code>
+            <code class="text-body-small text-break flex-grow-1">SHA-256 {{ data.file.sha256 }}</code>
             <v-btn :icon="mdiContentCopy" variant="text" size="small" aria-label="Copy SHA-256" @click="copy(data.file.sha256)" />
           </div>
-          <p v-if="copied" class="text-caption text-success" role="status">Copied</p>
+          <p v-if="copied" class="text-body-small text-success" role="status">Copied</p>
         </section>
 
         <section>
-          <h3 class="text-subtitle-2 mb-1">As published vs. cleaned up</h3>
+          <h3 class="text-title-small mb-1">As published vs. cleaned up</h3>
           <v-table density="compact">
             <thead>
               <tr>
@@ -115,21 +115,21 @@ const comparisons = computed(() => {
             </thead>
             <tbody>
               <tr v-for="row in comparisons" :key="row.label">
-                <td class="text-caption">{{ row.label }}</td>
-                <td class="text-body-2"><code>{{ row.published }}</code></td>
-                <td class="text-body-2">{{ row.cleaned }}</td>
+                <td class="text-body-small">{{ row.label }}</td>
+                <td class="text-body-medium"><code>{{ row.published }}</code></td>
+                <td class="text-body-medium">{{ row.cleaned }}</td>
               </tr>
             </tbody>
           </v-table>
         </section>
 
         <section>
-          <h3 class="text-subtitle-2 mb-1">Duplicates</h3>
-          <p class="text-body-2">
+          <h3 class="text-title-small mb-1">Duplicates</h3>
+          <p class="text-body-medium">
             This exact rate is published {{ plural(data.occurrences, 'time') }}<template v-if="data.itemLabelCount > 1">,
               under {{ plural(data.itemLabelCount, 'different item name') }}</template>. It's counted once here.
           </p>
-          <p v-if="data.codeSource === 'additional_information'" class="text-body-2 text-medium-emphasis mt-1">
+          <p v-if="data.codeSource === 'additional_information'" class="text-body-medium text-medium-emphasis mt-1">
             The plan files facility rates under revenue codes and names the procedure in a notes field. The item names
             attached to these rows don't match the procedure, so they're shown only for tracing:
             {{ data.itemLabelSamples.join('; ') }}{{ data.itemLabelCount > data.itemLabelSamples.length ? '…' : '' }}
@@ -137,8 +137,8 @@ const comparisons = computed(() => {
         </section>
 
         <section>
-          <h3 class="text-subtitle-2 mb-1">Provider groups covered ({{ data.providerGroupCount }})</h3>
-          <p v-if="data.providerGroupCount > data.providerGroups.length" class="text-caption text-medium-emphasis mb-1">
+          <h3 class="text-title-small mb-1">Provider groups covered ({{ data.providerGroupCount }})</h3>
+          <p v-if="data.providerGroupCount > data.providerGroups.length" class="text-body-small text-medium-emphasis mb-1">
             Showing the first {{ data.providerGroups.length }}.
           </p>
           <v-list density="compact" class="py-0">

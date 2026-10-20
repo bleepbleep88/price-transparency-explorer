@@ -72,8 +72,8 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
 
 <template>
   <v-container class="py-6" max-width="1280">
-    <h1 class="text-h5 mb-1">Search negotiated rates</h1>
-    <p class="text-body-2 text-medium-emphasis mb-4">
+    <h1 class="text-headline-medium mb-1">Search negotiated rates</h1>
+    <p class="text-body-medium text-medium-emphasis mb-4">
       What the plan has agreed to pay each provider for a service. Add an NPI or EIN to see where one provider sits.
     </p>
 
@@ -106,7 +106,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
       <v-alert v-else-if="apiError?.status === 400" type="warning" variant="tonal">{{ apiError.message }}</v-alert>
       <v-alert v-else-if="apiError" type="error" variant="tonal" data-testid="search-error">
         <p>{{ apiError.message }}</p>
-        <p v-if="apiError.traceId" class="text-caption mt-1">Reference: {{ apiError.traceId }}</p>
+        <p v-if="apiError.traceId" class="text-body-small mt-1">Reference: {{ apiError.traceId }}</p>
         <template #append>
           <v-btn variant="text" :prepend-icon="mdiRefresh" @click="search.refetch()">Try again</v-btn>
         </template>
@@ -133,8 +133,8 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
 
           <section v-if="result.groups.length" ref="tableSection" aria-labelledby="providers-heading">
             <div class="d-flex flex-wrap align-center ga-2 mb-2">
-              <h2 id="providers-heading" class="text-h6">Providers</h2>
-              <span class="text-body-2 text-medium-emphasis">
+              <h2 id="providers-heading" class="text-title-large">Providers</h2>
+              <span class="text-body-medium text-medium-emphasis">
                 {{ plural(result.rows.total, 'row') }}<template v-if="params.group"> in one comparison group</template>
               </span>
               <v-btn v-if="params.group" variant="text" size="small" @click="update({ group: null })">Show all groups</v-btn>

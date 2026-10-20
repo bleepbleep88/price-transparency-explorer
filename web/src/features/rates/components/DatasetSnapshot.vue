@@ -30,29 +30,29 @@ const totals = computed(() =>
     </v-card-item>
 
     <v-card-text class="d-flex flex-column ga-3">
-      <p class="text-body-2">
+      <p class="text-body-medium">
         {{ wholeNumber(totals.published) }} published prices become
         <strong>{{ wholeNumber(totals.unique) }} unique rates</strong> once exact duplicates are removed.
       </p>
 
       <v-sheet v-for="product in snapshot.products" :key="product.fileId" rounded="lg" border class="pa-3 d-flex flex-column ga-1">
         <div class="d-flex align-center ga-2 flex-wrap">
-          <span class="text-subtitle-2">{{ product.productLabel }}</span>
+          <span class="text-title-small">{{ product.productLabel }}</span>
           <v-chip :color="statusColor[product.status] ?? 'default'" size="x-small" variant="tonal">{{ product.status }}</v-chip>
         </div>
-        <p class="text-body-2 text-medium-emphasis">
+        <p class="text-body-medium text-medium-emphasis">
           {{ plural(product.distinctPlanIds, 'plan ID') }} ({{ plural(product.planEntries, 'listed plan') }}) ·
           {{ wholeNumber(product.distinctEins) }} tax IDs · {{ wholeNumber(product.distinctNpis) }} NPIs ·
           {{ megabytes(product.contentLength) }}
         </p>
-        <p class="text-body-2 text-medium-emphasis">
+        <p class="text-body-medium text-medium-emphasis">
           {{ wholeNumber(product.pricesPublished) }} prices → {{ wholeNumber(product.uniqueRates) }} unique rates
         </p>
-        <p class="text-caption text-medium-emphasis">
+        <p class="text-body-small text-medium-emphasis">
           Dates: index {{ shortDate(snapshot.indexDate) }} · file says {{ shortDate(product.fileLastUpdatedOn) }} · server
           {{ shortDate(product.httpLastModified) }}
         </p>
-        <p v-if="product.warning || product.error" class="text-caption text-warning">{{ product.warning ?? product.error }}</p>
+        <p v-if="product.warning || product.error" class="text-body-small text-warning">{{ product.warning ?? product.error }}</p>
         <v-btn :href="product.url" target="_blank" rel="noopener" variant="text" size="small" :append-icon="mdiOpenInNew" class="px-0 align-self-start">
           Rate file
         </v-btn>
@@ -72,8 +72,8 @@ const totals = computed(() =>
           <v-skeleton-loader v-if="plans.isPending.value" type="list-item@6" />
           <template v-else-if="plans.data.value">
             <section v-for="product in plans.data.value.products" :key="product.productKey" class="mb-4">
-              <h3 class="text-subtitle-1">{{ product.productLabel }}</h3>
-              <p class="text-caption text-medium-emphasis mb-1">
+              <h3 class="text-title-medium">{{ product.productLabel }}</h3>
+              <p class="text-body-small text-medium-emphasis mb-1">
                 {{ plural(product.planEntries, 'listed plan') }} under {{ plural(product.plans.length, 'plan ID') }}
                 (cost-sharing variants share an ID)
               </p>

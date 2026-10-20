@@ -36,7 +36,7 @@ function positionText(position: ProviderPosition): string {
     data-testid="group-card"
   >
     <v-card-item>
-      <v-card-title class="text-subtitle-1 font-weight-medium text-wrap">
+      <v-card-title class="text-title-medium font-weight-medium text-wrap">
         {{ group.feeTypeLabel }} · {{ group.settingLabel }}
       </v-card-title>
       <v-card-subtitle class="text-wrap">
@@ -63,7 +63,7 @@ function positionText(position: ProviderPosition): string {
 
       <!-- Fewer than 5 providers: list the rates, no statistics. -->
       <div v-if="group.statsLevel === 'list'" data-testid="stats-list">
-        <p class="text-body-2 text-medium-emphasis mb-1">Too few providers for statistics. Rates:</p>
+        <p class="text-body-medium text-medium-emphasis mb-1">Too few providers for statistics. Rates:</p>
         <div class="d-flex flex-wrap ga-1">
           <v-chip v-for="(rate, index) in group.listedRates" :key="index" variant="tonal">{{ money(rate) }}</v-chip>
         </div>
@@ -71,8 +71,8 @@ function positionText(position: ProviderPosition): string {
 
       <!-- 5 to 9 providers: median and range. -->
       <div v-else-if="group.statsLevel === 'basic'" data-testid="stats-basic">
-        <p class="text-h6">{{ money(stats.median) }} <span class="text-body-2 text-medium-emphasis">median</span></p>
-        <p class="text-body-2 text-medium-emphasis">Range {{ money(stats.min) }} to {{ money(stats.max) }}</p>
+        <p class="text-title-large">{{ money(stats.median) }} <span class="text-body-medium text-medium-emphasis">median</span></p>
+        <p class="text-body-medium text-medium-emphasis">Range {{ money(stats.min) }} to {{ money(stats.max) }}</p>
         <RangeBar :stats="stats" :marker="group.highlights[0]?.rate" class="mt-1" />
       </div>
 
@@ -80,29 +80,29 @@ function positionText(position: ProviderPosition): string {
       <div v-else data-testid="stats-full" class="d-flex flex-column ga-2">
         <div class="d-flex justify-space-between text-center">
           <div>
-            <div class="text-caption text-medium-emphasis">25th percentile</div>
-            <div class="text-subtitle-1">{{ money(stats.p25) }}</div>
+            <div class="text-body-small text-medium-emphasis">25th percentile</div>
+            <div class="text-title-medium">{{ money(stats.p25) }}</div>
           </div>
           <div>
-            <div class="text-caption text-medium-emphasis">Median</div>
-            <div class="text-h6">{{ money(stats.median) }}</div>
+            <div class="text-body-small text-medium-emphasis">Median</div>
+            <div class="text-title-large">{{ money(stats.median) }}</div>
           </div>
           <div>
-            <div class="text-caption text-medium-emphasis">75th percentile</div>
-            <div class="text-subtitle-1">{{ money(stats.p75) }}</div>
+            <div class="text-body-small text-medium-emphasis">75th percentile</div>
+            <div class="text-title-medium">{{ money(stats.p75) }}</div>
           </div>
         </div>
         <RangeBar :stats="stats" :marker="group.highlights[0]?.rate" />
-        <p class="text-body-2 text-medium-emphasis">
+        <p class="text-body-medium text-medium-emphasis">
           Highest is {{ times(stats.spreadMultiple) }} the lowest<template v-if="stats.p90ToP10 != null">
             · 90th to 10th percentile: {{ times(stats.p90ToP10) }}</template
           >
         </p>
-        <p v-if="group.lowerQuartileGap === 0" class="text-body-2 text-medium-emphasis" data-testid="no-gap">
+        <p v-if="group.lowerQuartileGap === 0" class="text-body-medium text-medium-emphasis" data-testid="no-gap">
           No gap: the 25th percentile and the median are the same rate.
         </p>
         <v-sheet v-else-if="group.lowerQuartileGap != null" rounded class="quartile-gap pa-3" data-testid="quartile-gap">
-          <p class="text-body-2">
+          <p class="text-body-medium">
             <strong>{{ money(group.lowerQuartileGap) }}</strong> gap to the lower quartile: the median rate is
             {{ money(stats.median) }}; a quarter of providers are paid {{ money(stats.p25) }} or less.
           </p>
@@ -110,8 +110,8 @@ function positionText(position: ProviderPosition): string {
       </div>
 
       <div v-if="group.highlights.length" class="d-flex flex-column ga-1" data-testid="group-highlights">
-        <p class="text-caption font-weight-medium">Where your provider sits</p>
-        <p v-for="position in group.highlights" :key="position.providerKey" class="text-body-2">
+        <p class="text-body-small font-weight-medium">Where your provider sits</p>
+        <p v-for="position in group.highlights" :key="position.providerKey" class="text-body-medium">
           <strong>{{ position.displayName }}</strong>: {{ positionText(position) }}
         </p>
       </div>
@@ -121,7 +121,7 @@ function positionText(position: ProviderPosition): string {
           {{ showNotes ? 'Hide' : 'Show' }} notes ({{ group.notes.length }})
         </v-btn>
         <v-expand-transition>
-          <ul v-show="showNotes" class="text-body-2 text-medium-emphasis ps-4 mt-1">
+          <ul v-show="showNotes" class="text-body-medium text-medium-emphasis ps-4 mt-1">
             <li v-for="(note, index) in group.notes" :key="index">{{ note }}</li>
           </ul>
         </v-expand-transition>

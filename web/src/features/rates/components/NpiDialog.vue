@@ -39,7 +39,7 @@ function rateText(rate: number, rateHigh: number): string {
         <v-btn :icon="mdiClose" variant="text" aria-label="Close" @click="open = false" />
       </template>
       <v-card-text>
-        <p class="text-body-2 text-medium-emphasis mb-2">
+        <p class="text-body-medium text-medium-emphasis mb-2">
           <template v-if="showRates">
             Individual providers (NPIs) the plan lists under this tax ID for these rates, with the rate each one is listed for.
           </template>
@@ -48,7 +48,7 @@ function rateText(rate: number, rateHigh: number): string {
         <v-skeleton-loader v-if="npis.isPending.value" type="list-item@4" />
         <v-alert v-else-if="errorMessage" type="error" variant="tonal">{{ errorMessage }}</v-alert>
         <template v-else-if="npis.data.value">
-          <p class="text-caption mb-1">{{ plural(npis.data.value.total, 'NPI') }}</p>
+          <p class="text-body-small mb-1">{{ plural(npis.data.value.total, 'NPI') }}</p>
           <v-list density="compact" class="py-0">
             <v-list-item
               v-for="item in npis.data.value.items"

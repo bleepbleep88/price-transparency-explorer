@@ -82,7 +82,7 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
           Also listed as: {{ item.otherNames.join('; ') }}
         </v-tooltip>
         <span v-else class="font-weight-medium">{{ item.businessName }}</span>
-        <div class="d-flex flex-wrap align-center ga-1 text-caption text-medium-emphasis">
+        <div class="d-flex flex-wrap align-center ga-1 text-body-small text-medium-emphasis">
           <span data-testid="row-ein">EIN {{ item.einDisplay }}</span>
           <v-tooltip
             v-if="item.einMasked"
@@ -110,15 +110,15 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
 
     <template #[`item.group`]="{ item }">
       <div class="py-1">
-        <div class="text-body-2">{{ groupLabel(item) }}</div>
-        <div class="text-caption text-medium-emphasis">{{ groupsByKey.get(item.groupKey)?.productLabel }}</div>
+        <div class="text-body-medium">{{ groupLabel(item) }}</div>
+        <div class="text-body-small text-medium-emphasis">{{ groupsByKey.get(item.groupKey)?.productLabel }}</div>
       </div>
     </template>
 
     <template #[`item.rate`]="{ item }">
       <div class="text-no-wrap">
         <span class="font-weight-medium" data-testid="row-rate">{{ money(item.rate) }}</span>
-        <div v-if="item.multipleRates" class="text-caption text-medium-emphasis">
+        <div v-if="item.multipleRates" class="text-body-small text-medium-emphasis">
           {{ money(item.rateLow) }} to {{ money(item.rateHigh) }} ({{ plural(item.rateCount, 'rate') }})
         </div>
       </div>
@@ -132,7 +132,7 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
       <v-chip v-if="item.band" :color="bandView[item.band]?.color" size="small" variant="tonal">
         {{ bandView[item.band]?.label }}
       </v-chip>
-      <span v-else class="text-caption text-medium-emphasis">Small group</span>
+      <span v-else class="text-body-small text-medium-emphasis">Small group</span>
     </template>
 
     <template #[`item.npis`]="{ item }">
@@ -145,7 +145,7 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
       >
         {{ item.npiCount }}
       </v-btn>
-      <span v-else class="text-caption text-medium-emphasis">None listed</span>
+      <span v-else class="text-body-small text-medium-emphasis">None listed</span>
     </template>
 
     <template #[`item.actions`]="{ item }">
@@ -160,7 +160,7 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
     </template>
 
     <template #no-data>
-      <p class="text-body-2 text-medium-emphasis py-4">No providers match. Try clearing a filter.</p>
+      <p class="text-body-medium text-medium-emphasis py-4">No providers match. Try clearing a filter.</p>
     </template>
   </v-data-table-server>
 </template>
