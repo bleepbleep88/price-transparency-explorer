@@ -1,54 +1,54 @@
-import { plural, shortDate, times, wholeNumber } from '@/lib/format'
-import type { ProviderScorecard, StatisticsBasis } from '../api/types'
+import { plural, shortDate } from '@/lib/format'
+import type { ProviderScorecard, ScorecardGroup, StatisticsBasis } from '../api/types'
+import { overallText } from './plainWords'
 
 // Plain sentences for the insights pages. Pure functions of the API's numbers, so they're unit-tested.
 
-/** "13% lower", "10% higher", "the same" for a ratio against 1 (0.87 → 13% lower). */
-export function percentDifference(ratio: number): string {
-  const percent = Math.round(Math.abs(ratio - 1) * 100)
-  if (percent === 0) return ratio === 1 ? 'the same' : 'within 1%'
-  return `${wholeNumber(percent)}% ${ratio < 1 ? 'lower' : 'higher'}`
-}
-
-/** What a provider's price index means, or why there is none. */
-export function indexSentence(index: ProviderScorecard['index']): string {
+/** A provider's overall reading and what it rests on, or why there's none. */
+export function overallSummary(index: ProviderScorecard['index']): { headline: string; detail: string } {
   if (index.value == null) {
-    return `No index: it needs ${plural(index.minimumGroups, 'group')} with ${index.minimumProviders} or more providers, and this provider has ${index.groupsCounted}.`
+    return {
+      headline: 'Not enough to sum up',
+      detail: `That needs ${plural(index.minimumGroups, 'service')} with ${index.minimumProviders} or more providers each; this provider has ${index.groupsCounted}.`,
+    }
   }
-  const percent = Math.round(Math.abs(index.value - 1) * 100)
-  const where = percent === 0 ? 'at the median' : `${percent}% ${index.value < 1 ? 'below' : 'above'} the median`
-  return `Typically ${where} for the same service, across ${plural(index.groupsCounted, 'group')} with ${index.minimumProviders} or more providers.`
+  return {
+    headline: overallText(index.value),
+    detail: `Across ${plural(index.groupsCounted, 'service')} with ${index.minimumProviders} or more providers.`,
+  }
 }
 
-/** How the index is worked out, for its tooltip. */
-export function indexExplainer(value: number | null): string {
-  const example = value == null ? '' : ` Half its groups sit at or below ${times(value)}, half at or above.`
-  return `The median of its × median values: its rate ÷ the group's median, in every group with a median.${example}`
+/** How the overall reading is worked out, for its tooltip. */
+export const OVERALL_EXPLAINER =
+  "Each service's price is compared with the typical price for that service (what the middle provider gets). " +
+  'This is the middle of those comparisons: about half its services sit higher, half lower.'
+
+/** "Lower than most for 9, about typical for 10, higher than most for 7." Groups too small to compare are left out. */
+export function positionCounts(groups: readonly Pick<ScorecardGroup, 'band'>[]): string | null {
+  const count = (band: string) => groups.filter((group) => group.band === band).length
+  const [low, typical, high] = [count('low'), count('typical'), count('high')]
+  if (low + typical + high === 0) return null
+  return `Lower than most for ${low}, about typical for ${typical}, higher than most for ${high}.`
 }
 
-/** "Below the median in 76 groups, at it in 1, above it in 99." */
-export function medianCounts(index: ProviderScorecard['index']): string {
-  return `Below the median in ${plural(index.below, 'group')}, at it in ${index.atMedian}, above it in ${index.above}.`
-}
-
-/** Snapshot and build time, for the line under each insights page's title. */
+/** Which plan files and when their figures were saved, for the line under each insights page's title. */
 export function statisticsLine(basis: StatisticsBasis): string {
-  const snapshot = `Snapshot ${shortDate(basis.snapshot.indexDate)}`
-  return basis.builtAt ? `${snapshot} · statistics saved ${shortDate(basis.builtAt)}` : snapshot
+  const files = `Plan files of ${shortDate(basis.snapshot.indexDate)}`
+  return basis.builtAt ? `${files} · figures saved ${shortDate(basis.builtAt)}` : files
 }
 
 /**
- * Why the numbers may not match a search, or null when they're current. Out of date means the data changed since they
+ * Why the figures may not match a search, or null when they're current. Out of date means the data changed since they
  * were saved (a reload, a rate past its end date); the page refreshes by itself when a rebuild finishes.
  */
 export function staleMessage(basis: StatisticsBasis): string | null {
   if (basis.isCurrent) return null
   return basis.builtAt
-    ? "These saved statistics are out of date, so some numbers may not match a search until they're rebuilt. This page refreshes when that finishes."
-    : "Statistics for this snapshot haven't been saved yet. This page fills in when they are."
+    ? "These saved figures are out of date, so some may not match a search until they're rebuilt. This page refreshes when that finishes."
+    : "The figures for these plan files haven't been saved yet. This page fills in when they are."
 }
 
-/** "CPT 45378 · Colonoscopy" or just "RC 0360" when the plan's files don't name the code. */
+/** "CPT 45378 · Colonoscopy" or "RC 0360 · Operating room"; just the code when nothing names it. */
 export function serviceName(item: { codeType: string; code: string; codeName: string | null }): string {
   return item.codeName ? `${item.codeType} ${item.code} · ${item.codeName}` : `${item.codeType} ${item.code}`
 }
@@ -57,3 +57,7 @@ export function serviceName(item: { codeType: string; code: string; codeName: st
 export function share(part: number, whole: number): string {
   return whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—'
 }
+
+/** Said once on each insights page: what these numbers are and what the files don't say. */
+export const RATES_NOT_COSTS =
+  "These are negotiated rates in the plan's files, not what a person pays. The files don't say how often a service happens, so differences are per visit or service, never yearly totals."

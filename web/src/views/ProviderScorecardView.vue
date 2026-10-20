@@ -5,14 +5,14 @@ import { useQueryClient } from '@tanstack/vue-query'
 import { useDisplay } from 'vuetify'
 import { mdiArrowLeft, mdiInformationOutline, mdiMagnify, mdiRefresh } from '@mdi/js'
 import { ApiError } from '@/lib/apiClient'
-import { money, ordinal, plural, times, wholeNumber } from '@/lib/format'
+import { money, plural, wholeNumber } from '@/lib/format'
 import LoadingPanel from '@/features/status/components/LoadingPanel.vue'
-import { groupName } from '@/features/rates/lib/lenses'
 import ScorecardExtremes from '@/features/insights/components/ScorecardExtremes.vue'
 import StatisticsNote from '@/features/insights/components/StatisticsNote.vue'
 import { insightKeys, useProviderScorecard } from '@/features/insights/composables/useInsightQueries'
 import { searchLocation } from '@/features/insights/lib/insightLinks'
-import { indexExplainer, indexSentence, medianCounts, serviceName } from '@/features/insights/lib/insightText'
+import { OVERALL_EXPLAINER, overallSummary, positionCounts, RATES_NOT_COSTS, serviceName } from '@/features/insights/lib/insightText'
+import { groupLine, POSITION_LABELS, versusTypical } from '@/features/insights/lib/plainWords'
 
 const route = useRoute()
 const router = useRouter()
@@ -44,20 +44,19 @@ const shownNames = 3
 const filter = ref('')
 const headers = [
   { title: 'Service', key: 'code', sortable: true },
-  { title: 'Comparison group', key: 'groupKey', sortable: false },
+  { title: 'Setting and plan', key: 'groupKey', sortable: false },
   { title: 'Providers', key: 'providerCount', sortable: true, align: 'end' as const, nowrap: true },
-  { title: 'Rate', key: 'value', sortable: true, align: 'end' as const, nowrap: true },
-  { title: 'Percentile', key: 'percentile', sortable: true, align: 'end' as const, nowrap: true },
-  { title: '× median', key: 'vsMedian', sortable: true, align: 'end' as const, nowrap: true },
-  { title: 'Position', key: 'band', sortable: false },
+  { title: 'Its price', key: 'value', sortable: true, align: 'end' as const, nowrap: true },
+  { title: 'Typical price', key: 'median', sortable: true, align: 'end' as const, nowrap: true },
+  // Sorted by how far above or below typical it is; shown in dollars.
+  { title: 'Compared with typical', key: 'vsMedian', sortable: true, align: 'end' as const },
+  { title: 'Where it sits', key: 'band', sortable: false },
   { title: 'Search', key: 'actions', sortable: false, align: 'end' as const },
 ]
-const filterKeys = ['code', 'codeName', 'categoryLabel', 'productLabel', 'settingLabel', 'feeTypeLabel']
-const bandView: Record<string, { label: string; color?: string }> = {
-  low: { label: 'Low', color: 'low' },
-  typical: { label: 'Typical' },
-  high: { label: 'High', color: 'high' },
-}
+const filterKeys = ['code', 'codeName', 'categoryLabel', 'productLabel', 'settingLabel']
+const bandColor: Record<string, string | undefined> = { low: 'low', typical: undefined, high: 'high' }
+const overall = computed(() => (result.value ? overallSummary(result.value.index) : null))
+const counts = computed(() => (result.value ? positionCounts(result.value.groups) : null))
 </script>
 
 <template>
@@ -107,7 +106,7 @@ const bandView: Record<string, { label: string; color?: string }> = {
         </div>
         <p class="text-body-medium">
           <template v-for="(product, index) in provider.products" :key="product.key">
-            <template v-if="index">, </template>{{ product.label }}: {{ plural(product.groups, 'comparison group') }}
+            <template v-if="index">, </template>{{ product.label }}: {{ plural(product.groups, 'service') }}
           </template>
         </p>
         <p v-if="provider.otherNames.length" class="text-body-small text-medium-emphasis">
@@ -120,55 +119,53 @@ const bandView: Record<string, { label: string; color?: string }> = {
           </v-tooltip>
         </p>
         <StatisticsNote :basis="result.statistics" class="mt-1" />
+        <p class="text-body-small text-medium-emphasis">{{ RATES_NOT_COSTS }}</p>
       </header>
 
       <v-row>
         <v-col cols="12" md="4">
-          <v-card class="h-100" data-testid="price-index">
+          <v-card class="h-100" data-testid="scorecard-overall">
             <v-card-item>
               <v-card-title tag="h2" class="d-flex align-center ga-1">
-                Price index
-                <v-tooltip :text="indexExplainer(result.index.value)" max-width="340" location="top">
+                Overall
+                <v-tooltip :text="OVERALL_EXPLAINER" max-width="340" location="top">
                   <template #activator="{ props: tip }">
-                    <v-icon v-bind="tip" :icon="mdiInformationOutline" size="small" tabindex="0" aria-label="How the price index works" />
+                    <v-icon v-bind="tip" :icon="mdiInformationOutline" size="small" tabindex="0" aria-label="How this is worked out" />
                   </template>
                 </v-tooltip>
               </v-card-title>
             </v-card-item>
-            <v-card-text class="d-flex flex-column ga-2">
-              <p class="stat-figure text-display-small" data-testid="price-index-value">
-                {{ result.index.value == null ? '—' : times(result.index.value) }}
-              </p>
-              <p class="text-body-medium">{{ indexSentence(result.index) }}</p>
-              <p v-if="result.index.groupsCounted" class="text-body-medium text-medium-emphasis">{{ medianCounts(result.index) }}</p>
+            <v-card-text v-if="overall" class="d-flex flex-column ga-2">
+              <p class="stat-figure text-headline-small" data-testid="scorecard-overall-text">{{ overall.headline }}</p>
+              <p class="text-body-medium">{{ overall.detail }}</p>
+              <p v-if="counts" class="text-body-medium text-medium-emphasis">{{ counts }}</p>
               <p v-if="result.index.groupsTotal > result.index.groupsCounted" class="text-body-small text-medium-emphasis">
-                {{ plural(result.index.groupsTotal - result.index.groupsCounted, 'group') }} with fewer than
-                {{ result.index.minimumProviders }} providers {{ result.index.groupsTotal - result.index.groupsCounted === 1 ? 'has' : 'have' }}
-                no median, so no percentile either.
+                {{ plural(result.index.groupsTotal - result.index.groupsCounted, 'service') }} with fewer than
+                {{ result.index.minimumProviders }} providers can't be compared.
               </p>
             </v-card-text>
           </v-card>
         </v-col>
         <v-col cols="12" md="4">
-          <ScorecardExtremes title="Furthest above the median" :groups="result.highest" empty="None of its rates is above the median." />
+          <ScorecardExtremes title="Most above typical" :groups="result.highest" empty="None of its prices is above typical." />
         </v-col>
         <v-col cols="12" md="4">
-          <ScorecardExtremes title="Furthest below the median" :groups="result.lowest" empty="None of its rates is below the median." />
+          <ScorecardExtremes title="Most below typical" :groups="result.lowest" empty="None of its prices is below typical." />
         </v-col>
       </v-row>
 
       <v-card>
         <v-card-item>
-          <v-card-title tag="h2">Every comparison group ({{ wholeNumber(result.groups.length) }})</v-card-title>
+          <v-card-title tag="h2">Every service ({{ wholeNumber(result.groups.length) }})</v-card-title>
           <v-card-subtitle class="text-wrap">
-            Each row is what a search for the code with this provider's tax ID shows: its rate, placed against every other
-            provider in the same group.
+            Each row is the same service, in the same setting, under the same plan, and matches a search for that code with
+            this provider's tax ID.
           </v-card-subtitle>
         </v-card-item>
         <v-card-text>
           <v-text-field
             v-model="filter"
-            label="Filter by code, name, product or setting"
+            label="Filter by code, name, plan or setting"
             clearable
             autocomplete="off"
             class="mb-2"
@@ -194,7 +191,7 @@ const bandView: Record<string, { label: string; color?: string }> = {
             </template>
             <template #[`item.groupKey`]="{ item }">
               <div class="py-1">
-                <div class="text-body-medium">{{ groupName(item) }}</div>
+                <div class="text-body-medium">{{ groupLine(item) }}</div>
                 <div class="text-body-small text-medium-emphasis">{{ item.unit }}</div>
               </div>
             </template>
@@ -207,15 +204,19 @@ const bandView: Record<string, { label: string; color?: string }> = {
                 </div>
               </div>
             </template>
-            <template #[`item.percentile`]="{ item }">
-              <span data-testid="scorecard-percentile">{{ item.percentile == null ? '—' : ordinal(item.percentile) }}</span>
+            <template #[`item.median`]="{ item }">
+              <span class="text-no-wrap">{{ item.median == null ? '—' : money(item.median) }}</span>
             </template>
             <template #[`item.vsMedian`]="{ item }">
-              <span data-testid="scorecard-vs-median">{{ times(item.vsMedian) }}</span>
+              <span data-testid="scorecard-vs-typical">
+                {{ versusTypical(item.value, item.median) ?? 'Too few providers to compare' }}
+              </span>
             </template>
             <template #[`item.band`]="{ item }">
-              <v-chip v-if="item.band" :color="bandView[item.band]?.color" size="small" variant="outlined">{{ bandView[item.band]?.label }}</v-chip>
-              <span v-else class="text-body-small text-medium-emphasis">Under {{ result.index.minimumProviders }} providers</span>
+              <v-chip v-if="item.band" :color="bandColor[item.band]" size="small" variant="outlined" class="text-no-wrap">
+                {{ POSITION_LABELS[item.band] }}
+              </v-chip>
+              <span v-else class="text-body-small text-medium-emphasis">Fewer than {{ result.index.minimumProviders }} providers</span>
             </template>
             <template #[`item.actions`]="{ item }">
               <v-btn
@@ -223,13 +224,13 @@ const bandView: Record<string, { label: string; color?: string }> = {
                 :icon="mdiMagnify"
                 variant="text"
                 size="small"
-                :aria-label="`Search ${item.codeType} ${item.code} with this provider, ${groupName(item)}`"
+                :aria-label="`Search ${item.codeType} ${item.code} with this provider, ${groupLine(item)}`"
                 data-testid="scorecard-search"
               />
             </template>
             <template #no-data>
               <p class="text-body-medium text-medium-emphasis py-4">
-                {{ filter ? 'No group matches this filter.' : 'No saved statistics for this provider yet.' }}
+                {{ filter ? 'Nothing matches this filter.' : 'No saved figures for this provider yet.' }}
               </p>
             </template>
           </v-data-table>

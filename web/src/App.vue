@@ -12,7 +12,7 @@ useDataStatus()
 
 const navItems = [
   { title: 'Search', to: { name: 'search' }, icon: mdiMagnify },
-  { title: 'Price gaps', to: { name: 'gaps' }, icon: mdiChartBar },
+  { title: 'Price differences', to: { name: 'gaps' }, icon: mdiChartBar },
   { title: 'Plan comparison', to: { name: 'compare' }, icon: mdiCompareHorizontal },
   { title: 'Provider scorecards', to: { name: 'providers' }, icon: mdiAccountSearchOutline },
   { title: 'Sources', to: { name: 'sources' }, icon: mdiDatabaseOutline },

@@ -1,55 +1,49 @@
 import { describe, expect, it } from 'vitest'
 import type { ProviderScorecard, StatisticsBasis } from '../../api/types'
-import { indexExplainer, indexSentence, medianCounts, percentDifference, serviceName, share, staleMessage, statisticsLine } from '../insightText'
+import { overallSummary, positionCounts, serviceName, share, staleMessage, statisticsLine } from '../insightText'
 
 function index(overrides: Partial<ProviderScorecard['index']> = {}): ProviderScorecard['index'] {
-  return { value: 0.87, groupsCounted: 54, groupsTotal: 55, minimumGroups: 5, minimumProviders: 5, below: 36, atMedian: 1, above: 17, ...overrides }
+  return { value: 1.08, groupsCounted: 26, groupsTotal: 26, minimumGroups: 5, minimumProviders: 5, below: 11, atMedian: 1, above: 14, ...overrides }
 }
 
 function basis(overrides: Partial<StatisticsBasis> = {}): StatisticsBasis {
   return { snapshot: { snapshotId: 1, indexDate: '2026-08-31', isLatest: true }, builtAt: '2026-10-20T08:42:16Z', isCurrent: true, ...overrides }
 }
 
-describe('percentDifference', () => {
-  it('says how far a ratio is from the same rate, in whole percent', () => {
-    expect(percentDifference(0.87)).toBe('13% lower')
-    expect(percentDifference(1.1)).toBe('10% higher')
-    expect(percentDifference(1)).toBe('the same')
-    expect(percentDifference(25.13)).toBe('2,413% higher')
+describe('overallSummary', () => {
+  it('says how the provider usually compares, and across how many services', () => {
+    expect(overallSummary(index())).toEqual({
+      headline: 'Usually about 8% more than typical',
+      detail: 'Across 26 services with 5 or more providers.',
+    })
+    expect(overallSummary(index({ value: 0.88 })).headline).toBe('Usually about 12% less than typical')
+    expect(overallSummary(index({ value: 1.03 })).headline).toBe('About typical')
   })
 
-  it('never calls a different rate the same', () => {
-    expect(percentDifference(1.004)).toBe('within 1%')
+  it('says why there is no summary', () => {
+    expect(overallSummary(index({ value: null, groupsCounted: 4 }))).toEqual({
+      headline: 'Not enough to sum up',
+      detail: 'That needs 5 services with 5 or more providers each; this provider has 4.',
+    })
   })
 })
 
-describe('indexSentence', () => {
-  it('reads the index against the median', () => {
-    expect(indexSentence(index())).toBe('Typically 13% below the median for the same service, across 54 groups with 5 or more providers.')
-    expect(indexSentence(index({ value: 1.08 }))).toBe('Typically 8% above the median for the same service, across 54 groups with 5 or more providers.')
-    expect(indexSentence(index({ value: 1, groupsCounted: 1 }))).toContain('Typically at the median for the same service, across 1 group')
-  })
-
-  it('says why there is no index', () => {
-    expect(indexSentence(index({ value: null, groupsCounted: 4 }))).toBe(
-      'No index: it needs 5 groups with 5 or more providers, and this provider has 4.',
+describe('positionCounts', () => {
+  it('counts where its rates sit, leaving out groups too small to compare', () => {
+    expect(positionCounts([{ band: 'low' }, { band: 'high' }, { band: 'typical' }, { band: 'high' }, { band: null }])).toBe(
+      'Lower than most for 1, about typical for 1, higher than most for 2.',
     )
-  })
-
-  it('explains itself and counts where the rates sit', () => {
-    expect(indexExplainer(0.87)).toContain('Half its groups sit at or below 0.87×, half at or above.')
-    expect(indexExplainer(null)).not.toContain('Half')
-    expect(medianCounts(index())).toBe('Below the median in 36 groups, at it in 1, above it in 17.')
+    expect(positionCounts([{ band: null }])).toBeNull()
   })
 })
 
-describe('statistics basis', () => {
-  it('names the snapshot and when its statistics were saved', () => {
-    expect(statisticsLine(basis())).toBe('Snapshot Aug 31, 2026 · statistics saved Oct 20, 2026')
-    expect(statisticsLine(basis({ builtAt: null }))).toBe('Snapshot Aug 31, 2026')
+describe('figures line', () => {
+  it('names the plan files and when their figures were saved', () => {
+    expect(statisticsLine(basis())).toBe('Plan files of Aug 31, 2026 · figures saved Oct 20, 2026')
+    expect(statisticsLine(basis({ builtAt: null }))).toBe('Plan files of Aug 31, 2026')
   })
 
-  it('warns only when the statistics are not current', () => {
+  it('warns only when the figures are not current', () => {
     expect(staleMessage(basis())).toBeNull()
     expect(staleMessage(basis({ isCurrent: false }))).toContain('out of date')
     expect(staleMessage(basis({ isCurrent: false, builtAt: null }))).toContain("haven't been saved yet")

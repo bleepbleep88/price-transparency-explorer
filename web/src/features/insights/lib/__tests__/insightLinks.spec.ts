@@ -94,6 +94,12 @@ describe('gapsLink', () => {
     expect(gapsLink(result([group({ statsLevel: 'basic' })]), 'gap')).toEqual({ name: 'gaps', query: {} })
   })
 
+  it('asks for facility charges when the code searched is a revenue code on its own', () => {
+    const rc = group({ key: 'ambetter|RC|0360|facility|hospital-outpatient||negotiated', codeType: 'RC', code: '0360' })
+    const search = { ...result([rc]), code: { ...code, codeType: 'RC', code: '0360' } }
+    expect(gapsLink(search, 'gap')).toEqual({ name: 'gaps', query: { code: 'RC 0360', includeFacilityCharges: 'true' } })
+  })
+
   it('keeps an earlier snapshot', () => {
     expect(gapsLink(result([group()], {}, false), 'gap')).toEqual({ name: 'gaps', query: { snapshot: '3', code: 'CPT 45378' } })
   })

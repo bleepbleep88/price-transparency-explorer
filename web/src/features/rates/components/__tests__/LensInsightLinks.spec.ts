@@ -112,7 +112,7 @@ describe('lens links to the insights', () => {
 
     expect(link(wrapper, 'lens-gaps-link')).toEqual({ path: '/insights/gaps', query: { code: '45378', sort: 'spread' } })
     expect(link(wrapper, 'lens-compare-link')).toEqual({ path: '/insights/compare', query: { code: '45378' } })
-    expect(wrapper.get('[data-testid="lens-gaps-link"]').text()).toBe("Rank this code's groups by spread")
+    expect(wrapper.get('[data-testid="lens-gaps-link"]').text()).toBe('See how widely prices range for this code')
   })
 
   it('plans: no comparison link with one product; the whole leaderboard when no group is ranked', () => {
@@ -120,7 +120,7 @@ describe('lens links to the insights', () => {
 
     expect(wrapper.find('[data-testid="lens-compare-link"]').exists()).toBe(false)
     expect(link(wrapper, 'lens-gaps-link')).toEqual({ path: '/insights/gaps', query: { sort: 'spread' } })
-    expect(wrapper.get('[data-testid="lens-gaps-link"]').text()).toBe('See where rates spread widest')
+    expect(wrapper.get('[data-testid="lens-gaps-link"]').text()).toBe('See where prices range widest')
   })
 
   it("employers: ranks the code's groups by gap under the search's filters", () => {

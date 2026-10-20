@@ -17,6 +17,8 @@ export interface GapParams {
   setting?: string
   feeType?: FeeType
   code?: string
+  /** Also rank charges filed under a revenue code with no procedure named (off by default: not like for like). */
+  includeFacilityCharges?: boolean
   sort: GapSort
   page: number
   pageSize: number
@@ -61,6 +63,7 @@ export function parseGapQuery(query: LocationQuery): GapParams {
     setting: first(query.setting),
     feeType: (FEE_TYPES as readonly string[]).includes(feeType ?? '') ? (feeType as FeeType) : undefined,
     code: first(query.code),
+    includeFacilityCharges: first(query.includeFacilityCharges) === 'true' || undefined,
     sort: gapSort.parse(first(query.sort)),
     page: positiveInteger(first(query.page)) ?? 1,
     pageSize: positiveInteger(first(query.pageSize), 100) ?? DEFAULT_INSIGHT_PAGE_SIZE,

@@ -21,7 +21,7 @@ function open(item: ProviderSuggestion | null) {
     <h1 class="text-headline-medium mb-1">Provider scorecards</h1>
     <p class="text-body-medium text-medium-emphasis mb-4">
       One provider (tax ID) across every service it has a rate for: where each rate sits among other providers for the
-      same service, and a price index that sums it up.
+      same service, and how its prices compare overall.
     </p>
 
     <v-autocomplete

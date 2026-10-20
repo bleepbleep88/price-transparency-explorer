@@ -91,7 +91,7 @@ function onCases(value: number | string | null) {
       </ul>
     </template>
     <v-btn :to="gapsLink(result, 'gap')" class="align-self-start px-1" variant="text" color="primary" data-testid="lens-gaps-link">
-      {{ ranked ? "Rank this code's groups by gap" : 'See the biggest gaps across services' }}
+      {{ ranked ? 'See the biggest price differences for this code' : 'See where prices differ most' }}
     </v-btn>
   </div>
 </template>

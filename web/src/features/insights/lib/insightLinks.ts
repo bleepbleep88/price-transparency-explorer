@@ -27,6 +27,8 @@ export function gapsLink(result: RateSearchResult, sort: GapSort): RouteLocation
   const query: Record<string, string> = { ...snapshotQuery(result) }
   if (hasRankedGroup(result)) {
     query.code = codeFilter(result)
+    // A revenue code searched on its own is a facility charge with no procedure named: ranked only when asked for.
+    if (result.code?.codeType === 'RC') query.includeFacilityCharges = 'true'
     for (const key of ['product', 'setting', 'feeType'] as const) {
       const value = result.query[key]
       if (value) query[key] = value

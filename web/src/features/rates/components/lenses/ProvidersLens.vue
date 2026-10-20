@@ -64,7 +64,7 @@ const moreGroups = computed(() => groups.value.length - shownGroups.value.length
           See this provider's scorecard
         </v-btn>
         <p class="text-body-small text-medium-emphasis">
-          Every service it has a rate for, with a price index.<template v-if="scorecard.byNpi">
+          Every service it has a rate for, and how its prices compare overall.<template v-if="scorecard.byNpi">
             It covers every rate under the NPI's tax ID, not only the NPI's own.</template>
         </p>
       </div>

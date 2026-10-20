@@ -38,7 +38,7 @@ const option = computed(() => {
     grid: { left: 8, right: 56, top: 8, bottom: 8, containLabel: true },
     tooltip: {
       trigger: 'item',
-      formatter: (item: { name: string; value: number }) => `${item.name}: ${wholeNumber(item.value)} pairs (${share(item.value, total)})`,
+      formatter: (item: { name: string; value: number }) => `${item.name}: ${wholeNumber(item.value)} prices (${share(item.value, total)})`,
     },
     xAxis: { type: 'value', show: false },
     yAxis: {

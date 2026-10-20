@@ -59,12 +59,15 @@ export interface GapLeaderboard {
     feeType: string | null
     code: string | null
     matchedCodes: string[]
+    includeFacilityCharges: boolean
     sort: GapSort
     page: number
     pageSize: number
   }
   minimumProviders: number
   categories: CategoryOption[]
+  /** Groups of charges filed under a revenue code with no procedure named; ranked only with includeFacilityCharges. */
+  facilityCharges: number
   rows: { total: number; page: number; pageSize: number; items: GapRow[] }
   notes: string[]
 }

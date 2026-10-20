@@ -55,9 +55,9 @@ function scorecardGroup(overrides: Partial<ScorecardGroup> = {}): ScorecardGroup
 }
 
 describe('StatisticsNote', () => {
-  it('names the snapshot and stays quiet while the statistics are current', () => {
+  it('names the plan files and stays quiet while the figures are current', () => {
     const wrapper = mount(StatisticsNote, { props: { basis: basis() }, global: { plugins: plugins() } })
-    expect(wrapper.text()).toContain('Snapshot Aug 31, 2026 · statistics saved Oct 20, 2026')
+    expect(wrapper.text()).toContain('Plan files of Aug 31, 2026 · figures saved Oct 20, 2026')
     expect(wrapper.find('[data-testid="statistics-stale"]').exists()).toBe(false)
   })
 
@@ -70,7 +70,7 @@ describe('StatisticsNote', () => {
 })
 
 describe('ScorecardExtremes', () => {
-  it('lists each group with its rate, × median and percentile, linked to the search that shows it', () => {
+  it('lists each service with its price against typical, in plain words, linked to the search that shows it', () => {
     const wrapper = mount(ScorecardExtremes, {
       props: { title: 'Furthest above the median', groups: [scorecardGroup()], empty: 'None above.' },
       global: { plugins: plugins() },
@@ -78,7 +78,8 @@ describe('ScorecardExtremes', () => {
     const item = wrapper.get('[data-testid="extreme-group"]')
     expect(item.text()).toContain('RC 0460')
     expect(item.text()).toContain('Essential Plan · Facility fee · Hospital outpatient department')
-    expect(item.text()).toContain('$393.99, 14.72× the median · 86th percentile')
+    expect(item.text()).toContain('$393.99: about 15 times the typical price')
+    expect(item.text()).not.toMatch(/median|percentile|×/)
     const href = new URL(item.attributes('href')!, 'http://localhost')
     expect(href.pathname).toBe('/')
     expect(Object.fromEntries(href.searchParams)).toEqual({
