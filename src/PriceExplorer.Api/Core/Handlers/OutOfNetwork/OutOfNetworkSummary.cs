@@ -8,7 +8,8 @@ namespace PriceExplorer.Api.Core.Handlers.OutOfNetwork;
 
 /// <summary>
 /// Groups out-of-network payments by code, product, fee type and modifiers, and summarizes each group's allowed amounts
-/// (one per unique payment), billed charges (one per provider on a payment) and the share of each charge allowed.
+/// (one per unique payment), billed charges (one per provider on a payment) and how many times the allowed amount each
+/// charge was.
 /// Pure; covered by unit tests.
 /// </summary>
 internal static class OutOfNetworkSummary
@@ -54,7 +55,7 @@ internal static class OutOfNetworkSummary
             .DistinctBy(fact => (fact.PaymentId, fact.ProviderIndex))
             .ToList();
         var billed = providerEntries.Select(fact => fact.BilledCharge!.Value).ToList();
-        var shares = providerEntries.Select(fact => fact.AllowedAmount / fact.BilledCharge!.Value).Order().ToList();
+        var multiples = providerEntries.Select(fact => fact.BilledCharge!.Value / fact.AllowedAmount).Order().ToList();
 
         return new OutOfNetworkGroup(
             Key: string.Join('|', key.ProductKey, key.CodeType, key.Code, key.FeeType, key.Modifiers),
@@ -79,7 +80,7 @@ internal static class OutOfNetworkSummary
             Npis: facts.Where(fact => fact.Npi is not null).Select(fact => fact.Npi).Distinct().Count(),
             Allowed: Amounts(payments.Select(payment => payment.AllowedAmount)),
             Billed: billed.Count == 0 ? null : Amounts(billed),
-            AllowedShareOfBilled: shares.Count < RateStatistics.MinimumForBasicStats ? null : RateStatistics.Median(shares));
+            BilledToAllowed: multiples.Count < RateStatistics.MinimumForBasicStats ? null : RateStatistics.Median(multiples));
     }
 
     private sealed record GroupKey(
