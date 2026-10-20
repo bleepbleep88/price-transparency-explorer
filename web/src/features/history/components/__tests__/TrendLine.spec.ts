@@ -37,17 +37,34 @@ describe('TrendLine', () => {
 
     expect(line.find('[data-testid="trend-chart-stub"]').exists()).toBe(true)
     expect(line.get('[data-testid="trend-typical"]').text()).toBe(
-      'The typical price went from $113 (Jul 27) to $114 (Sep 28): up $1 (under 1%).',
+      'The typical price was $113 (Jul 27), $114 (Aug 31) and $114 (Sep 28): up $1 (under 1%) since Jul 27.',
     )
     expect(line.text().toLowerCase()).not.toMatch(/median|percentile|quartile/)
     expect(line.find('[data-testid="trend-provider"]').exists()).toBe(false)
   })
 
-  it("follows the searched provider's rate when an NPI or EIN picked one out", async () => {
+  it("follows the searched provider's rate by name when an NPI or EIN picked one out", async () => {
     const line = await mountLine(threeFiles, true)
 
+    // A card is read by every audience, so it isn't "your rate".
     expect(line.get('[data-testid="trend-provider"]').text()).toBe(
-      'Your rate went from $100.36 (Jul 27) to $117.77 (Sep 28): up $17.41 (17%).',
+      'The rate for PM Pediatrics was $100.36 (Jul 27), $100.36 (Aug 31) and $117.77 (Sep 28): up $17.41 (17%) since Jul 27.',
+    )
+  })
+
+  it('says why the typical price moved when the providers in both files kept their rates', async () => {
+    const line = await mountLine(
+      trend([
+        point(2, '2026-08-31', { median: 573.48 }),
+        point(1, '2026-09-28', {
+          median: 610,
+          sincePrevious: { sinceSnapshotId: 2, stayed: 40, raised: 0, lowered: 0, left: 87, joined: 39 },
+        }),
+      ]),
+    )
+
+    expect(line.get('[data-testid="trend-typical"]').text()).toBe(
+      'The typical price went from $573 (Aug 31) to $610 (Sep 28): up $37 (6%). Providers listed in both files kept their rates: the typical price moved because different providers are listed (87 left and 39 joined).',
     )
   })
 

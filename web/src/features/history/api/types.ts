@@ -130,6 +130,18 @@ export interface TrendPoint {
   max: number
   /** The searched provider's rate here, as the card marks it; null without a provider filter or when it has none here. */
   provider: TrendProvider | null
+  /** How the providers behind the group moved since the previous complete file; null for the first and for incomplete ones. */
+  sincePrevious: TrendStep | null
+}
+
+/** Providers in both files, how many of those got a higher or lower rate, and how many left or joined. */
+export interface TrendStep {
+  sinceSnapshotId: number
+  stayed: number
+  raised: number
+  lowered: number
+  left: number
+  joined: number
 }
 
 export interface GroupTrend {

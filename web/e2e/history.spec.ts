@@ -6,7 +6,8 @@ import { expect, test } from '@playwright/test'
 test("the app bar's snapshot picker moves search to the brief's file and back, and each card shows its trend", async ({ page }) => {
   await page.goto('/?code=45378')
   const card = page.getByTestId('group-card').filter({ has: page.getByTestId('trend-line') }).first()
-  await expect(card.getByTestId('trend-typical')).toContainText(/^The typical price (went from \$[\d,.]+ \(Jul 27\) to \$[\d,.]+ \(Sep 28\)|was \$)/)
+  // Three files: each one is named, so the one on screen is never skipped.
+  await expect(card.getByTestId('trend-typical')).toContainText(/^The typical price (was \$[\d,.]+ \(Jul 27\), \$[\d,.]+ \(Aug 31\) and \$[\d,.]+ \(Sep 28\)|was \$[\d,.]+ in the)/)
   await expect(card.getByTestId('trend-line')).not.toContainText(/median|percentile|quartile/i)
   await expect(page.getByText('Snapshot Sep 28, 2026')).toBeVisible()
 
@@ -58,7 +59,8 @@ test("the changes page compares the newest file with the one before, narrows to 
   await expect(page).toHaveURL(/[?&]ein=[^&]+/)
   await expect(page).toHaveURL(/[?&]group=[^&]+/)
   await expect(page.getByTestId('provider-row').first()).toBeVisible()
-  await expect(page.getByTestId('trend-provider').first()).toContainText(/^Your rate( went from|:| was) \$[\d,.]+/)
+  // The card names the provider; "your rate" is only the providers lens speaking to the provider.
+  await expect(page.getByTestId('trend-provider').first()).toContainText(/^The rate for .+?( went from|:| was) \$[\d,.]+/)
 })
 
 // Decision 89, as plain.spec.ts checks the search pages: history speaks in plain words too.

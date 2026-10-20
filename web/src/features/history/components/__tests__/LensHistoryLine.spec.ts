@@ -53,7 +53,24 @@ const PM = { providerKey: '061036715', displayName: 'PM Pediatrics', rate: 117.7
 
 function result(groups: RateGroup[], ein: string | null = null): RateSearchResult {
   return {
-    query: { code: '99213', matchedCodes: ['99213'], codeType: null, npi: null, ein, product: null, setting: null, feeType: null, provider: null, group: null, sort: 'rate', page: 1, pageSize: 25 },
+    query: {
+      code: '99213',
+      matchedCodes: ['99213'],
+      codeType: null,
+      npi: null,
+      ein,
+      product: null,
+      setting: null,
+      feeType: null,
+      provider: null,
+      specialty: null,
+      county: null,
+      countyPlace: null,
+      group: null,
+      sort: 'rate',
+      page: 1,
+      pageSize: 25,
+    },
     snapshot: { snapshotId: 1, indexDate: '2026-09-28', isLatest: true },
     code: null,
     groups,
@@ -109,7 +126,7 @@ describe('LensHistoryLine', () => {
     await mountLine('providers', result([group(ASC, 200), group(OFFICE, 114, [PM])], '061036715'), { ein: '061036715' })
 
     expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain(
-      'Your rate went from $100.36 (Jul 27) to $117.77 (Sep 28): up $17.41 (17%).',
+      'Your rate was $100.36 (Jul 27), $100.36 (Aug 31) and $117.77 (Sep 28): up $17.41 (17%) since Jul 27.',
     )
     await wrapper!.get('[data-testid="show-trend"]').trigger('click')
     expect(wrapper!.emitted('showTrend')).toEqual([[OFFICE]])

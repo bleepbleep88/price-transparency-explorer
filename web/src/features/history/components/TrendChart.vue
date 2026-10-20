@@ -19,7 +19,8 @@ const props = defineProps<{ trend: GroupTrend; selectedId: number | null; showPr
 const theme = useTheme()
 
 const TYPICAL = 'Typical price'
-const YOURS = 'Your rate'
+// Read under every audience, so not "your": the card's line names the provider.
+const YOURS = 'This provider'
 const MOST = 'Most providers'
 
 function rgba(hex: string, alpha: number): string {
@@ -42,7 +43,7 @@ function tooltip(index: number): string {
   lines.push(point.median != null ? `${TYPICAL}: ${dollars(point.median)}` : 'Too few providers for a typical price')
   if (point.p10 != null && point.p90 != null) lines.push(`${MOST} get ${dollars(point.p10)} to ${dollars(point.p90)}`)
   lines.push(plural(point.providerCount, 'provider'))
-  if (props.showProvider && point.provider) lines.push(`${YOURS}: ${money(point.provider.rate)}`)
+  if (props.showProvider && point.provider) lines.push(`${point.provider.displayName}: ${money(point.provider.rate)}`)
   return lines.join('<br>')
 }
 

@@ -27,7 +27,8 @@ const yours = computed(() => {
   for (const group of props.result.groups) {
     const trend = trendFor(props.trend, group.key)
     if (!group.highlights.length || !hasHistory(trend)) continue
-    const text = providerTrendText(trend)
+    // The providers lens speaks to the provider, so here it is "your rate".
+    const text = providerTrendText(trend, 'Your rate', props.trend?.selected.snapshotId ?? null)
     if (text) return { groupKey: group.key, text }
   }
   return null
@@ -38,7 +39,7 @@ const typical = computed(() => {
   if (props.lens !== 'employers') return null
   for (const line of costLines(props.result)) {
     const trend = trendFor(props.trend, line.groupKey)
-    const text = hasHistory(trend) ? typicalTrendText(trend) : null
+    const text = hasHistory(trend) ? typicalTrendText(trend, props.trend?.selected.snapshotId ?? null) : null
     if (text) return { groupKey: line.groupKey, text: `On the card with the most providers, ${lowerFirst(text)}` }
   }
   return null

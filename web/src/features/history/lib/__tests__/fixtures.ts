@@ -67,6 +67,7 @@ export function point(snapshotId: number, indexDate: string, overrides: Partial<
     p90: 663.64,
     max: 1154.16,
     provider: null,
+    sincePrevious: null,
     ...overrides,
   }
 }
