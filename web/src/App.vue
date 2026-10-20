@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ALWAYS_TRUE } from '@/lib/plainNumbers'
-import { mdiMagnify, mdiThemeLightDark } from '@mdi/js'
+import { mdiDatabaseOutline, mdiMagnify, mdiThemeLightDark } from '@mdi/js'
 import { useTheme } from 'vuetify'
 import DataStatusChip from '@/features/status/components/DataStatusChip.vue'
 import { useDataStatus } from '@/features/status/useDataStatus'
@@ -10,7 +10,10 @@ const theme = useTheme()
 // Start the live status stream once for the whole app.
 useDataStatus()
 
-const navItems = [{ title: 'Search', to: { name: 'search' }, icon: mdiMagnify }]
+const navItems = [
+  { title: 'Search', to: { name: 'search' }, icon: mdiMagnify },
+  { title: 'Sources', to: { name: 'sources' }, icon: mdiDatabaseOutline },
+]
 </script>
 
 <template>

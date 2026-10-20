@@ -60,6 +60,7 @@ const totals = computed(() =>
 
       <div class="d-flex flex-wrap ga-2">
         <v-btn variant="tonal" size="small" @click="plansOpen = true">See the plans</v-btn>
+        <v-btn :to="{ name: 'sources' }" variant="text" size="small">Sources and data quality</v-btn>
         <v-btn :href="snapshot.indexUrl" target="_blank" rel="noopener" variant="text" size="small" :append-icon="mdiOpenInNew">
           List of files
         </v-btn>
