@@ -7,6 +7,7 @@ import {
   groupName,
   hasFacilityCharges,
   hasProviderFilter,
+  highlightHeading,
   isDrugCode,
   LENS_OPTIONS,
   qualityLines,
@@ -125,23 +126,73 @@ describe('providers lens', () => {
     providerCount: 124,
     highlights: [{ providerKey: '995084138', displayName: 'Heel Sole Podiatry PC', rate: 80.72, percentile: 68, vsMedian: 1.57, aboveP25: 29.27 }],
   })
+  const byNpi = (groups: RateGroup[], rows: RateSearchResult['rows']['items'] = []) => {
+    const result = makeResult(groups, { rows: { total: rows.length, page: 1, pageSize: 25, items: rows } })
+    return { ...result, query: { ...result.query, npi: '1801474036' } }
+  }
+  const byName = (groups: RateGroup[], provider: string) => {
+    const result = makeResult(groups)
+    return { ...result, query: { ...result.query, provider } }
+  }
 
   it('needs an NPI, EIN or name filter', () => {
     expect(hasProviderFilter(makeResult([office]))).toBe(false)
-    const result = makeResult([office])
-    expect(hasProviderFilter({ ...result, query: { ...result.query, npi: '1801474036' } })).toBe(true)
-    expect(hasProviderFilter({ ...result, query: { ...result.query, provider: 'heel' } })).toBe(true)
+    expect(hasProviderFilter(byNpi([office]))).toBe(true)
+    expect(hasProviderFilter(byName([office], 'heel'))).toBe(true)
   })
 
-  it('says where your rate sits, by percentile and multiple of the median', () => {
-    const [line] = yourRateLines(makeResult([office]))
-    expect(line).toMatchObject({ provider: 'Heel Sole Podiatry PC', rate: 80.72 })
+  it('says "your rate" when an NPI or EIN pins one provider, and just "rate" for a name search', () => {
+    const [line] = yourRateLines(byNpi([office]))
+    expect(line).toMatchObject({ provider: 'Heel Sole Podiatry PC', providerKey: '995084138', rate: 80.72 })
     expect(line!.text).toBe('Your rate $80.72 is at the 68th percentile, 1.57× the median.')
+    expect(yourRateLines(byName([office], 'heel'))[0]!.text).toBe('Rate $80.72 is at the 68th percentile, 1.57× the median.')
+    expect(highlightHeading(byNpi([office]))).toBe('Where your provider sits')
+    expect(highlightHeading(byName([office], 'heel'))).toBe('Where providers whose name contains "heel" sit')
+  })
+
+  it('calls the median the most common rate only when the quartiles prove it', () => {
+    const feeSchedule = makeGroup({
+      key: 'fee-schedule',
+      stats: { min: 143.75, p10: 167.09, p25: 167.09, median: 167.09, p75: 167.09, p90: 167.09, max: 185.4, spreadMultiple: 1.29, p90ToP10: 1 },
+      highlights: [{ providerKey: 'a', displayName: 'Downtown Gastroenterology Assoc', rate: 167.09, percentile: 50, vsMedian: 1, aboveP25: 0 }],
+    })
+    expect(yourRateLines(byNpi([feeSchedule]))[0]!.text).toBe('Your rate $167.09 is at the 50th percentile, 1.00× the median (the most common rate).')
+    const spread = { ...feeSchedule, stats: { ...feeSchedule.stats, p25: 150, p75: 180 } }
+    expect(yourRateLines(byNpi([spread]))[0]!.text).not.toContain('most common')
+  })
+
+  it('adds the range when the provider has several rates in the group', () => {
+    const row = {
+      groupKey: office.key,
+      providerKey: '995084138',
+      ein: '99-5084138',
+      einDisplay: '99-5084138',
+      einMasked: false,
+      einLevel: false,
+      businessName: 'Heel Sole Podiatry PC',
+      otherNames: [],
+      rate: 80.72,
+      rateLow: 57.05,
+      rateHigh: 94.5,
+      multipleRates: true,
+      vsMedian: 1.57,
+      percentile: 68,
+      band: 'typical' as const,
+      npiCount: 1,
+      occurrences: 2,
+      rateCount: 2,
+      firstRateId: 1,
+      rateIds: [1, 2],
+      matched: true,
+    }
+    expect(yourRateLines(byNpi([office], [row]))[0]!.text).toBe(
+      'Your rate $80.72 is at the 68th percentile, 1.57× the median (your rates here range from $57.05 to $94.50).',
+    )
   })
 
   it('does not invent a percentile for a group too small to have one', () => {
     const small = { ...singleEr, highlights: [{ providerKey: 'x', displayName: 'Lone Hospital', rate: 4803.34, percentile: null, vsMedian: null, aboveP25: null }] }
-    expect(yourRateLines(makeResult([small]))[0]!.text).toBe('Your rate $4,803.34. With 1 provider in this group there is no percentile.')
+    expect(yourRateLines(byNpi([small]))[0]!.text).toBe('Your rate $4,803.34. With 1 provider in this group there is no percentile.')
   })
 })
 

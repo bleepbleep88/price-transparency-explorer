@@ -16,6 +16,7 @@ import StartHere from '@/features/rates/components/StartHere.vue'
 import type { RateRow } from '@/features/rates/api/types'
 import { useRateSearch, useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import { useSearchRoute } from '@/features/rates/composables/useSearchRoute'
+import { highlightHeading } from '@/features/rates/lib/lenses'
 import type { SortKey } from '@/features/rates/lib/searchParams'
 
 const { params, hasCode, urlErrors, canSearch, update, replace, startOver } = useSearchRoute()
@@ -137,7 +138,12 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
 
           <v-row v-if="result.groups.length" aria-label="Comparison groups">
             <v-col v-for="group in result.groups" :key="group.key" cols="12" md="6" lg="4">
-              <GroupCard :group="group" :selected="params.group === group.key" @show-providers="showGroup" />
+              <GroupCard
+                :group="group"
+                :selected="params.group === group.key"
+                :highlight-heading="highlightHeading(result)"
+                @show-providers="showGroup"
+              />
             </v-col>
           </v-row>
 

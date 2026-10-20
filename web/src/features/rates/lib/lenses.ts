@@ -104,8 +104,20 @@ export function hasProviderFilter(result: RateSearchResult): boolean {
   return Boolean(query.npi || query.ein || query.provider)
 }
 
+/** An NPI or EIN pins one provider, so the reading can say "your". A name filter can match many providers. */
+export function pinsProvider(result: RateSearchResult): boolean {
+  return Boolean(result.query.npi || result.query.ein)
+}
+
+/** At least half the group is paid exactly the median (25th and 75th percentiles equal it), so it is the most common rate. */
+export function isMostCommonRate(group: RateGroup, rate: number): boolean {
+  const { p25, median, p75 } = group.stats
+  return median != null && rate === median && p25 === median && p75 === median
+}
+
 export interface YourRateLine {
   groupKey: string
+  providerKey: string
   group: string
   provider: string
   rate: number
@@ -114,21 +126,44 @@ export interface YourRateLine {
 
 /** For each group the searched provider appears in: where its rate sits. */
 export function yourRateLines(result: RateSearchResult): YourRateLine[] {
+  const yours = pinsProvider(result)
+  const subject = yours ? 'Your rate' : 'Rate'
+  const rows = new Map(result.rows.items.map((row) => [`${row.groupKey}|${row.providerKey}`, row]))
   return result.groups.flatMap((group) =>
     group.highlights.map((position) => {
       let text: string
       if (group.statsLevel === 'list') {
-        text = `Your rate ${money(position.rate)}. With ${plural(group.providerCount, 'provider')} in this group there is no percentile.`
+        text = `${subject} ${money(position.rate)}. With ${plural(group.providerCount, 'provider')} in this group there is no percentile.`
       } else if (position.percentile != null && position.vsMedian != null) {
-        text = `Your rate ${money(position.rate)} is at the ${ordinal(position.percentile)} percentile, ${times(position.vsMedian)} the median.`
+        const common = isMostCommonRate(group, position.rate) ? ' (the most common rate)' : ''
+        text = `${subject} ${money(position.rate)} is at the ${ordinal(position.percentile)} percentile, ${times(position.vsMedian)} the median${common}.`
       } else if (position.vsMedian != null) {
-        text = `Your rate ${money(position.rate)} is ${times(position.vsMedian)} the median.`
+        text = `${subject} ${money(position.rate)} is ${times(position.vsMedian)} the median.`
       } else {
-        text = `Your rate ${money(position.rate)}.`
+        text = `${subject} ${money(position.rate)}.`
       }
-      return { groupKey: group.key, group: groupName(group), provider: position.displayName, rate: position.rate, text }
+      // Several rates in one group: the table row (when it's on this page) has the range.
+      const row = rows.get(`${group.key}|${position.providerKey}`)
+      if (row?.multipleRates) {
+        text = `${text.slice(0, -1)} (${yours ? 'your rates here' : 'its rates'} range from ${money(row.rateLow)} to ${money(row.rateHigh)}).`
+      }
+      return {
+        groupKey: group.key,
+        providerKey: position.providerKey,
+        group: groupName(group),
+        provider: position.displayName,
+        rate: position.rate,
+        text,
+      }
     }),
   )
+}
+
+/** Heading over a card's highlights: "your" only when an NPI or EIN pins one provider. */
+export function highlightHeading(result: RateSearchResult): string {
+  return pinsProvider(result) || !result.query.provider
+    ? 'Where your provider sits'
+    : `Where providers whose name contains "${result.query.provider}" sit`
 }
 
 // ---- Plans ----

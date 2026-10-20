@@ -5,7 +5,15 @@ import { money, ordinal, plural, times } from '@/lib/format'
 import type { ProviderPosition, RateGroup } from '../api/types'
 import RangeBar from './RangeBar.vue'
 
-const props = defineProps<{ group: RateGroup; selected?: boolean }>()
+const props = withDefaults(
+  defineProps<{
+    group: RateGroup
+    selected?: boolean
+    /** Over the highlights: "your provider" only when an NPI or EIN pins one; a name filter names the filter. */
+    highlightHeading?: string
+  }>(),
+  { selected: false, highlightHeading: 'Where your provider sits' },
+)
 const emit = defineEmits<{ showProviders: [groupKey: string] }>()
 
 const showNotes = ref(false)
@@ -111,7 +119,7 @@ function positionText(position: ProviderPosition): string {
       </div>
 
       <div v-if="group.highlights.length" class="yours-rule d-flex flex-column ga-1" data-testid="group-highlights">
-        <p class="text-body-small font-weight-medium">Where your provider sits</p>
+        <p class="text-body-small font-weight-medium">{{ highlightHeading }}</p>
         <div v-for="position in group.highlights" :key="position.providerKey" class="d-flex flex-wrap align-center ga-1 text-body-medium">
           <v-chip class="copper-mark" variant="outlined" data-testid="your-rate">{{ money(position.rate) }}</v-chip>
           <strong>{{ position.displayName }}</strong>

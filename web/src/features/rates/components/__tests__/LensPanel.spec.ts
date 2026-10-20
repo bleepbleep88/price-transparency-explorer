@@ -97,6 +97,18 @@ describe('LensPanel', () => {
     expect(without.emitted('focusNpi')).toHaveLength(1)
   })
 
+  it('providers: a name search names the filter and counts the groups left, not the lines', () => {
+    const matches = (prefix: string) =>
+      Array.from({ length: 4 }, (_, i) => ({ providerKey: `${prefix}${i}`, displayName: `Gastro Practice ${prefix}${i}`, rate: 300 + i, percentile: 40 + i, vsMedian: 1.1, aboveP25: 10 }))
+    const groups = ['a', 'b', 'c'].map((key) => group({ key, highlights: matches(key) }))
+    const wrapper = mountPanel(result(groups, { provider: 'gastro' }), { lens: 'providers', provider: 'gastro' })
+    expect(wrapper.text()).toContain('Providers whose name contains "gastro":')
+    expect(wrapper.text()).not.toContain('your provider')
+    expect(wrapper.text()).not.toContain('Your rate')
+    expect(wrapper.findAll('[data-testid="your-rate-line"]')).toHaveLength(8)
+    expect(wrapper.get('[data-testid="more-groups"]').text()).toBe('1 more group in the cards below.')
+  })
+
   it('plans: widest spread first, and one click sorts by the highest rate', async () => {
     const wrapper = mountPanel(result([group()]), { lens: 'plans' })
     expect(wrapper.get('[data-testid="spread-line"]').text()).toContain('the median sits $123.86 above the lower quartile')

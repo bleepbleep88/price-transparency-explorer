@@ -46,9 +46,9 @@ function makeGroup(overrides: Partial<RateGroup> = {}): RateGroup {
   }
 }
 
-function mountCard(group: RateGroup, selected = false) {
+function mountCard(group: RateGroup, selected = false, highlightHeading?: string) {
   const vuetify = createVuetify({ theme: { defaultTheme: 'light' } })
-  return mount(GroupCard, { props: { group, selected }, global: { plugins: [vuetify] } })
+  return mount(GroupCard, { props: { group, selected, highlightHeading }, global: { plugins: [vuetify] } })
 }
 
 describe('GroupCard', () => {
@@ -128,5 +128,15 @@ describe('GroupCard', () => {
 
     await wrapper.findAll('button').find((button) => button.text() === 'Show these providers')!.trigger('click')
     expect(wrapper.emitted('showProviders')).toEqual([[group.key]])
+  })
+
+  it('names the filter instead of "your provider" for a name search', () => {
+    const group = makeGroup({
+      highlights: [{ providerKey: 'a', displayName: 'Hudson Valley Gastroenterology PC', rate: 627.5, percentile: 75, vsMedian: 1.09, aboveP25: 173.06 }],
+    })
+    const heading = 'Where providers whose name contains "gastro" sit'
+    const highlights = mountCard(group, false, heading).get('[data-testid="group-highlights"]')
+    expect(highlights.text()).toContain(heading)
+    expect(highlights.text()).not.toContain('your provider')
   })
 })
