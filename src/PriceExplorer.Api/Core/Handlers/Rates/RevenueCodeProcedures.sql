@@ -1,7 +1,7 @@
 -- Facility rates filed under a searched revenue code that are searchable under the procedure code in their notes field
 -- (additional_information). Searching the revenue code alone would never show them.
--- Scoped to one product when $product is set, and to a provider when NPI / EIN / name filters are set (NPI, EIN and
--- name in the same provider group, as in SearchRates.sql). One row per revenue code and procedure code; the last four
+-- Scoped to one product when $product is set, and to a provider when NPI / EIN / name / specialty / location filters are
+-- set (all in the same provider group, as in SearchRates.sql). One row per revenue code and procedure code; the last four
 -- columns describe all rows together: Providers (distinct tax IDs; 0 without provider filters), Products (labels), and
 -- TaxIds: one record per matching tax ID (name, EIN or empty when masked, 'm' when masked, count of other names), as in
 -- ProviderLookup.sql.
@@ -24,18 +24,25 @@ hits AS (
     SELECT f.*, NULL::VARCHAR AS provider_key, NULL::VARCHAR AS ein, false AS masked, NULL::VARCHAR AS business_name
     FROM refiled f
     WHERE $npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL
+      AND $specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL
     UNION ALL
     SELECT f.*, pg.provider_key, CASE WHEN pg.ein_unverified THEN NULL ELSE pg.ein END, pg.ein_unverified, pg.business_name
     FROM refiled f
     JOIN rate_provider_refs rr ON rr.rate_id = f.rate_id
     JOIN provider_groups pg ON pg.file_id = rr.file_id AND pg.provider_ref_id = rr.provider_ref_id
-    WHERE NOT ($npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL)
+    WHERE NOT ($npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL
+               AND $specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL)
       AND ($npi::BIGINT IS NULL OR EXISTS (
           SELECT 1 FROM group_npis gn
           WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
             AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
       AND ($ein::VARCHAR IS NULL OR pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR)
       AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))
+      AND (($specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL) OR EXISTS (
+          SELECT 1 FROM group_npis gn
+          JOIN directory_matches($specialty::VARCHAR, $county::VARCHAR) dm ON dm.npi = gn.npi
+          WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id AND gn.group_idx = pg.group_idx
+            AND ($specialty::VARCHAR IS NULL OR dm.specialty_match) AND ($county::VARCHAR IS NULL OR dm.county_match)))
 )
 SELECT
     h.billing_code            AS RevenueCode,

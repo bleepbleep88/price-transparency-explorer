@@ -13,6 +13,8 @@ public sealed record RateSearchResult(
     SearchQuality Quality);
 
 /// <summary>The search as the server understood it (normalized), so the UI can show exactly what ran.</summary>
+/// <param name="Specialty">The specialty filter as typed.</param>
+/// <param name="County">The location filter as typed.</param>
 public sealed record RateSearchEcho(
     string Code,
     IReadOnlyList<string> MatchedCodes,
@@ -23,6 +25,8 @@ public sealed record RateSearchEcho(
     string? Setting,
     string? FeeType,
     string? Provider,
+    string? Specialty,
+    string? County,
     string? Group,
     string Sort,
     int Page,

@@ -7,7 +7,10 @@ using PriceExplorer.Api.Core.Reference;
 
 namespace PriceExplorer.Api.Core.Queries.Rates;
 
-/// <summary>Negotiated rates for one billing code, optionally narrowed to a provider by NPI, EIN, or name.</summary>
+/// <summary>
+/// Negotiated rates for one billing code, optionally narrowed to a provider by NPI, EIN, or name, or to providers with a
+/// clinician specialty or a New York location (from the national provider registry).
+/// </summary>
 /// <param name="Code">Required. CPT/HCPCS/revenue code as typed ("45378", "j0585", "490").</param>
 /// <param name="CodeType">Optional: CPT, HCPCS, RC... Needed only when a short number is ambiguous.</param>
 /// <param name="Npi">Optional 10-digit NPI. Combined with an EIN, it must bill under that EIN.</param>
@@ -16,6 +19,8 @@ namespace PriceExplorer.Api.Core.Queries.Rates;
 /// <param name="Setting">Optional care setting key, e.g. "asc", "hospital-outpatient", "office".</param>
 /// <param name="FeeType">Optional: "facility" or "professional".</param>
 /// <param name="Provider">Optional text matched against provider business names.</param>
+/// <param name="Specialty">Optional: providers listing an NPI with this specialty (NUCC name or grouping text, e.g. "gastro", or a taxonomy code).</param>
+/// <param name="County">Optional: providers listing an NPI that practices in this New York county or NYC borough ("Manhattan", "Monroe", or a FIPS code).</param>
 /// <param name="Group">Optional comparison group key: limits the rows (not the group cards) to that group.</param>
 /// <param name="Snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
 /// <param name="Sort">rate | -rate | provider | -provider | vsMedian | -vsMedian.</param>
@@ -28,6 +33,8 @@ public sealed record SearchRatesQuery(
     string? Setting = null,
     string? FeeType = null,
     string? Provider = null,
+    string? Specialty = null,
+    string? County = null,
     string? Group = null,
     int? Snapshot = null,
     string? Sort = null,
@@ -99,6 +106,36 @@ public sealed partial class SearchRatesQueryValidator : AbstractValidator<Search
             .Must(name => !InputRules.HasControlCharacters(name!))
             .When(query => query.Provider is not null)
             .WithMessage("The provider name can't contain control characters.");
+
+        RuleFor(query => query.Specialty)
+            .Must(specialty => specialty!.Trim().Length >= 2)
+            .When(query => !string.IsNullOrWhiteSpace(query.Specialty))
+            .WithMessage("Type at least 2 characters of a specialty, for example 'gastro'.");
+
+        RuleFor(query => query.Specialty)
+            .Must(specialty => specialty!.Trim().Length <= 100)
+            .When(query => !string.IsNullOrWhiteSpace(query.Specialty))
+            .WithMessage("A specialty is at most 100 characters.");
+
+        RuleFor(query => query.County)
+            .Must(county => county!.Trim().Length >= 2)
+            .When(query => !string.IsNullOrWhiteSpace(query.County))
+            .WithMessage("Enter a New York county or NYC borough, for example 'Brooklyn' or 'Monroe'.");
+
+        RuleFor(query => query.County)
+            .Must(county => county!.Trim().Length <= 60)
+            .When(query => !string.IsNullOrWhiteSpace(query.County))
+            .WithMessage("A location is at most 60 characters.");
+
+        RuleFor(query => query.Specialty)
+            .Must(specialty => !InputRules.HasControlCharacters(specialty!))
+            .When(query => query.Specialty is not null)
+            .WithMessage("The specialty can't contain control characters.");
+
+        RuleFor(query => query.County)
+            .Must(county => !InputRules.HasControlCharacters(county!))
+            .When(query => query.County is not null)
+            .WithMessage("The location can't contain control characters.");
 
         // Product keys are slugs from the snapshot ("essential-plan"); group keys come from search results.
         RuleFor(query => query.Product)
