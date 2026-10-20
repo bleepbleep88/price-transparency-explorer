@@ -108,7 +108,7 @@ The rate files list bare NPIs. `reference/provider_directory.csv.gz` (1.9 MB) gi
 
 - Each provider row shows who its NPIs are: "Gastroenterology Physician · Manhattan, NY · +12 more".
 - Filter by **specialty** or by **New York county or NYC borough**. With both, one NPI must have that specialty and practice there. Like an NPI filter, they pick rows; the statistics stay market-wide. A specialty picked from the list finds just that specialty. Typed words match the start of words in specialty names, so "urology" never finds neurologists, and common forms work ("cardiologist", "ENT", "OB/GYN", "orthopaedic"). Locations take county or borough names ("Kings County", "The Bronx") or "NYC".
-- **Check this** flags mark listed rates that look unusual for the provider: a facility rate whose NPIs are all individual clinicians, anesthesia without an anesthesia clinician, imaging without a radiologist, deactivated NPIs. The files list contracted rates, not services performed, so a flag is a prompt to verify.
+- **Check this** flags mark listed rates that look unusual for the provider: a facility rate whose NPIs are all individual clinicians, anesthesia without an anesthesia clinician, a CT, MRI or PET read with no radiologist or nuclear medicine physician (cardiologists count for cardiac scans), deactivated NPIs. The files list contracted rates, not services performed, so a flag is a prompt to verify.
 
 ## API
 

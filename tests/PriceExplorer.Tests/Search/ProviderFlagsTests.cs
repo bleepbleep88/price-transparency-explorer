@@ -35,7 +35,43 @@ public sealed class ProviderFlagsTests
     public void An_imaging_read_without_a_radiologist_is_flagged()
     {
         ProviderFlags.For(Group("professional", "CPT", "70553"), Profile(npis: 1, individuals: 1, "Family Nurse Practitioner"))
-            .Should().ContainSingle(flag => flag.Kind == "imaging_without_radiologist");
+            .Should().ContainSingle(flag => flag.Kind == "imaging_without_radiologist").Which.Message.Should().Be(
+                "A CT, MRI or PET read, but no NPI behind it is a radiologist or nuclear medicine physician in the national registry.");
+    }
+
+    [Fact]
+    public void A_ct_mri_or_pet_read_by_a_radiologist_or_nuclear_medicine_physician_is_not_flagged()
+    {
+        // Body Imaging Physicians are radiologists whose name doesn't say so; the reader count comes from their taxonomy.
+        ProviderFlags.For(Group("professional", "CPT", "74177"), Profile(npis: 1, individuals: 1, "Body Imaging Physician") with { ImagingReaders = 1 })
+            .Should().BeEmpty();
+        ProviderFlags.For(Group("professional", "CPT", "78815"), Profile(npis: 3, individuals: 3, "Nuclear Medicine Physician") with { ImagingReaders = 3 })
+            .Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Cardiologists_read_cardiac_ct_mri_and_pet_but_not_other_scans()
+    {
+        var cardiologists = Profile(npis: 2, individuals: 2, "Cardiovascular Disease Physician") with { CardiacReaders = 2 };
+
+        ProviderFlags.For(Group("professional", "CPT", "75574"), cardiologists).Should().BeEmpty();
+        ProviderFlags.For(Group("professional", "CPT", "78492"), cardiologists).Should().BeEmpty();
+        ProviderFlags.For(Group("professional", "CPT", "70553"), cardiologists).Should().ContainSingle();
+        ProviderFlags.For(Group("professional", "CPT", "75574"), Profile(npis: 1, individuals: 1, "Family Nurse Practitioner"))
+            .Should().ContainSingle().Which.Message.Should().StartWith("A cardiac CT, MRI or PET read, but no NPI behind it is a radiologist");
+    }
+
+    [Theory]
+    // The specialists who order these studies bill them: they aren't a radiologist's read.
+    [InlineData("76801", "Obstetrics & Gynecology Physician")]
+    [InlineData("76519", "Ophthalmology Physician")]
+    [InlineData("73630", "Foot & Ankle Surgery Podiatrist")]
+    [InlineData("76942", "Gastroenterology Physician")]
+    [InlineData("77300", "Radiation Oncology Physician")]
+    [InlineData("78452", "Cardiovascular Disease Physician")]
+    public void Ultrasound_x_rays_guidance_and_radiation_therapy_are_not_flagged(string code, string specialty)
+    {
+        ProviderFlags.For(Group("professional", "CPT", code), Profile(npis: 1, individuals: 1, specialty)).Should().BeEmpty();
     }
 
     [Fact]

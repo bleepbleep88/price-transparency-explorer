@@ -156,7 +156,11 @@ public sealed class SearchRatesHandler(
                         .Select(line => new SpecialtyCount(line.Label!, line.GroupName, (int)line.Npis))
                         .ToList(),
                     places.Take(3).Select(line => line.Label!).ToList(),
-                    places.Count);
+                    places.Count)
+                {
+                    ImagingReaders = (int)totals.ImagingReaders,
+                    CardiacReaders = (int)totals.CardiacReaders,
+                };
 
                 return counted with
                 {
@@ -217,5 +221,6 @@ public sealed class SearchRatesHandler(
 
     /// <summary>One line of ProviderProfiles.sql: a row's totals, or one of its specialties or places.</summary>
     private sealed record ProfileLine(
-        long RowIndex, string Kind, string? Label, string? GroupName, long Npis, long Found, long Individuals, long Deactivated, bool Matches);
+        long RowIndex, string Kind, string? Label, string? GroupName, long Npis, long Found, long Individuals, long Deactivated,
+        long ImagingReaders, long CardiacReaders, bool Matches);
 }

@@ -1,8 +1,8 @@
 -- For each row on the current page: the distinct NPIs behind it, over ALL of the row's rates, and who they are in the
 -- provider directory. The count is the row's NPI count, so the profile, the row and its NPI list always agree.
 -- {rows} is replaced with a VALUES list of ($iN, $kN, rate id) triples (row index, provider key, rate id) built by the
--- handler. Per row: one 'totals' line (NPIs; how many the directory has; active individuals; deactivated), then one line
--- per specialty and per place, with their NPI counts. Matches marks the specialties and places that meet the search's
+-- handler. Per row: one 'totals' line (NPIs; how many the directory has; active individuals; deactivated; active imaging
+-- readers and cardiologists, for the imaging flag), then one line per specialty and per place, with their NPI counts. Matches marks the specialties and places that meet the search's
 -- specialty and location filters, so they can be listed first. Places read "Manhattan, NY" in New York City and
 -- "Rome, NY · Oneida County" elsewhere, so a county filter visibly matches.
 WITH page(row_index, provider_key, rate_id) AS (
@@ -22,7 +22,7 @@ row_npis AS (
 ),
 described AS (
     SELECT
-        n.row_index, n.npi, pd.npi IS NOT NULL AS found, pd.entity_type, pd.specialty, pd.specialty_group, pd.city,
+        n.row_index, n.npi, pd.npi IS NOT NULL AS found, pd.entity_type, pd.taxonomy_code, pd.specialty, pd.specialty_group, pd.city,
         pd.state, pd.county, pd.borough,
         coalesce(pd.deactivated, false)     AS deactivated,
         coalesce(dm.specialty_match, false) AS matches_specialty,
@@ -40,12 +40,20 @@ SELECT
     count(d.npi) FILTER (WHERE d.found)                                            AS Found,
     count(d.npi) FILTER (WHERE d.entity_type = 'individual' AND NOT d.deactivated) AS Individuals,
     count(d.npi) FILTER (WHERE d.deactivated)                                      AS Deactivated,
+    -- Radiologists of every kind (NUCC 2085*, but not radiation oncology or therapeutic radiology, which treat), nuclear
+    -- medicine physicians (207U*) and radiology centers read CT, MRI and PET.
+    count(d.npi) FILTER (WHERE NOT d.deactivated AND (
+        (d.taxonomy_code LIKE '2085%' AND d.taxonomy_code NOT IN ('2085R0001X', '2085R0203X'))
+        OR d.taxonomy_code LIKE '207U%' OR d.taxonomy_code = '261QR0200X'))           AS ImagingReaders,
+    -- Cardiologists, who also read cardiac CT, MRI and PET: general, electrophysiology, interventional, heart failure, pediatric.
+    count(d.npi) FILTER (WHERE NOT d.deactivated AND d.taxonomy_code IN (
+        '207RC0000X', '207RC0001X', '207RI0011X', '207RA0001X', '2080P0202X'))          AS CardiacReaders,
     false                       AS Matches
 FROM (SELECT DISTINCT row_index FROM row_groups) r
 LEFT JOIN described d ON d.row_index = r.row_index
 GROUP BY r.row_index
 UNION ALL
-SELECT CAST(row_index AS BIGINT), 'specialty', specialty, any_value(specialty_group), count(*), 0, 0, 0, bool_or(matches_specialty)
+SELECT CAST(row_index AS BIGINT), 'specialty', specialty, any_value(specialty_group), count(*), 0, 0, 0, 0, 0, bool_or(matches_specialty)
 FROM described
 WHERE coalesce(specialty, '') <> ''
 GROUP BY row_index, specialty
@@ -56,7 +64,7 @@ SELECT
     CASE WHEN coalesce(borough, '') <> '' THEN borough || ', NY'
          WHEN coalesce(county, '') <> '' THEN city || ', ' || state || ' · ' || county
          ELSE city || ', ' || state END,
-    NULL, count(*), 0, 0, 0, bool_or(matches_county)
+    NULL, count(*), 0, 0, 0, 0, 0, bool_or(matches_county)
 FROM described
 WHERE coalesce(city, '') <> ''
 GROUP BY 1, 3

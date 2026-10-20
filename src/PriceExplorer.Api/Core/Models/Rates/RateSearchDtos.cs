@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using PriceExplorer.Api.Core.Domain;
 
 namespace PriceExplorer.Api.Core.Models.Rates;
@@ -185,7 +186,16 @@ public sealed record ProviderProfile(
     int Deactivated,
     IReadOnlyList<SpecialtyCount> Specialties,
     IReadOnlyList<string> Locations,
-    int LocationCount);
+    int LocationCount)
+{
+    /// <summary>Active radiologists, nuclear medicine physicians and radiology centers among the NPIs (for the imaging flag).</summary>
+    [JsonIgnore]
+    public int ImagingReaders { get; init; }
+
+    /// <summary>Active cardiologists among the NPIs: they read cardiac CT, MRI and PET too.</summary>
+    [JsonIgnore]
+    public int CardiacReaders { get; init; }
+}
 
 /// <param name="Group">The NUCC grouping, e.g. "Allopathic &amp; Osteopathic Physicians".</param>
 public sealed record SpecialtyCount(string Specialty, string? Group, int Npis);
