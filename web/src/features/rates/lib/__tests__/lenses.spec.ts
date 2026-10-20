@@ -11,6 +11,8 @@ import {
   hasProviderFilter,
   highlightHeading,
   isDrugCode,
+  marketWideNote,
+  marksSearchedProvider,
   modifierText,
   noYearlyReason,
   LENS_OPTIONS,
@@ -77,6 +79,7 @@ function makeResult(groups: RateGroup[], overrides: Partial<RateSearchResult> = 
       provider: null,
       specialty: null,
       county: null,
+      countyPlace: null,
       group: null,
       sort: 'rate',
       page: 1,
@@ -161,9 +164,11 @@ describe('providers lens', () => {
     return { ...result, query: { ...result.query, provider } }
   }
 
-  const byDirectory = (groups: RateGroup[], filters: { specialty?: string; county?: string; npi?: string }) => {
+  // The API names the place a location matched: "Brooklyn" for county=Brooklyn.
+  const byDirectory = (groups: RateGroup[], filters: { specialty?: string; county?: string; countyPlace?: string | null; npi?: string; provider?: string }) => {
     const result = makeResult(groups)
-    return { ...result, query: { ...result.query, ...filters } }
+    const countyPlace = filters.county && filters.countyPlace === undefined ? filters.county : (filters.countyPlace ?? null)
+    return { ...result, query: { ...result.query, ...filters, countyPlace } }
   }
 
   it('needs an NPI, EIN, name, specialty or location filter', () => {
@@ -176,15 +181,40 @@ describe('providers lens', () => {
   })
 
   it('names the specialty and location as the API does, and says "your" only for an NPI or EIN', () => {
-    expect(highlightHeading(byDirectory([office], { county: 'Brooklyn' }))).toBe('Where providers in "Brooklyn" sit')
+    expect(highlightHeading(byDirectory([office], { county: 'Brooklyn' }))).toBe('Where providers in Brooklyn sit')
     expect(highlightHeading(byDirectory([office], { specialty: 'podiatr', county: 'Brooklyn' }))).toBe(
-      'Where providers with a specialty matching "podiatr" in "Brooklyn" sit',
+      'Where providers with a specialty matching "podiatr" in Brooklyn sit',
     )
+    // The place as matched ("Delaware" is Delaware County, not the state); text that matched no place stays quoted.
+    expect(highlightHeading(byDirectory([office], { county: 'Delaware', countyPlace: 'Delaware County' }))).toBe(
+      'Where providers in Delaware County sit',
+    )
+    expect(highlightHeading(byDirectory([office], { county: 'Manhatan', countyPlace: null }))).toBe('Where providers in "Manhatan" sit')
     expect(highlightHeading(byDirectory([office], { npi: '1801474036', county: 'Brooklyn' }))).toBe('Where your provider sits')
     expect(filteredProviders({ ...makeResult([]).query, provider: 'heel', specialty: 'podiatr' })).toBe(
       'providers whose name contains "heel" with a specialty matching "podiatr"',
     )
     expect(yourRateLines(byDirectory([office], { county: 'Brooklyn' }))[0]!.text).toMatch(/^Rate \$80\.72/)
+  })
+
+  it('marks only a provider searched by NPI, EIN or name as yours', () => {
+    expect(marksSearchedProvider(byNpi([office]))).toBe(true)
+    expect(marksSearchedProvider(byName([office], 'heel'))).toBe(true)
+    expect(marksSearchedProvider(byDirectory([office], { county: 'Brooklyn', specialty: 'podiatr' }))).toBe(false)
+  })
+
+  it('says typical prices cover all of New York under a specialty or location filter', () => {
+    const query = (filters: Parameters<typeof byDirectory>[1]) => byDirectory([office], filters).query
+    expect(marketWideNote(query({ county: 'Delaware', countyPlace: 'Delaware County' }))).toBe(
+      'Typical prices are for all of New York, not just Delaware County.',
+    )
+    expect(marketWideNote(query({ specialty: 'podiatr' }))).toBe(
+      'Typical prices are for all of New York, not just providers with a specialty matching "podiatr".',
+    )
+    expect(marketWideNote(query({ specialty: 'podiatr', county: 'Brooklyn' }))).toBe(
+      'Typical prices are for all of New York, not just providers with a specialty matching "podiatr" in Brooklyn.',
+    )
+    expect(marketWideNote(query({ provider: 'heel' }))).toBeNull()
   })
 
   it('says "your price" when an NPI or EIN pins one provider, and just "price" for a name search', () => {

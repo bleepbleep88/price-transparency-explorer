@@ -138,14 +138,39 @@ export function hasDirectoryFilter(result: RateSearchResult): boolean {
 }
 
 /**
+ * The search names a provider (NPI, EIN or name): only then do its matches get the copper "your provider" mark. A
+ * specialty or location picks a set of providers, not yours.
+ */
+export function marksSearchedProvider(result: RateSearchResult): boolean {
+  const query = result.query
+  return Boolean(query.npi || query.ein || query.provider)
+}
+
+/** The place the location filter matched, as the API names it ("Delaware County"), else the text as typed, quoted. */
+export function placePhrase(query: RateSearchEcho): string {
+  return query.countyPlace ?? `"${query.county}"`
+}
+
+/**
  * The providers a name, specialty or location filter picks, worded like the API's hints:
- * 'providers whose name contains "heel" with a specialty matching "podiatr" in "Brooklyn"'.
+ * 'providers whose name contains "heel" with a specialty matching "podiatr" in Brooklyn'.
  */
 export function filteredProviders(query: RateSearchEcho): string {
   let text = query.provider ? `providers whose name contains "${query.provider}"` : 'providers'
   if (query.specialty) text += ` with a specialty matching "${query.specialty}"`
-  if (query.county) text += ` in "${query.county}"`
+  if (query.county) text += ` in ${placePhrase(query)}`
   return text
+}
+
+/**
+ * Under a specialty or location filter the rows narrow, but each group's typical price and spread still count every
+ * provider in it: "Typical prices are for all of New York, not just Manhattan." Null without those filters.
+ */
+export function marketWideNote(query: RateSearchEcho): string | null {
+  if (!query.specialty && !query.county) return null
+  const place = query.county ? placePhrase(query) : null
+  const who = query.specialty ? `providers with a specialty matching "${query.specialty}"${place ? ` in ${place}` : ''}` : place
+  return `Typical prices are for all of New York, not just ${who}.`
 }
 
 /** An NPI or EIN pins one provider, so the reading can say "your". A name filter can match many providers. */

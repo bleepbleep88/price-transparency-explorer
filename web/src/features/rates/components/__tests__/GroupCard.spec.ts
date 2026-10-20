@@ -47,9 +47,9 @@ function makeGroup(overrides: Partial<RateGroup> = {}): RateGroup {
   }
 }
 
-function mountCard(group: RateGroup, selected = false, highlightHeading?: string) {
+function mountCard(group: RateGroup, selected = false, highlightHeading?: string, yours = true) {
   const vuetify = createVuetify({ theme: { defaultTheme: 'light' } })
-  return mount(GroupCard, { props: { group, selected, highlightHeading }, global: { plugins: [vuetify] } })
+  return mount(GroupCard, { props: { group, selected, highlightHeading, yours }, global: { plugins: [vuetify] } })
 }
 
 const BANNED = /percentile|median|quartile|×|spread|index/i
@@ -191,5 +191,21 @@ describe('GroupCard', () => {
     const highlights = mountCard(group, false, heading).get('[data-testid="group-highlights"]')
     expect(highlights.text()).toContain(heading)
     expect(highlights.text()).not.toContain('your provider')
+  })
+
+  it('marks the searched provider in copper, and specialty or location matches without it', () => {
+    const group = makeGroup({
+      highlights: [{ providerKey: 'a', displayName: 'Carnegie Hill Endoscopy', rate: 367.1, percentile: 8, vsMedian: 0.63, aboveP25: -87.35, rateLow: 367.1, rateHigh: 367.1 }],
+    })
+    const yours = mountCard(group, false, 'Where your provider sits', true)
+    expect(yours.get('[data-testid="group-highlights"]').classes()).toContain('yours-rule')
+    expect(yours.get('[data-testid="your-rate"]').classes()).toContain('copper-mark')
+    expect(yours.find('.range-bar__marker').exists()).toBe(true)
+
+    const matches = mountCard(group, false, 'Where providers in Manhattan sit', false)
+    expect(matches.get('[data-testid="group-highlights"]').classes()).toContain('match-rule')
+    expect(matches.find('.copper-mark').exists()).toBe(false)
+    expect(matches.find('.yours-rule').exists()).toBe(false)
+    expect(matches.find('.range-bar__marker').exists()).toBe(false)
   })
 })

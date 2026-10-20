@@ -215,7 +215,7 @@ export interface ProviderProfile {
   deactivated: number
   /** Specialties matching the specialty filter first, then the most NPIs. */
   specialties: SpecialtyCount[]
-  /** Up to 3 places ("Manhattan, NY", "Rome, NY · Oneida County"): those in the filtered location first. */
+  /** Up to 3 places ("Manhattan, NY", "Rome, NY (Oneida County)"): those in the filtered location first. */
   locations: string[]
   /** How many places there are in all. */
   locationCount: number
@@ -274,6 +274,8 @@ export interface RateSearchEcho {
   specialty: string | null
   /** The location filter as typed. */
   county: string | null
+  /** The place the location filter matched ("Manhattan", "Delaware County", "New York City"); null without one or when it matches no one. */
+  countyPlace: string | null
   group: string | null
   sort: string
   page: number
@@ -392,6 +394,8 @@ export interface LocationOption {
   label: string
   isBorough: boolean
   npis: number
+  /** The county's own name, which the filter takes too: "Kings County" for Brooklyn, "Monroe County". */
+  county: string
 }
 
 /** Where the provider directory came from. */

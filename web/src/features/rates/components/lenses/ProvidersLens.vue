@@ -4,7 +4,7 @@ import { plural } from '@/lib/format'
 import type { OutOfNetworkResult } from '@/features/out-of-network/api/types'
 import { providersLensLine, visibleGroups } from '@/features/out-of-network/lib/outOfNetworkText'
 import type { RateSearchResult } from '../../api/types'
-import { filteredProviders, hasDirectoryFilter, hasProviderFilter, pinsProvider, yourRateGroups, type YourRateGroup } from '../../lib/lenses'
+import { filteredProviders, hasProviderFilter, marksSearchedProvider, pinsProvider, yourRateGroups, type YourRateGroup } from '../../lib/lenses'
 import type { SearchParams } from '../../lib/searchParams'
 
 const props = defineProps<{ result: RateSearchResult; params?: SearchParams; outOfNetwork?: OutOfNetworkResult | null }>()
@@ -13,7 +13,9 @@ const emit = defineEmits<{ focusNpi: [] }>()
 const SHOWN_LINES = 8
 const filtered = computed(() => hasProviderFilter(props.result))
 const pinned = computed(() => pinsProvider(props.result))
-// "Providers in "Manhattan":" for a name, specialty or location filter.
+// Copper only for a provider searched by NPI, EIN or name; specialty or location matches get a neutral rule.
+const yours = computed(() => marksSearchedProvider(props.result))
+// "Providers in Manhattan:" for a name, specialty or location filter.
 const intro = computed(() => {
   const text = filteredProviders(props.result.query)
   return `${text.charAt(0).toUpperCase()}${text.slice(1)}:`
@@ -44,7 +46,7 @@ const moreGroups = computed(() => groups.value.length - shownGroups.value.length
         <div
           v-for="line in entry.lines"
           :key="`${line.groupKey}|${line.providerKey}`"
-          class="yours-rule"
+          :class="yours ? 'yours-rule' : 'match-rule'"
           data-testid="your-rate-line"
         >
           <p class="text-body-medium font-weight-medium">{{ line.provider }}</p>
@@ -54,9 +56,6 @@ const moreGroups = computed(() => groups.value.length - shownGroups.value.length
       </div>
       <p v-if="moreGroups" class="text-body-small text-medium-emphasis" data-testid="more-groups">
         {{ plural(moreGroups, 'more card') }} below.
-      </p>
-      <p v-if="hasDirectoryFilter(result)" class="text-body-small text-medium-emphasis" data-testid="lens-market-wide">
-        Percentiles compare with every provider in the group, not only those matching the specialty or location.
       </p>
     </template>
     <template v-else>

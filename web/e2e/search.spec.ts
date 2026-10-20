@@ -62,6 +62,31 @@ test('a Manhattan location filter on 45378 keeps only providers that practice th
       return lines.length > 0 && lines.every((line) => line.includes('Manhattan, NY'))
     })
     .toBe(true)
-  await expect(page.getByTestId('group-highlights').first()).toContainText('Where providers in "Manhattan" sit')
+  await expect(page.getByTestId('group-highlights').first()).toContainText('Where providers in Manhattan sit')
+  // Copper marks only a provider searched by NPI, EIN or name, never a location's matches.
+  await expect(page.getByTestId('group-highlights').first().locator('.copper-mark')).toHaveCount(0)
   await expect(page.getByTestId('directory-source')).toContainText('national provider registry (NPPES, October 2026)')
 })
+
+for (const { typed, how } of [
+  { typed: 'Brooklyn', how: 'click' },
+  { typed: 'Brookl', how: 'enter' },
+  { typed: 'Kings', how: 'enter' },
+] as const) {
+  test(`a location typed as "${typed}" (${how === 'click' ? 'then Search' : 'then Enter'}) searches Brooklyn`, async ({ page }) => {
+    await page.goto('/?code=45378')
+    await expect(page.getByTestId('provider-row').first()).toBeVisible()
+
+    await page.getByText('More filters').click()
+    const location = page.getByRole('combobox', { name: 'Location' })
+    await location.click()
+    await location.pressSequentially(typed)
+    // "Kings" is Brooklyn's county: the option shows that name too.
+    await expect(page.getByRole('option', { name: /^Brooklyn/ })).toBeVisible()
+    if (how === 'click') await page.getByRole('button', { name: 'Search', exact: true }).click()
+    else await location.press('Enter')
+
+    await expect(page).toHaveURL(/[?&]county=Brooklyn(&|$)/)
+    await expect(page.getByTestId('active-filter').filter({ hasText: 'Location: Brooklyn' })).toBeVisible()
+  })
+}

@@ -19,7 +19,7 @@ import { visibleGroups } from '@/features/out-of-network/lib/outOfNetworkText'
 import type { RateRow } from '@/features/rates/api/types'
 import { useRateSearch, useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import { useSearchRoute } from '@/features/rates/composables/useSearchRoute'
-import { groupName, highlightHeading } from '@/features/rates/lib/lenses'
+import { groupName, highlightHeading, marksSearchedProvider } from '@/features/rates/lib/lenses'
 import { LIKE_FOR_LIKE } from '@/lib/plainNumbers'
 import type { QueryPatch, SortKey } from '@/features/rates/lib/searchParams'
 
@@ -178,6 +178,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
                 :group="group"
                 :selected="params.group === group.key"
                 :highlight-heading="highlightHeading(result)"
+                :yours="marksSearchedProvider(result)"
                 @show-providers="showGroup"
               />
             </v-col>
@@ -198,7 +199,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
               :groups="result.groups"
               :sort="params.sort"
               :loading="search.isFetching.value"
-              :yours="Boolean(result.query.npi || result.query.ein || result.query.provider)"
+              :yours="marksSearchedProvider(result)"
               :directory="reference.data.value?.directory"
               @update-options="onTableOptions"
               @open-source="openSource"

@@ -11,7 +11,7 @@ import type {
   SpecialtySuggestion,
 } from '../api/types'
 import { useCodeSuggestions, useProviderSuggestions, useSpecialtySuggestions } from '../composables/useRateQueries'
-import { locationSelectItems } from '../lib/locations'
+import { findLocation, locationSelectItems } from '../lib/locations'
 import {
   npiCheckDigitWarning,
   validateSearchForm,
@@ -57,6 +57,7 @@ const localErrors = ref<FormErrors>({})
 const codeSearch = ref('')
 const providerSearch = ref('')
 const specialtySearch = ref('')
+const countySearch = ref('')
 const filtersOpen = ref<number[]>([])
 
 function syncFromParams(params: SearchParams) {
@@ -123,6 +124,13 @@ function describeCode(item: CodeSuggestion): string {
   }
   parts.push(plural(item.rates, 'rate'))
   return parts.join(' · ')
+}
+
+// An autocomplete forgets text that wasn't picked when it loses focus (a click on Search). Keep a place typed in full,
+// or by its county's name ("Kings County").
+function keepTypedLocation() {
+  const match = findLocation(countySearch.value, props.locations ?? [])
+  if (match && draft.county !== match.label) draft.county = match.label
 }
 
 // Vuetify's combobox keeps Enter for itself (to pick a suggestion), so the form never submits. Search once it's done.
@@ -290,14 +298,19 @@ function onSubmit() {
             <v-col cols="12" sm="6" md="4">
               <v-autocomplete
                 v-model="draft.county"
+                v-model:search="countySearch"
                 :items="locationItems"
+                :filter-keys="['title', 'raw.county']"
                 label="Location"
-                placeholder="Any New York county or NYC borough"
+                placeholder="Any county or borough"
                 persistent-placeholder
                 clearable
                 auto-select-first
+                autocomplete="off"
                 :error-messages="errorFor('county')"
                 data-testid="county-input"
+                @keydown.enter="onComboboxEnter"
+                @blur="keepTypedLocation"
               >
                 <template #item="{ props: itemProps, item }">
                   <v-list-item v-bind="itemProps" :subtitle="item.subtitle" />
