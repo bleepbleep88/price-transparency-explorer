@@ -7,6 +7,7 @@ import LoadingPanel from '@/features/status/components/LoadingPanel.vue'
 import DatasetSnapshot from '@/features/rates/components/DatasetSnapshot.vue'
 import ExampleSearches from '@/features/rates/components/ExampleSearches.vue'
 import GroupCard from '@/features/rates/components/GroupCard.vue'
+import LensPanel from '@/features/rates/components/LensPanel.vue'
 import NpiDialog from '@/features/rates/components/NpiDialog.vue'
 import ProviderTable from '@/features/rates/components/ProviderTable.vue'
 import ResultSummary from '@/features/rates/components/ResultSummary.vue'
@@ -17,7 +18,7 @@ import { useRateSearch, useReferenceLists, useSnapshots } from '@/features/rates
 import { useSearchRoute } from '@/features/rates/composables/useSearchRoute'
 import type { SortKey } from '@/features/rates/lib/searchParams'
 
-const { params, hasCode, urlErrors, canSearch, update, startOver } = useSearchRoute()
+const { params, hasCode, urlErrors, canSearch, update, replace, startOver } = useSearchRoute()
 const search = useRateSearch(params, canSearch)
 const snapshots = useSnapshots()
 const reference = useReferenceLists()
@@ -48,6 +49,7 @@ const sourceRow = ref<RateRow | null>(null)
 const npiOpen = ref(false)
 const npiRow = ref<RateRow | null>(null)
 const tableSection = useTemplateRef<HTMLElement>('tableSection')
+const searchForm = useTemplateRef<InstanceType<typeof SearchForm>>('searchForm')
 
 function openSource(row: RateRow) {
   sourceRow.value = row
@@ -78,6 +80,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
     </p>
 
     <SearchForm
+      ref="searchForm"
       :params="params"
       :products="products"
       :settings="settings"
@@ -124,6 +127,15 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
         <v-progress-linear v-if="search.isFetching.value" indeterminate color="primary" />
         <div :style="{ opacity: search.isPlaceholderData.value ? 0.6 : 1 }" class="d-flex flex-column ga-4">
           <ResultSummary :result="result" :params="params" :products="products" :settings="settings" @update="update" />
+
+          <LensPanel
+            :result="result"
+            :params="params"
+            @update="update"
+            @cases="(cases) => replace({ cases })"
+            @focus-npi="searchForm?.focusNpi()"
+            @search="(code) => startOver(code)"
+          />
 
           <v-row v-if="result.groups.length" aria-label="Comparison groups">
             <v-col v-for="group in result.groups" :key="group.key" cols="12" md="6" lg="4">
