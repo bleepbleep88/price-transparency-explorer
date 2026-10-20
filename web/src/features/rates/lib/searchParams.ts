@@ -17,8 +17,6 @@ export const lensSchema = z.enum(LENSES)
 export type Lens = z.infer<typeof lensSchema>
 /** Upper bound for the employers lens's cases-a-year input. */
 export const MAX_CASES = 1_000_000
-/** Upper bound for the dose calculator's dose, in the drug code's unit. */
-export const MAX_DOSE = 1_000_000
 
 export interface SearchParams {
   code: string
@@ -60,10 +58,22 @@ function positiveInteger(value: string | undefined, max = Number.MAX_SAFE_INTEGE
   return Number.isInteger(number) && number >= 1 && number <= max ? number : undefined
 }
 
-function positiveNumber(value: string | undefined, max: number): number | undefined {
-  const number = Number(value)
-  return Number.isFinite(number) && number > 0 && number <= max ? number : undefined
+/** Decimals a dose can have. */
+export const DOSE_DECIMALS = 6
+
+/**
+ * A dose as typed: a plain decimal ("45", "2.5", ".5"), thousands commas allowed ("2,400,000"), up to 6 decimals.
+ * No signs, exponents or hex ("1e3", "0x10"). Null for anything else, and for 0.
+ */
+export function parseDose(text: string | null | undefined): number | null {
+  const trimmed = (text ?? '').trim()
+  if (!/^(?:\d{1,3}(?:,\d{3})+|\d*)(?:\.\d+)?$/.test(trimmed) || !/\d/.test(trimmed)) return null
+  const [, decimals = ''] = trimmed.split('.')
+  if (decimals.length > DOSE_DECIMALS) return null
+  const value = Number(trimmed.replace(/,/g, ''))
+  return Number.isFinite(value) && value > 0 ? value : null
 }
+
 
 /** Tolerant: unknown or malformed values fall back to defaults instead of breaking the page. */
 export function parseRouteQuery(query: LocationQuery): SearchParams {
@@ -87,7 +97,7 @@ export function parseRouteQuery(query: LocationQuery): SearchParams {
     snapshot: positiveInteger(first(query.snapshot)),
     lens: lensSchema.safeParse(first(query.lens)).data,
     cases: positiveInteger(first(query.cases), MAX_CASES),
-    dose: positiveNumber(first(query.dose), MAX_DOSE),
+    dose: parseDose(first(query.dose)) ?? undefined,
   }
 }
 
