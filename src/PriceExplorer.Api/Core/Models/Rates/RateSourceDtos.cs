@@ -86,6 +86,26 @@ public sealed record ProviderSuggestion(
     IReadOnlyList<string> OtherNames,
     long Rates);
 
-public sealed record ReferenceLists(IReadOnlyList<SettingOption> Settings, IReadOnlyList<string> Sorts);
+/// <param name="Locations">New York counties and NYC boroughs for the location filter; empty without a provider directory.</param>
+/// <param name="Directory">Where the provider directory came from; null when none is loaded.</param>
+public sealed record ReferenceLists(
+    IReadOnlyList<SettingOption> Settings, IReadOnlyList<string> Sorts, IReadOnlyList<LocationOption> Locations, DirectorySource? Directory);
 
 public sealed record SettingOption(string Key, string Label, string? Note);
+
+/// <summary>Where the loaded provider directory came from (reference/provider_directory.source.json).</summary>
+/// <param name="Release">The NPPES monthly release it was built from, e.g. "October 2026"; null when unknown.</param>
+/// <param name="BuiltAt">When the builder tool made the bundled file.</param>
+/// <param name="NpisLoaded">NPIs in the loaded directory.</param>
+/// <param name="Source">The NPPES download it was built from.</param>
+public sealed record DirectorySource(string? Release, DateTimeOffset? BuiltAt, long NpisLoaded, string? Source);
+
+/// <summary>A New York county or NYC borough where NPIs in the files practice.</summary>
+/// <param name="Label">What the location filter accepts: "Manhattan", "Monroe".</param>
+/// <param name="Npis">NPIs practicing there.</param>
+/// <param name="County">The county's own name, which the filter accepts too: "Kings County" for Brooklyn, "Monroe County".</param>
+public sealed record LocationOption(string Label, bool IsBorough, long Npis, string County);
+
+/// <param name="Group">The NUCC grouping, e.g. "Hospitals" or "Ambulatory Health Care Facilities".</param>
+/// <param name="Npis">NPIs in the files with this specialty.</param>
+public sealed record SpecialtySuggestion(string Specialty, string? Group, long Npis);

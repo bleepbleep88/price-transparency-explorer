@@ -19,7 +19,7 @@ import { visibleGroups } from '@/features/out-of-network/lib/outOfNetworkText'
 import type { RateRow } from '@/features/rates/api/types'
 import { useRateSearch, useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import { useSearchRoute } from '@/features/rates/composables/useSearchRoute'
-import { groupName, highlightHeading } from '@/features/rates/lib/lenses'
+import { groupName, highlightHeading, marksSearchedProvider } from '@/features/rates/lib/lenses'
 import { LIKE_FOR_LIKE } from '@/lib/plainNumbers'
 import type { QueryPatch, SortKey } from '@/features/rates/lib/searchParams'
 
@@ -35,6 +35,7 @@ const currentSnapshot = computed(() => {
 })
 const products = computed(() => currentSnapshot.value?.products ?? [])
 const settings = computed(() => reference.data.value?.settings ?? [])
+const locations = computed(() => reference.data.value?.locations ?? [])
 
 const apiError = computed(() => (search.error.value instanceof ApiError ? search.error.value : null))
 const stillLoading = computed(() => apiError.value?.isLoading ?? false)
@@ -108,6 +109,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
       :params="params"
       :products="products"
       :settings="settings"
+      :locations="locations"
       :external-errors="fieldErrors"
       :busy="search.isFetching.value"
       @submit="update"
@@ -146,7 +148,14 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
       <template v-else-if="result">
         <v-progress-linear v-if="search.isFetching.value" indeterminate color="primary" />
         <div :style="{ opacity: search.isPlaceholderData.value ? 0.6 : 1 }" class="d-flex flex-column ga-4">
-          <ResultSummary :result="result" :params="params" :products="products" :settings="settings" @update="update" />
+          <ResultSummary
+            :result="result"
+            :params="params"
+            :products="products"
+            :settings="settings"
+            :locations="locations"
+            @update="update"
+          />
 
           <!-- No groups, no reading: the hint or the empty state already says why and what to try. -->
           <LensPanel
@@ -169,6 +178,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
                 :group="group"
                 :selected="params.group === group.key"
                 :highlight-heading="highlightHeading(result)"
+                :yours="marksSearchedProvider(result)"
                 @show-providers="showGroup"
               />
             </v-col>
@@ -179,7 +189,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
           <section v-if="result.groups.length" ref="tableSection" aria-labelledby="providers-heading">
             <div class="d-flex flex-wrap align-center ga-2 mb-2">
               <h2 id="providers-heading" class="text-title-large">Providers</h2>
-              <span class="text-body-medium text-medium-emphasis">
+              <span class="text-body-medium text-medium-emphasis" data-testid="row-total">
                 {{ plural(result.rows.total, 'row') }}<template v-if="params.group"> for {{ pickedGroup ?? 'one card' }}</template>
               </span>
               <v-btn v-if="params.group" variant="text" size="small" @click="update({ group: null })">Show all cards</v-btn>
@@ -189,7 +199,8 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
               :groups="result.groups"
               :sort="params.sort"
               :loading="search.isFetching.value"
-              :yours="Boolean(result.query.npi || result.query.ein || result.query.provider)"
+              :yours="marksSearchedProvider(result)"
+              :directory="reference.data.value?.directory"
               @update-options="onTableOptions"
               @open-source="openSource"
               @open-npis="openNpis"

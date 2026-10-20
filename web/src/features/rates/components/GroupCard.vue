@@ -25,8 +25,13 @@ const props = withDefaults(
     selected?: boolean
     /** Over the highlights: "your provider" only when an NPI or EIN pins one; a name filter names the filter. */
     highlightHeading?: string
+    /**
+     * The search named a provider (NPI, EIN or name): its highlights get the copper mark and the range bar marks its
+     * rate. Specialty or location matches are a set of providers, shown without copper.
+     */
+    yours?: boolean
   }>(),
-  { selected: false, highlightHeading: 'How your provider compares' },
+  { selected: false, highlightHeading: 'How your provider compares', yours: false },
 )
 const emit = defineEmits<{ showProviders: [groupKey: string] }>()
 
@@ -35,6 +40,7 @@ const showNotes = ref(false)
 const summary = computed<PriceSummary>(() => ({ ...props.group.stats, providers: props.group.providerCount }))
 const typical = computed(() => typicalPrice(summary.value))
 const facilityBilling = computed(() => props.group.billedAs.filter((billed) => billed.billingCodeType === 'RC'))
+const marker = computed(() => (props.yours ? props.group.highlights[0]?.rate : null))
 
 /** After the copper price chip: "Lower than most · $23 less than typical". Nothing under 5 providers. */
 function positionText(position: ProviderPosition): string | null {
@@ -89,13 +95,18 @@ function positionText(position: ProviderPosition): string | null {
           <div class="text-title-large stat-figure" data-testid="typical-price">{{ dollars(typical) }}</div>
         </div>
         <p class="text-body-medium" data-testid="range-line">{{ rangeLine(summary) }}</p>
-        <RangeBar :summary="summary" :marker="group.highlights[0]?.rate" :marker-label="group.highlights[0]?.displayName" />
+        <RangeBar :summary="summary" :marker="marker" :marker-label="group.highlights[0]?.displayName" />
         <v-sheet v-if="gapLine(summary)" rounded class="quartile-gap pa-3" data-testid="quartile-gap">
           <p class="text-body-medium">{{ gapLine(summary) }}</p>
         </v-sheet>
       </div>
 
-      <div v-if="group.highlights.length" class="yours-rule d-flex flex-column ga-1" data-testid="group-highlights">
+      <div
+        v-if="group.highlights.length"
+        :class="yours ? 'yours-rule' : 'match-rule'"
+        class="d-flex flex-column ga-1"
+        data-testid="group-highlights"
+      >
         <p class="text-body-small font-weight-medium">{{ highlightHeading }}</p>
         <div
           v-for="position in group.highlights"
@@ -103,7 +114,7 @@ function positionText(position: ProviderPosition): string | null {
           class="d-flex flex-wrap align-center ga-1 text-body-medium"
           data-testid="highlight-line"
         >
-          <v-chip class="copper-mark" variant="outlined" data-testid="your-rate">{{ money(position.rate) }}</v-chip>
+          <v-chip :class="{ 'copper-mark': yours }" variant="outlined" data-testid="your-rate">{{ money(position.rate) }}</v-chip>
           <strong>{{ position.displayName }}</strong>
           <span v-if="positionText(position)" data-testid="highlight-position">{{ positionText(position) }}</span>
         </div>

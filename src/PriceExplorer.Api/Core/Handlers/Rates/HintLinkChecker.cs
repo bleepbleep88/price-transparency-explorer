@@ -20,7 +20,7 @@ internal sealed class HintLinkChecker(DuckDbConnectionFactory connections, Resol
 
     /// <summary>The search parameters a link may set. Anything else is a bug in the hint.</summary>
     private static readonly HashSet<string> Keys =
-        new(["code", "codeType", "npi", "ein", "provider", "product", "setting", "feeType", "group"], StringComparer.Ordinal);
+        new(["code", "codeType", "npi", "ein", "provider", "specialty", "county", "product", "setting", "feeType", "group"], StringComparer.Ordinal);
 
     public async Task<List<SearchHint>> KeepLinksThatFindRatesAsync(
         SearchRatesQuery request, SearchContext search, IReadOnlyList<RateFactRow> facts, List<SearchHint> hints, CancellationToken cancellationToken)
@@ -71,6 +71,8 @@ internal sealed class HintLinkChecker(DuckDbConnectionFactory connections, Resol
             Npi = Value("npi", request.Npi),
             Ein = Value("ein", request.Ein),
             Provider = Value("provider", request.Provider),
+            Specialty = Value("specialty", request.Specialty),
+            County = Value("county", request.County),
             Product = Value("product", request.Product),
             Setting = Value("setting", request.Setting),
             FeeType = Value("feeType", request.FeeType),
@@ -100,6 +102,8 @@ internal sealed class HintLinkChecker(DuckDbConnectionFactory connections, Resol
         && target.Npi == current.Npi
         && target.Ein == current.Ein
         && target.Name == current.Name
+        && target.Specialty == current.Specialty
+        && target.County == current.County
         && target.ForeignCodeType == current.ForeignCodeType
         && (!target.ForeignCodeType || target.CodeType == current.CodeType);
 

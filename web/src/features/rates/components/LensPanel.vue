@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { OutOfNetworkResult } from '@/features/out-of-network/api/types'
 import type { RateSearchResult } from '../api/types'
-import { LENS_OPTIONS, lensOption } from '../lib/lenses'
+import { LENS_OPTIONS, lensOption, marketWideNote } from '../lib/lenses'
 import type { Lens, QueryPatch, SearchParams } from '../lib/searchParams'
 import EmployersLens from './lenses/EmployersLens.vue'
 import InnovatorsLens from './lenses/InnovatorsLens.vue'
@@ -25,6 +25,8 @@ const emit = defineEmits<{
 
 const lens = computed(() => props.params.lens ?? null)
 const answers = computed(() => (lens.value ? lensOption(lens.value).answers : null))
+// Every lens but the innovators' shows typical prices, and those count every provider in the group.
+const marketWide = computed(() => (lens.value && lens.value !== 'innovators' ? marketWideNote(props.result.query) : null))
 
 // A lens only changes the reading, so the reader stays on the same page of results. Picking the active one clears it.
 function choose(next: unknown) {
@@ -78,6 +80,7 @@ function choose(next: unknown) {
       <EmployersLens v-else-if="lens === 'employers'" :result="result" :params="params" @cases="emit('cases', $event)" />
       <InnovatorsLens v-else-if="lens === 'innovators'" :result="result" :params="params" />
       <LifeSciencesLens v-else :result="result" @search="emit('search', $event)" />
+      <p v-if="marketWide" class="text-body-small text-medium-emphasis" data-testid="lens-market-wide">{{ marketWide }}</p>
     </v-card-text>
   </v-card>
 </template>

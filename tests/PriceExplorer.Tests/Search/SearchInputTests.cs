@@ -65,6 +65,34 @@ public sealed class SearchInputTests
         _validator.TestValidate(new SearchRatesQuery("99213", Provider: "a\0b")).ShouldHaveValidationErrorFor(q => q.Provider);
         new SuggestCodesQueryValidator().TestValidate(new SuggestCodesQuery("\0")).ShouldHaveValidationErrorFor(q => q.Q);
         new SuggestProvidersQueryValidator().TestValidate(new SuggestProvidersQuery("\0\0")).ShouldHaveValidationErrorFor(q => q.Q);
+        new SuggestSpecialtiesQueryValidator().TestValidate(new SuggestSpecialtiesQuery("g\0")).ShouldHaveValidationErrorFor(q => q.Q);
+        _validator.TestValidate(new SearchRatesQuery("99213", Specialty: "ga\0")).ShouldHaveValidationErrorFor(q => q.Specialty);
+        _validator.TestValidate(new SearchRatesQuery("99213", County: "\0\0")).ShouldHaveValidationErrorFor(q => q.County);
+    }
+
+    [Theory]
+    [InlineData("g", null, "Specialty", "Type at least 2 characters of a specialty, for example 'gastro'.")]
+    [InlineData(null, "x", "County", "Enter a New York county or NYC borough, for example 'Brooklyn' or 'Monroe'.")]
+    [InlineData(null, "Manhattan Manhattan Manhattan Manhattan Manhattan Manhattan !", "County", "A location is at most 60 characters.")]
+    public void Specialty_and_location_filters_need_a_little_text_and_not_too_much(string? specialty, string? county, string field, string message)
+    {
+        _validator.TestValidate(new SearchRatesQuery("45378", Specialty: specialty, County: county))
+            .ShouldHaveValidationErrorFor(field).WithErrorMessage(message);
+        _validator.TestValidate(new SearchRatesQuery("45378", Specialty: new string('a', 101)))
+            .ShouldHaveValidationErrorFor(q => q.Specialty).WithErrorMessage("A specialty is at most 100 characters.");
+        _validator.TestValidate(new SearchRatesQuery("45378", Specialty: " gastro ", County: "Staten Island")).ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Fact]
+    public void The_specialty_typeahead_needs_text()
+    {
+        var validator = new SuggestSpecialtiesQueryValidator();
+
+        validator.TestValidate(new SuggestSpecialtiesQuery(null)).ShouldHaveValidationErrorFor(q => q.Q)
+            .WithErrorMessage("Type at least 2 characters of a specialty, for example 'gastro'.");
+        validator.TestValidate(new SuggestSpecialtiesQuery(" a ")).ShouldHaveValidationErrorFor(q => q.Q);
+        validator.TestValidate(new SuggestSpecialtiesQuery("gastro", Limit: 0)).ShouldHaveValidationErrorFor(q => q.Limit);
+        validator.TestValidate(new SuggestSpecialtiesQuery("gastro")).ShouldNotHaveAnyValidationErrors();
     }
 
     [Fact]

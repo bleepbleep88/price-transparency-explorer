@@ -5,7 +5,7 @@ import { typicalLine } from '@/lib/plainNumbers'
 import type { OutOfNetworkResult } from '@/features/out-of-network/api/types'
 import { plansLensLine, visibleGroups } from '@/features/out-of-network/lib/outOfNetworkText'
 import type { RateSearchResult } from '../../api/types'
-import { spreadLines, spreadText, widestSpread } from '../../lib/lenses'
+import { hasProviderFilter, spreadLines, spreadText, widestSpread } from '../../lib/lenses'
 import type { QueryPatch, SearchParams } from '../../lib/searchParams'
 
 const props = defineProps<{ result: RateSearchResult; params: SearchParams; outOfNetwork?: OutOfNetworkResult | null }>()
@@ -16,8 +16,10 @@ const varying = computed(() => widestSpread(lines.value, lines.value.length))
 const widest = computed(() => varying.value.slice(0, 3))
 const outOfNetworkLine = computed(() => plansLensLine(visibleGroups(props.outOfNetwork, props.params)))
 
+// The spread line describes everyone in the group, so its highest rates are shown for everyone, not only the filtered providers.
 function showHighest(groupKey: string) {
-  emit('update', { group: groupKey, sort: '-rate', page: 1 })
+  const everyone = hasProviderFilter(props.result) ? { npi: null, ein: null, provider: null, specialty: null, county: null } : {}
+  emit('update', { group: groupKey, sort: '-rate', page: 1, ...everyone })
 }
 </script>
 

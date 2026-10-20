@@ -48,6 +48,9 @@ function result(groups: RateGroup[], query: Partial<RateSearchResult['query']> =
       setting: null,
       feeType: null,
       provider: null,
+      specialty: null,
+      county: null,
+      countyPlace: null,
       group: null,
       sort: 'rate',
       page: 1,
@@ -137,6 +140,47 @@ describe('LensPanel', () => {
     expect(wrapper.get('[data-testid="highlight-cap"]').text()).toBe('Showing 5 of 12 matching providers; the table lists them all.')
   })
 
+  it('providers: a location or specialty search names the filters and says typical prices count everyone', () => {
+    const highlights = [{ providerKey: 'k', displayName: 'Yorkville Endoscopy, LLC', rate: 371.78, percentile: 10, vsMedian: 0.64, aboveP25: -82.67, rateLow: 371.78, rateHigh: 371.78 }]
+    const filters = { specialty: 'ambulatory', county: 'Manhattan' }
+    const wrapper = mountPanel(result([group({ matchedProviders: 1, highlights })], { ...filters, countyPlace: 'Manhattan' }), {
+      lens: 'providers',
+      ...filters,
+    })
+
+    expect(wrapper.get('[data-testid="lens-filtered"]').text()).toBe('Providers with a specialty matching "ambulatory" in Manhattan:')
+    expect(wrapper.get('[data-testid="your-rate-line"]').text()).toContain('Price $371.78: lower than most')
+    expect(wrapper.get('[data-testid="your-rate-line"]').classes()).toContain('match-rule')
+    expect(wrapper.find('.yours-rule').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="lens-market-wide"]').text()).toBe(
+      'Typical prices are for all of New York, not just providers with a specialty matching "ambulatory" in Manhattan.',
+    )
+    // An NPI still pins "your" provider; the note stays because the typical price still counts everyone.
+    const pinned = mountPanel(result([group({ matchedProviders: 1, highlights })], { npi: '1174873780', county: 'Manhattan', countyPlace: 'Manhattan' }), {
+      lens: 'providers',
+      npi: '1174873780',
+      county: 'Manhattan',
+    })
+    expect(pinned.find('[data-testid="lens-filtered"]').exists()).toBe(false)
+    expect(pinned.get('[data-testid="your-rate-line"]').text()).toContain('Your price $371.78')
+    expect(pinned.get('[data-testid="your-rate-line"]').classes()).toContain('yours-rule')
+    expect(pinned.find('[data-testid="lens-market-wide"]').exists()).toBe(true)
+  })
+
+  it.each(['plans', 'employers', 'life-sciences'])('%s: says once that typical prices cover all of New York under a location', (lens) => {
+    const located = result([group()], { county: 'Manhattan', countyPlace: 'Manhattan' })
+    const wrapper = mountPanel(located, { lens, county: 'Manhattan' })
+    expect(wrapper.findAll('[data-testid="lens-market-wide"]').map((note) => note.text())).toEqual([
+      'Typical prices are for all of New York, not just Manhattan.',
+    ])
+    expect(mountPanel(result([group()]), { lens }).find('[data-testid="lens-market-wide"]').exists()).toBe(false)
+  })
+
+  it('innovators: no note, since that lens shows no typical prices', () => {
+    const wrapper = mountPanel(result([group()], { county: 'Manhattan', countyPlace: 'Manhattan' }), { lens: 'innovators', county: 'Manhattan' })
+    expect(wrapper.find('[data-testid="lens-market-wide"]').exists()).toBe(false)
+  })
+
   it('plans: where prices vary most first, and one click shows the highest prices for it', async () => {
     const wrapper = mountPanel(result([group()]), { lens: 'plans' })
     const line = wrapper.get('[data-testid="spread-line"]').text()
@@ -144,6 +188,25 @@ describe('LensPanel', () => {
     expect(line).toContain('Even leaving out the extremes, the high end is about 1.8 times the low end. $124 less per case at a lower-priced provider.')
     await wrapper.get('[data-testid="show-highest"]').trigger('click')
     expect(wrapper.emitted('update')).toEqual([[{ group: 'ambetter|CPT|45378|facility|asc||negotiated', sort: '-rate', page: 1 }]])
+  })
+
+  it("plans: the group's highest rates are everyone's, so a location or provider filter is dropped", async () => {
+    const wrapper = mountPanel(result([group()], { county: 'Manhattan', countyPlace: 'Manhattan' }), { lens: 'plans', county: 'Manhattan' })
+    await wrapper.get('[data-testid="show-highest"]').trigger('click')
+    expect(wrapper.emitted('update')).toEqual([
+      [
+        {
+          group: 'ambetter|CPT|45378|facility|asc||negotiated',
+          sort: '-rate',
+          page: 1,
+          npi: null,
+          ein: null,
+          provider: null,
+          specialty: null,
+          county: null,
+        },
+      ],
+    ])
   })
 
   it('plans: says so when prices barely vary, or when no card has the 10 providers it takes', () => {

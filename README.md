@@ -100,15 +100,23 @@ Each provider (tax ID) counts once per group. If it has several rates in one gro
 
 The gap to the lower quartile is how far a typical rate sits above the cheapest quarter of providers. Plans and employers read it as room to steer care; providers read it as negotiating context. The files have no claim counts, so it is never multiplied into a total unless you enter a number of cases yourself.
 
-Filtering by NPI, EIN or name narrows the rows to that provider's matching rates (an NPI search shows that NPI's own rate), but the statistics stay market-wide. So a provider is shown as "17th percentile, 0.92× median" against everyone else. Providers paid the same rate count half in a percentile, so a provider paid the fee-schedule rate most of its group gets sits near the middle, not at the bottom. Care settings come from CMS place-of-service codes. Hospital outpatient (POS 19 and 22) is one setting. Clinics, and telehealth at home versus elsewhere, each have their own.
+Filtering by NPI, EIN, name, specialty or location narrows the rows to the matching providers' rates (an NPI search shows that NPI's own rate), but the statistics stay market-wide. So a provider is shown as "17th percentile, 0.92× median" against everyone else. Providers paid the same rate count half in a percentile, so a provider paid the fee-schedule rate most of its group gets sits near the middle, not at the bottom. Care settings come from CMS place-of-service codes. Hospital outpatient (POS 19 and 22) is one setting. Clinics, and telehealth at home versus elsewhere, each have their own.
+
+## Extra: who is behind each rate
+
+The rate files list bare NPIs. `reference/provider_directory.csv.gz` (1.9 MB) gives the 58,688 NPIs in the files a name, specialty and practice place, from the October 2026 NPPES release, the NUCC taxonomy and Census ZIP-to-county data. `tools/PriceExplorer.ReferenceBuilder` rebuilds it (see `reference/README.md`).
+
+- Each provider row shows who its NPIs are: "Gastroenterology Physician · Manhattan, NY · +12 more".
+- Filter by **specialty** or by **New York county or NYC borough**. With both, one NPI must have that specialty and practice there. Like an NPI filter, they pick rows; the statistics stay market-wide. A specialty picked from the list finds just that specialty. Typed words match the start of words in specialty names, so "urology" never finds neurologists, and common forms work ("cardiologist", "ENT", "OB/GYN", "orthopaedic"). Locations take county or borough names ("Kings County", "The Bronx") or "NYC".
+- **Check this** flags mark listed rates that look unusual for the provider: a facility rate whose NPIs are all individual clinicians, anesthesia without an anesthesia clinician, a CT, MRI or PET read with no radiologist or nuclear medicine physician (cardiologists count for cardiac scans), deactivated NPIs. The files list contracted rates, not services performed, so a flag is a prompt to verify.
 
 ## API
 
 | Endpoint | |
 |---|---|
-| `GET /api/v1/rates?code=&npi=&ein=&provider=&product=&setting=&feeType=&group=&sort=&page=&pageSize=&snapshot=` | Comparison groups, provider rows, and hints that explain empty or surprising results. Every hint link is checked to find rates before it's sent. |
+| `GET /api/v1/rates?code=&npi=&ein=&provider=&specialty=&county=&product=&setting=&feeType=&group=&sort=&page=&pageSize=&snapshot=` | Comparison groups, provider rows, and hints that explain empty or surprising results. Every hint link is checked to find rates before it's sent. |
 | `GET /api/v1/rates/{id}/source` · `/npis?provider=&alsoRate=` | Where a rate came from; the NPIs behind a result row, each with its rate |
-| `GET /api/v1/codes?q=` · `/providers?q=` · `/reference` | Typeahead and filter options |
+| `GET /api/v1/codes?q=` · `/providers?q=` · `/specialties?q=` · `/reference` | Typeahead and filter options (including New York counties and the registry release) |
 | `GET /api/v1/status` · `/status/stream` | Loading progress (the stream uses server-sent events) |
 | `GET /api/v1/snapshots` · `/snapshots/{id}/plans` | Loaded files, their sources and counts; plans per product |
 | `GET /api/v1/sources` | Every snapshot and file (rate and allowed-amount files): URL, three dates, size, SHA-256, ETag, counts, rejects by reason, timing |

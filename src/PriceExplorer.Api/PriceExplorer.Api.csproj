@@ -30,4 +30,9 @@
     <EmbeddedResource Include="Core\Reference\*.tsv" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Prebuilt reference files (the provider directory and its source note) ship next to the app; see reference/README.md. -->
+    <Content Include="..\..\reference\*.csv.gz;..\..\reference\*.source.json" Link="reference\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

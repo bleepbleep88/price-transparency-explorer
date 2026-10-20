@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using PriceExplorer.Api.Configuration;
 using PriceExplorer.Api.Core.Ingestion;
+using PriceExplorer.Api.Core.Reference;
 
 namespace PriceExplorer.Api.Hosting;
 
@@ -9,6 +10,7 @@ internal sealed class IngestionService(
     IngestionCoordinator coordinator,
     DuckDbIngestionWriter writer,
     DataPaths paths,
+    ReferenceDataLoader referenceData,
     IngestionStatus status,
     IOptions<IngestionOptions> options,
     ILogger<IngestionService> logger) : BackgroundService
@@ -16,8 +18,8 @@ internal sealed class IngestionService(
     private bool _storageReady;
 
     /// <summary>
-    /// Hosted services start before the web server, so preparing storage here means no request ever meets a missing
-    /// table. A storage problem is reported in the status instead of stopping the app.
+    /// Hosted services start before the web server, so preparing storage and the reference tables here means no request
+    /// ever meets a missing table. A storage problem is reported in the status instead of stopping the app.
     /// </summary>
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -25,6 +27,7 @@ internal sealed class IngestionService(
         {
             paths.EnsureCreated();
             await writer.EnsureSchemaAsync(cancellationToken);
+            await referenceData.LoadAsync(cancellationToken);
             _storageReady = true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

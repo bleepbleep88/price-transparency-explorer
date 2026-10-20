@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useDisplay } from 'vuetify'
-import { mdiFileSearchOutline } from '@mdi/js'
+import { mdiAlertOutline, mdiFileSearchOutline } from '@mdi/js'
 import { money, plural } from '@/lib/format'
 import { capitalize, feeLabel, positionParts, typicalPrice } from '@/lib/plainNumbers'
-import type { ModifierRef, RateGroup, RateRow, RateRowsPage } from '../api/types'
+import type { DirectorySource, ModifierRef, RateGroup, RateRow, RateRowsPage } from '../api/types'
 import { modifierText } from '../lib/lenses'
 import type { SortKey } from '../lib/searchParams'
+import { directorySourceNote, moreCount, moreLines, moreText, whoLine } from '../lib/whoLine'
 
 const props = defineProps<{
   rows: RateRowsPage
@@ -15,6 +16,8 @@ const props = defineProps<{
   loading?: boolean
   /** The search named a provider (NPI, EIN or name): its rows get the copper "your provider" edge. */
   yours?: boolean
+  /** Where the specialties and places under each provider come from. */
+  directory?: DirectorySource | null
 }>()
 const emit = defineEmits<{
   updateOptions: [options: { page: number; pageSize: number; sort: SortKey }]
@@ -35,7 +38,11 @@ const headers = [
 ]
 
 const groupsByKey = computed(() => new Map(props.groups.map((group) => [group.key, group])))
-const items = computed(() => props.rows.items.map((row) => ({ ...row, id: `${row.groupKey}::${row.providerKey}`, compared: compared(row) })))
+const items = computed(() =>
+  props.rows.items.map((row) => ({ ...row, id: `${row.groupKey}::${row.providerKey}`, compared: compared(row), who: whoLine(row.profile) })),
+)
+const hasFlags = computed(() => props.rows.items.some((row) => row.flags.length > 0))
+const hasProfiles = computed(() => props.rows.items.some((row) => row.profile))
 
 const sortBy = computed(() => {
   const descending = props.sort.startsWith('-')
@@ -99,6 +106,17 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
     data-testid="provider-table"
     @update:options="onOptions"
   >
+    <template #top>
+      <div v-if="hasFlags || hasProfiles" class="d-flex flex-column ga-1 pb-2 text-body-small text-medium-emphasis">
+        <p v-if="hasFlags" data-testid="flags-caveat">
+          <v-icon :icon="mdiAlertOutline" color="warning" size="small" class="me-1" />"Check this" marks a listed rate that looks
+          unusual for the provider. These files list contracted rates, not services performed, so a flag is a prompt to verify,
+          not proof.
+        </p>
+        <p v-if="hasProfiles" data-testid="directory-source">{{ directorySourceNote(directory) }}</p>
+      </div>
+    </template>
+
     <template #[`item.provider`]="{ item }">
       <div class="py-1" data-testid="provider-row">
         <v-tooltip v-if="item.otherNames.length" location="top" max-width="360">
@@ -130,6 +148,34 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
               <v-chip v-bind="tip" size="x-small" variant="tonal">Whole tax ID</v-chip>
             </template>
           </v-tooltip>
+          <v-tooltip v-if="item.flags.length" location="top" max-width="380">
+            <template #activator="{ props: tip }">
+              <v-chip
+                v-bind="tip"
+                size="x-small"
+                color="warning"
+                variant="tonal"
+                :prepend-icon="mdiAlertOutline"
+                tabindex="0"
+                data-testid="row-flag"
+              >
+                Check this
+              </v-chip>
+            </template>
+            <p v-for="flag in item.flags" :key="flag.kind">{{ flag.message }}</p>
+          </v-tooltip>
+        </div>
+        <div v-if="item.who" class="text-body-small text-medium-emphasis" data-testid="row-who">
+          {{ [item.who.specialty, item.who.location].filter(Boolean).join(' · ') || 'No specialty or place in the registry' }}
+          <v-tooltip v-if="moreCount(item.who) > 0" location="top" max-width="420">
+            <template #activator="{ props: tip }">
+              · <span v-bind="tip" class="has-tooltip" tabindex="0">{{ moreText(item.who) }}</span>
+            </template>
+            <p v-for="line in moreLines(item.who)" :key="line">{{ line }}</p>
+          </v-tooltip>
+        </div>
+        <div v-if="item.who?.registryNote" class="text-body-small text-medium-emphasis" data-testid="row-registry">
+          {{ item.who.registryNote }}
         </div>
       </div>
     </template>

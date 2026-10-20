@@ -15,7 +15,15 @@ namespace PriceExplorer.Api.Core.Handlers.Rates;
 /// </summary>
 internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot snapshot, ReferenceCatalog catalog, SearchContext search)
 {
-    private static readonly (string Key, string? Value)[] ClearProvider = [("npi", null), ("ein", null), ("provider", null)];
+    /// <summary>Every filter that picks providers: NPI, EIN, name, specialty and location.</summary>
+    private static readonly (string Key, string? Value)[] ClearProvider =
+        [("npi", null), ("ein", null), ("provider", null), ("specialty", null), ("county", null)];
+
+    /// <summary>
+    /// The specialty and location filters. Links that keep only an NPI or EIN clear them too: the facts that say such a
+    /// link finds rates (NPI or EIN matches) don't look at them.
+    /// </summary>
+    private static readonly (string Key, string? Value)[] ClearDirectory = [("specialty", null), ("county", null)];
 
     /// <summary>Revenue codes the input can mean, looked up for facility rates filed under procedure codes.</summary>
     private IReadOnlyList<string> _revenueCodes = [];
@@ -119,6 +127,8 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
                     npi = search.Npi,
                     ein = search.Ein,
                     provider = search.Name,
+                    specialty = search.Specialty,
+                    county = search.County,
                     product = search.Product,
                 }))
             .Where(kind => kind.CodeType != type)
@@ -232,11 +242,13 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
                 npi = forProvider ? search.Npi : null,
                 ein = forProvider ? search.Ein : null,
                 provider = forProvider ? search.Name : null,
+                specialty = forProvider ? search.Specialty : null,
+                county = forProvider ? search.County : null,
             })).ToList();
 
     /// <summary>
     /// The code is in these files as other kinds. Each link searches one, keeping as much of the provider filter as has
-    /// rates there: all of it, the NPI/EIN without the name, the NPI alone, the EIN alone, or nobody.
+    /// rates there: all of it, the NPI/EIN without the name, specialty and location, the NPI alone, the EIN alone, or nobody.
     /// </summary>
     private SearchHint CodeTypeMismatch(IReadOnlyList<KindOption> options) =>
         Hint("code_type_mismatch", "info",
@@ -251,20 +263,24 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             return Link($"Search {option.Kind.Label}", [.. kind, .. ClearNarrowing]);
         }
 
-        if (search.NameTyped is not null && search.IdFilter && option.ForId)
+        // A name, specialty or location filter on top of the NPI/EIN.
+        var beyondId = search.NameTyped is not null || search.DirectoryFilter;
+        if (beyondId && search.IdFilter && option.ForId)
         {
-            return Link($"Search {option.Kind.Label} for {FilterLabel(search.Npi, search.Ein, null, sentenceStart: false)}",
-                [.. kind, ("provider", null), .. ClearNarrowing]);
+            return Link($"Search {option.Kind.Label} for {IdLabel(search.Npi, search.Ein, sentenceStart: false)}",
+                [.. kind, ("provider", null), .. ClearDirectory, .. ClearNarrowing]);
         }
 
-        if (search.Npi is not null && (search.Ein is not null || search.NameTyped is not null) && option.ForNpi)
+        if (search.Npi is not null && (search.Ein is not null || beyondId) && option.ForNpi)
         {
-            return Link($"Search {option.Kind.Label} for NPI {search.NpiText}", [.. kind, ("ein", null), ("provider", null), .. ClearNarrowing]);
+            return Link($"Search {option.Kind.Label} for NPI {search.NpiText}",
+                [.. kind, ("ein", null), ("provider", null), .. ClearDirectory, .. ClearNarrowing]);
         }
 
-        if (search.Ein is { } ein && (search.Npi is not null || search.NameTyped is not null) && option.ForEin)
+        if (search.Ein is { } ein && (search.Npi is not null || beyondId) && option.ForEin)
         {
-            return Link($"Search {option.Kind.Label} for {TaxIdLabel(ein)}", [.. kind, ("npi", null), ("provider", null), .. ClearNarrowing]);
+            return Link($"Search {option.Kind.Label} for {TaxIdLabel(ein)}",
+                [.. kind, ("npi", null), ("provider", null), .. ClearDirectory, .. ClearNarrowing]);
         }
 
         return Link($"Search {option.Kind.Label} for all providers", [.. kind, .. ClearNarrowing, .. ClearProvider]);
@@ -337,8 +353,12 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         facts.Any(fact => fact.CodeType == BillingCodes.RevenueCode && _revenueCodes.Contains(fact.Code)
             && (scope.Product is null || fact.ProductKey == scope.Product)
             && (!scope.HasProvider
-                || (scope.OtherEin ? fact.NpiMatch && (scope.Name is null || fact.NameMatch)
-                    : scope.OtherName ? fact.IdMatch
+                || (scope.OtherEin ? fact.NpiMatch && (scope.Name is null || fact.NameMatch) && (!search.DirectoryFilter || fact.SpecialtyMatch && fact.CountyMatch)
+                    : scope.OtherName && scope.OtherDirectory ? fact.IdMatch
+                    : scope.OtherName ? fact.WithoutName
+                    : scope.OtherSpecialty && scope.OtherCounty ? fact.WithoutDirectory
+                    : scope.OtherSpecialty ? fact.WithoutSpecialty
+                    : scope.OtherCounty ? fact.WithoutCounty
                     : fact.FilterMatch)));
 
     /// <summary>
@@ -365,15 +385,18 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             }
         }
 
-        var market = new RevenueScope(null, null, null, search.Product);
+        var market = new RevenueScope(null, null, null, null, null, search.Product);
         var rows = await ProceduresAsync(revenueCodes, market);
         return rows.Count == 0 ? null : new RevenueHint(MarketRevenueHint(rows, direct(market), lead), ProviderScoped: false, ProviderHasDirect: false);
     }
 
     /// <summary>
     /// The provider filters as searched, then relaxed one at a time: any product, then any name (when an NPI or EIN
-    /// names the provider), then any tax ID for the NPI (keeping the name before dropping it too). The first scope with
-    /// rates explains where they are, so each dropped filter is one that really hides them.
+    /// names the provider), then any tax ID for the NPI (keeping the name before dropping it too), then the specialty
+    /// and location: one of them, both, and finally everything but the NPI/EIN, or (with a name and no NPI/EIN) the
+    /// name. The first scope with rates explains where they are, so each dropped filter is one that really hides them,
+    /// and no single filter is left out: a provider is never told it has no rate when its rates are filed under
+    /// procedure codes.
     /// </summary>
     private IEnumerable<RevenueScope> ProviderScopes()
     {
@@ -382,29 +405,61 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             yield break;
         }
 
+        var (specialty, county) = (search.Specialty, search.County);
         var otherProduct = search.Product is not null;
-        yield return new RevenueScope(search.Npi, search.Ein, search.Name, search.Product);
+        yield return new RevenueScope(search.Npi, search.Ein, search.Name, specialty, county, search.Product);
         if (otherProduct)
         {
-            yield return new RevenueScope(search.Npi, search.Ein, search.Name, null) { OtherProduct = true };
+            yield return new RevenueScope(search.Npi, search.Ein, search.Name, specialty, county, null) { OtherProduct = true };
         }
 
         if (search.IdFilter && search.Name is not null)
         {
-            yield return new RevenueScope(search.Npi, search.Ein, null, null) { OtherProduct = otherProduct, OtherName = true };
+            yield return new RevenueScope(search.Npi, search.Ein, null, specialty, county, null) { OtherProduct = otherProduct, OtherName = true };
         }
 
         if (search.Npi is not null && search.Ein is not null)
         {
             if (search.Name is not null)
             {
-                yield return new RevenueScope(search.Npi, null, search.Name, null) { OtherProduct = otherProduct, OtherEin = true };
+                yield return new RevenueScope(search.Npi, null, search.Name, specialty, county, null) { OtherProduct = otherProduct, OtherEin = true };
             }
 
-            yield return new RevenueScope(search.Npi, null, null, null)
+            yield return new RevenueScope(search.Npi, null, null, specialty, county, null)
             {
                 OtherProduct = otherProduct, OtherName = search.Name is not null, OtherEin = true,
             };
+        }
+
+        if (!search.DirectoryFilter)
+        {
+            yield break;
+        }
+
+        if (specialty is not null && county is not null)
+        {
+            yield return new RevenueScope(search.Npi, search.Ein, search.Name, null, county, null) { OtherProduct = otherProduct, OtherSpecialty = true };
+            yield return new RevenueScope(search.Npi, search.Ein, search.Name, specialty, null, null) { OtherProduct = otherProduct, OtherCounty = true };
+        }
+
+        if (search.IdFilter || search.Name is not null)
+        {
+            yield return new RevenueScope(search.Npi, search.Ein, search.Name, null, null, null)
+            {
+                OtherProduct = otherProduct, OtherSpecialty = specialty is not null, OtherCounty = county is not null,
+            };
+        }
+
+        if (search.IdFilter && search.Name is not null)
+        {
+            yield return new RevenueScope(search.Npi, search.Ein, null, null, null, null)
+            {
+                OtherProduct = otherProduct, OtherName = true, OtherSpecialty = specialty is not null, OtherCounty = county is not null,
+            };
+        }
+        else if (search.Name is not null)
+        {
+            yield return new RevenueScope(null, null, null, specialty, county, null) { OtherProduct = otherProduct, OtherName = true };
         }
     }
 
@@ -418,9 +473,8 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         string message;
         if (!scope.Relaxed)
         {
-            var whose = search.IdFilter
-                ? $"for {FilterLabel()}"
-                : $"for providers whose name contains \"{search.NameTyped}\" ({Plural(first.Providers, "tax ID")})";
+            // Without an NPI or EIN the filters can match several tax IDs: say how many.
+            var whose = search.IdFilter ? $"for {FilterLabel()}" : $"for {FilterLabel()} ({Plural(first.Providers, "tax ID")})";
             // With rates billed directly under the revenue code too (shown as rows), these are the others, not all of them.
             message = (direct, total == 1) switch
             {
@@ -436,9 +490,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         {
             // Relaxing a filter found them: count exactly those (rates filed under procedure codes, within what the scope
             // still filters on), say where they are, and which filter hides them.
-            var subject = scope.Npi is not null || scope.Ein is not null
-                ? FilterLabel(scope.Npi, scope.Ein, scope.Name, sentenceStart: true)
-                : $"Providers whose name contains \"{search.NameTyped}\"";
+            var subject = FilterLabel(scope.Npi, scope.Ein, scope.Name, scope.Specialty, scope.County, sentenceStart: true);
             var has = subject.StartsWith("Providers", StringComparison.Ordinal) ? "have" : "has";
             message = $"{subject} {has} {Plural(total, "facility rate")} under {label} filed under the procedure code in the notes field " +
                 (total == 1 ? $"({only})" : $"({Plural(codes, "code")})");
@@ -452,9 +504,9 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
                 message += $", in {first.Products}";
             }
 
-            if (scope.OtherName)
+            if (scope.OtherName || scope.OtherDirectory)
             {
-                message += $", but none under a name containing \"{search.NameTyped}\"";
+                message += $", but none {DroppedPhrase(scope)}";
             }
 
             message += ".";
@@ -476,6 +528,16 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         if (scope.OtherEin)
         {
             clear.Add(("ein", null));
+        }
+
+        if (scope.OtherSpecialty)
+        {
+            clear.Add(("specialty", null));
+        }
+
+        if (scope.OtherCounty)
+        {
+            clear.Add(("county", null));
         }
 
         return Hint("revenue_code_procedures", "info", Lead(lead, message), ProcedureLinks(rows, [.. clear]));
@@ -521,11 +583,23 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             return null;
         }
 
-        var rows = await ProceduresAsync(_revenueCodes, new RevenueScope(null, null, search.Name, search.Product));
+        var rows = await ProceduresAsync(_revenueCodes, new RevenueScope(null, null, search.Name, search.Specialty, search.County, search.Product));
         var otherProduct = rows.Count == 0 && search.Product is not null;
         if (otherProduct)
         {
-            rows = await ProceduresAsync(_revenueCodes, new RevenueScope(null, null, search.Name, null));
+            rows = await ProceduresAsync(_revenueCodes, new RevenueScope(null, null, search.Name, search.Specialty, search.County, null));
+        }
+
+        // The specialty and location can hide them too; the message then says none are listed for the NPI/EIN with them.
+        var withoutDirectory = rows.Count == 0 && search.DirectoryFilter;
+        if (withoutDirectory)
+        {
+            rows = await ProceduresAsync(_revenueCodes, new RevenueScope(null, null, search.Name, null, null, search.Product));
+            otherProduct = rows.Count == 0 && search.Product is not null;
+            if (otherProduct)
+            {
+                rows = await ProceduresAsync(_revenueCodes, new RevenueScope(null, null, search.Name, null, null, null));
+            }
         }
 
         if (rows.Count == 0)
@@ -538,12 +612,21 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         var codes = rows.Select(row => (row.CodeType, row.Code)).Distinct().Count();
         var first = rows[0];
         var where = otherProduct ? $", {(total == 1 ? "in" : "all in")} {first.Products}" : "";
-        var message = $"Providers whose name contains \"{search.NameTyped}\" ({Plural(first.Providers, "tax ID")}) have " +
-            $"{Plural(total, "facility rate")} under {label}{where}, {(total == 1 ? "not" : "none")} listed for {FilterLabel(search.Npi, search.Ein, null, sentenceStart: false)}. " +
+        var subject = withoutDirectory
+            ? FilterLabel(null, null, search.Name, null, null, sentenceStart: true)
+            : FilterLabel(null, null, search.Name, search.Specialty, search.County, sentenceStart: true);
+        var listedFor = withoutDirectory
+            ? FilterLabel(search.Npi, search.Ein, null, search.Specialty, search.County, sentenceStart: false)
+            : IdLabel(search.Npi, search.Ein, sentenceStart: false);
+        var message = $"{subject} ({Plural(first.Providers, "tax ID")}) have " +
+            $"{Plural(total, "facility rate")} under {label}{where}, {(total == 1 ? "not" : "none")} listed for {listedFor}. " +
             (total == 1
                 ? $"It is filed under the procedure code in its notes field ({first.CodeType} {first.Code}). Search it:"
                 : $"They're filed under the procedure code in the notes field ({Plural(codes, "code")}). Search one to see them:");
-        return Hint("revenue_code_procedures", "info", message, ProcedureLinks(rows, [.. ClearNarrowing, ("npi", null), ("ein", null)]));
+        (string Key, string? Value)[] clear = withoutDirectory
+            ? [.. ClearNarrowing, ("npi", null), ("ein", null), .. ClearDirectory]
+            : [.. ClearNarrowing, ("npi", null), ("ein", null)];
+        return Hint("revenue_code_procedures", "info", message, ProcedureLinks(rows, clear));
     }
 
     private static List<HintLink> ProcedureLinks(List<RevenueProcedureRow> rows, (string Key, string? Value)[] clear) =>
@@ -559,7 +642,11 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
     private async Task<List<RevenueProcedureRow>> ProceduresAsync(IReadOnlyList<string> revenueCodes, RevenueScope scope) =>
         (await connection.QueryAsync<RevenueProcedureRow>(
             SqlFile.For<SearchHints>("RevenueCodeProcedures.sql"),
-            new { snapshotId = snapshot.SnapshotId, codes = revenueCodes, product = scope.Product, npi = scope.Npi, ein = scope.Ein, provider = scope.Name }))
+            new
+            {
+                snapshotId = snapshot.SnapshotId, codes = revenueCodes, product = scope.Product, npi = scope.Npi, ein = scope.Ein, provider = scope.Name,
+                specialty = scope.Specialty, county = scope.County,
+            }))
         .ToList();
 
     /// <summary>"revenue code 0490 (Ambulatory surgery)", or "revenue codes 0490 (…), 0491 (…)".</summary>
@@ -570,7 +657,8 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
 
     /// <summary>
     /// The provider filters matched no rate for this code. Says which filter is the reason: the NPI/EIN has no rate for
-    /// the code, no provider name matches, or each matches on its own but never in the same provider group.
+    /// the code; no provider name, specialty or location matches; or each matches on its own but never in the same
+    /// provider group.
     /// </summary>
     private async Task<List<SearchHint>> ProviderAsync(List<RateFactRow> facts, CodeInfo? code)
     {
@@ -578,6 +666,8 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         var codeLabel = code is null ? "this code" : $"{code.CodeType} {code.Code}";
         var idProblem = search.IdFilter && !facts.Any(fact => fact.IdMatch);
         var nameProblem = search.NameTyped is not null && !facts.Any(fact => fact.NameMatch);
+        var specialtyProblem = search.SpecialtyTyped is not null && !facts.Any(fact => fact.SpecialtyMatch);
+        var countyProblem = search.CountyTyped is not null && !facts.Any(fact => fact.CountyMatch);
 
         if (idProblem)
         {
@@ -598,31 +688,145 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             {
                 // The NPI/EIN has rates for the code itself: clearing the name leads to them.
                 hints.Add(Hint("provider_name_no_match", "info",
-                    $"{FilterLabel(search.Npi, search.Ein, null, sentenceStart: true)} has rates for {codeLabel}, but not under a name containing \"{search.NameTyped}\".",
-                    [ClearNameLink(facts)]));
+                    $"{IdLabel(search.Npi, search.Ein, sentenceStart: true)} has rates for {codeLabel}, but not under a name containing \"{search.NameTyped}\".",
+                    [ClearFilterLink(facts, code, NameKey)]));
             }
             else if (nameRevenue is null)
             {
-                var message = $"No provider whose name contains \"{search.NameTyped}\" has a rate for {codeLabel}.";
-                // The label names one kind of code, so the link searches exactly that kind.
-                (string Key, string? Value)[] exactCode = code is null ? [] : [("code", code.Code), ("codeType", code.CodeType)];
-                hints.Add(idProblem
-                    // The NPI/EIN fails too, so clearing only the name would still find nothing.
-                    ? Hint("provider_name_no_match", "info", message,
-                        [Link($"Search {codeLabel} for all providers", [.. exactCode, .. ClearProvider, .. ClearNarrowing])])
-                    : Hint("provider_name_no_match", "info", message, [ClearNameLink(facts)]));
+                // With the NPI/EIN failing too, clearing only the name would still find nothing.
+                hints.Add(await FiledUnderProceduresAsync(new RevenueScope(null, null, search.Name, null, null, null))
+                    ?? Hint("provider_name_no_match", "info",
+                        $"No provider whose name contains \"{search.NameTyped}\" has a rate for {codeLabel}.",
+                        [idProblem ? AllProvidersLink(code) : ClearFilterLink(facts, code, NameKey)]));
             }
         }
 
-        if (!idProblem && !nameProblem && search.IdFilter && search.NameTyped is not null)
+        if (!idProblem && !nameProblem && search.IdFilter && search.NameTyped is not null && !facts.Any(fact => fact.WithoutDirectory))
         {
             // Both match on their own, but never in the same provider group.
             hints.Add(Hint("provider_name_no_match", "info",
-                $"{FilterLabel(search.Npi, search.Ein, null, sentenceStart: true)} has rates for {codeLabel}, but not under a name containing \"{search.NameTyped}\".",
-                [ClearNameLink(facts)]));
+                $"{IdLabel(search.Npi, search.Ein, sentenceStart: true)} has rates for {codeLabel}, but not under a name containing \"{search.NameTyped}\".",
+                [ClearFilterLink(facts, code, NameKey)]));
+        }
+
+        if (specialtyProblem || countyProblem)
+        {
+            hints.AddRange(await DirectoryHintsAsync(facts, code, codeLabel, specialtyProblem, countyProblem));
+        }
+        else if (search.DirectoryFilter && !idProblem && !nameProblem && facts.Any(fact => fact.WithoutDirectory))
+        {
+            hints.Add(DirectoryConflict(facts, code, codeLabel));
         }
 
         return hints;
+    }
+
+    /// <summary>
+    /// No rate for the code lists an NPI with the specialty, or one practicing in the location (whatever the other
+    /// filters). When the text matches no one in the provider registry, it says only that: the registry can't tell a
+    /// typo from a place with no providers in these files. On a revenue-code search, rates filed under procedure codes
+    /// count too.
+    /// </summary>
+    private async Task<List<SearchHint>> DirectoryHintsAsync(
+        List<RateFactRow> facts, CodeInfo? code, string codeLabel, bool specialtyProblem, bool countyProblem)
+    {
+        var known = await connection.QuerySingleAsync<DirectoryCountsRow>(
+            SqlFile.For<SearchHints>("DirectoryCounts.sql"), new { specialty = search.Specialty, county = search.County });
+        if (known.Npis == 0)
+        {
+            return [Hint(specialtyProblem ? "specialty_no_match" : "county_no_match", "info",
+                "The provider registry isn't loaded, so specialty and location filters match no one.",
+                [ClearFilterLink(facts, code, DirectoryKey)])];
+        }
+
+        var hints = new List<SearchHint>();
+        if (specialtyProblem)
+        {
+            hints.Add(known.SpecialtyNpis == 0
+                ? Hint("specialty_no_match", "info", $"No providers here matched \"{search.SpecialtyTyped}\".", [ClearFilterLink(facts, code, SpecialtyKey)])
+                : await FiledUnderProceduresAsync(new RevenueScope(null, null, null, search.Specialty, null, null))
+                  ?? Hint("specialty_no_match", "info", $"No provider with a specialty matching \"{search.SpecialtyTyped}\" has a rate for {codeLabel}.",
+                      [ClearFilterLink(facts, code, SpecialtyKey)]));
+        }
+
+        if (countyProblem)
+        {
+            hints.Add(known.CountyNpis == 0
+                ? Hint("county_no_match", "info", $"No providers here matched \"{search.CountyTyped}\".", [ClearFilterLink(facts, code, CountyKey)])
+                : await FiledUnderProceduresAsync(new RevenueScope(null, null, null, null, search.County, null))
+                  ?? Hint("county_no_match", "info", $"No provider in {CountyLabel()} has a rate for {codeLabel}.", [ClearFilterLink(facts, code, CountyKey)]));
+        }
+
+        return hints;
+    }
+
+    /// <summary>
+    /// On a revenue-code search, the facility rates that one filter alone (<paramref name="scope"/>) has filed under
+    /// procedure codes, as a hint pointing to them: then "no rate for RC 0490" would be false. Its links keep that filter
+    /// and clear the other provider filters. Null when there are none, or the code can't be a revenue code.
+    /// </summary>
+    private async Task<SearchHint?> FiledUnderProceduresAsync(RevenueScope scope)
+    {
+        var rows = _revenueCodes.Count == 0 ? [] : await ProceduresAsync(_revenueCodes, scope);
+        if (rows.Count == 0)
+        {
+            return null;
+        }
+
+        var label = RevenueCodeLabel(rows.Select(row => row.RevenueCode).Distinct().Order().ToList());
+        var total = rows.Sum(row => row.Rates);
+        var codes = rows.Select(row => (row.CodeType, row.Code)).Distinct().Count();
+        var first = rows[0];
+        var subject = FilterLabel(scope.Npi, scope.Ein, scope.Name, scope.Specialty, scope.County, sentenceStart: true);
+        var has = scope.Npi is null && scope.Ein is null ? $"({Plural(first.Providers, "tax ID")}) have" : "has";
+        var message = $"{subject} {has} {Plural(total, "facility rate")} under {label} filed under the procedure code in the notes field " +
+            (total == 1 ? $"({first.CodeType} {first.Code}), not" : $"({Plural(codes, "code")}), none of them") + $" for {FilterLabel()}. " +
+            (total == 1 ? "Search it:" : "Search one to see them:");
+        (string Key, string? Value)[] clear =
+        [
+            .. ClearNarrowing,
+            .. ClearProvider.Where(filter => filter.Key switch
+            {
+                "npi" => scope.Npi is null,
+                "ein" => scope.Ein is null,
+                NameKey => scope.Name is null,
+                SpecialtyKey => scope.Specialty is null,
+                _ => scope.County is null,
+            }),
+        ];
+        return Hint("revenue_code_procedures", "info", message, ProcedureLinks(rows, clear));
+    }
+
+    /// <summary>
+    /// Each filter finds rates for the code on its own, and the NPI/EIN and name find them together, but not with the
+    /// specialty and location: no provider group has them all, or (with both) no listed NPI has that specialty and
+    /// practices there.
+    /// </summary>
+    private SearchHint DirectoryConflict(List<RateFactRow> facts, CodeInfo? code, string codeLabel)
+    {
+        string message;
+        if (search.IdFilter || search.NameTyped is not null)
+        {
+            var who = FilterLabel(search.Npi, search.Ein, search.Name, null, null, sentenceStart: true);
+            message = $"{who} {(who.StartsWith("Providers", StringComparison.Ordinal) ? "have" : "has")} rates for {codeLabel}, but none {DirectoryPhrase()}.";
+        }
+        else
+        {
+            message = $"No {codeLabel} rate lists an NPI {DirectoryPhrase()}. Each filter finds rates on its own.";
+        }
+
+        var links = new List<HintLink>();
+        if (search.SpecialtyTyped is not null)
+        {
+            links.Add(ClearFilterLink(facts, code, SpecialtyKey));
+        }
+
+        if (search.CountyTyped is not null)
+        {
+            links.Add(ClearFilterLink(facts, code, CountyKey));
+        }
+
+        return Hint("provider_filters_conflict", "info", message, links.DistinctBy(link => link.Label).ToList());
     }
 
     private async Task<List<SearchHint>> IdHintsAsync(List<RateFactRow> facts, string codeLabel)
@@ -635,7 +839,13 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             return [Hint("npi_other_ein", "info",
                 $"NPI {npi} has no rate for {codeLabel} under {TaxIdLabel(ein)}, but has {codeLabel} rates under " +
                 $"{DescribeProviders(facts.Where(fact => fact.NpiMatch))}. Contracts are signed per tax ID, so the NPI and EIN must match.",
-                [Link("Search this NPI without the EIN", [("ein", null), ("provider", null), .. ClearNarrowing])])];
+                [Link("Search this NPI without the EIN", [("ein", null), ("provider", null), .. ClearDirectory, .. ClearNarrowing])])];
+        }
+
+        // On a revenue-code search, rates filed under procedure codes are rates too: say where they are instead.
+        if (await FiledUnderProceduresAsync(new RevenueScope(search.Npi, ein, null, null, null, null)) is { } filed)
+        {
+            return [filed];
         }
 
         var both = await LookupAsync(search.Npi, ein);
@@ -647,11 +857,17 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
                 return [Hint("npi_not_listed", "info", $"NPI {npi} isn't listed in this snapshot's files.")];
             }
 
+            if (await FiledUnderProceduresAsync(new RevenueScope(search.Npi, null, null, null, null, null)) is { } filedForNpi)
+            {
+                return [filedForNpi];
+            }
+
             var taxIds = DescribeTaxIds(npiOnly.TaxIds, out var count);
             return [Hint("npi_other_ein", "info",
                 $"NPI {npi} is listed under {(count == 1 ? "a different tax ID" : "different tax IDs")}: {taxIds}. It has no rate for {codeLabel} " +
                 $"there either{OtherCodes(npiOnly)}. Contracts are signed per tax ID, so the NPI and EIN must match.",
-                npiOnly.TopCodeList.Select(top => Link($"Search {top} for this NPI", [("code", top), ("ein", null), ("provider", null), .. ClearNarrowing])).ToList())];
+                npiOnly.TopCodeList.Select(top => Link($"Search {top} for this NPI",
+                    [("code", top), ("ein", null), ("provider", null), .. ClearDirectory, .. ClearNarrowing])).ToList())];
         }
 
         if (both.GroupCount == 0)
@@ -667,7 +883,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             return [Hint("provider_whole_tin", "info",
                 $"NPI {npi} isn't listed on any {codeLabel} rate, but {both.WholeTinLabel} has a {codeLabel} contract that covers the " +
                 "whole tax ID (the file lists no NPIs for it), which may include this clinician.",
-                [Link("See that tax ID's rate", [("npi", null), ("ein", both.WholeTinKeyList[0]), ("provider", null), .. ClearNarrowing])])];
+                [Link("See that tax ID's rate", [("npi", null), ("ein", both.WholeTinKeyList[0]), ("provider", null), .. ClearDirectory, .. ClearNarrowing])])];
         }
 
         var describe = DescribeTaxIds(both.TaxIds, out _);
@@ -675,18 +891,101 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         var links = new List<HintLink>();
         if (npi is not null && ein is not null && facts.Any(fact => fact.EinMatch))
         {
-            links.Add(Link("Search this EIN without the NPI", [("npi", null), ("provider", null), .. ClearNarrowing]));
+            links.Add(Link("Search this EIN without the NPI", [("npi", null), ("provider", null), .. ClearDirectory, .. ClearNarrowing]));
         }
 
-        links.AddRange(both.TopCodeList.Select(top => Link($"Search {top}", [("code", top), ("provider", null), .. ClearNarrowing])));
+        links.AddRange(both.TopCodeList.Select(top => Link($"Search {top}", [("code", top), ("provider", null), .. ClearDirectory, .. ClearNarrowing])));
         return [Hint("provider_no_rate", "info", $"{who} has no rate for {codeLabel} in these files{OtherCodes(both)}.", links)];
     }
 
-    /// <summary>"Clear the name filter", also clearing the narrowing filters when they would still leave nothing.</summary>
-    private HintLink ClearNameLink(List<RateFactRow> facts) =>
-        facts.Any(fact => (!search.IdFilter || fact.IdMatch) && SurvivesNarrowing(fact))
-            ? Link("Clear the name filter", ("provider", null))
-            : Link("Clear the name filter", [("provider", null), .. ClearNarrowing]);
+    private const string NameKey = "provider";
+    private const string SpecialtyKey = "specialty";
+    private const string CountyKey = "county";
+
+    /// <summary>Both directory filters (the specialty and the location), cleared together.</summary>
+    private const string DirectoryKey = "directory";
+
+    /// <summary>
+    /// "Clear the name filter" (or the specialty or location filter): clears that filter, then also the other specialty
+    /// and location filters when keeping them would still find nothing, and the narrowing filters when those would.
+    /// Each step is chosen by a flag that says exactly which rates the search would then match. When none would find
+    /// rates, it searches the code for all providers.
+    /// </summary>
+    private HintLink ClearFilterLink(List<RateFactRow> facts, CodeInfo? code, string filter)
+    {
+        foreach (var (keys, finds) in ClearSteps(filter))
+        {
+            (string Key, string? Value)[] clear = [.. keys.Select(key => (key, (string?)null))];
+            if (facts.Any(fact => finds(fact) && SurvivesNarrowing(fact)))
+            {
+                return Link(ClearLabel(keys), clear);
+            }
+
+            if (facts.Any(finds))
+            {
+                return Link(ClearLabel(keys), [.. clear, .. ClearNarrowing]);
+            }
+        }
+
+        return AllProvidersLink(code);
+    }
+
+    /// <summary>What to clear, in order, and the flag saying a search without those filters still matches a rate.</summary>
+    private IEnumerable<(string[] Keys, Func<RateFactRow, bool> Finds)> ClearSteps(string filter)
+    {
+        var directory = new List<string>();
+        if (search.SpecialtyTyped is not null)
+        {
+            directory.Add(SpecialtyKey);
+        }
+
+        if (search.CountyTyped is not null)
+        {
+            directory.Add(CountyKey);
+        }
+
+        switch (filter)
+        {
+            case NameKey:
+                yield return ([NameKey], fact => fact.WithoutName);
+                if (directory.Count > 0)
+                {
+                    yield return ([NameKey, .. directory], fact => fact.IdMatch);
+                }
+
+                break;
+            case SpecialtyKey or CountyKey:
+                yield return ([filter], fact => filter == SpecialtyKey ? fact.WithoutSpecialty : fact.WithoutCounty);
+                if (directory.Count > 1)
+                {
+                    yield return ([.. directory], fact => fact.WithoutDirectory);
+                }
+
+                break;
+            default:
+                yield return ([.. directory], fact => fact.WithoutDirectory);
+                break;
+        }
+    }
+
+    /// <summary>"Clear the name filter", "Clear the specialty and location filters".</summary>
+    private static string ClearLabel(IReadOnlyList<string> keys)
+    {
+        var names = keys.Select(key => key switch { NameKey => "name", SpecialtyKey => "specialty", _ => "location" }).ToList();
+        return names.Count switch
+        {
+            1 => $"Clear the {names[0]} filter",
+            _ => $"Clear the {string.Join(", ", names.Take(names.Count - 1))} and {names[^1]} filters",
+        };
+    }
+
+    /// <summary>The code as described (one kind of code), for everyone: always finds rates, since the code has some.</summary>
+    private HintLink AllProvidersLink(CodeInfo? code)
+    {
+        (string Key, string? Value)[] exactCode = code is null ? [] : [("code", code.Code), ("codeType", code.CodeType)];
+        return Link($"Search {(code is null ? "this code" : $"{code.CodeType} {code.Code}")} for all providers",
+            [.. exactCode, .. ClearProvider, .. ClearNarrowing]);
+    }
 
     private bool SurvivesNarrowing(RateFactRow fact) =>
         (search.Setting is null || catalog.SettingForPlace(fact.Pos).Key == search.Setting)
@@ -737,24 +1036,88 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         await connection.QuerySingleAsync<ProviderLookupRow>(
             SqlFile.For<SearchHints>("ProviderLookup.sql"), new { snapshotId = snapshot.SnapshotId, codes = search.Candidates, npi, ein });
 
-    /// <summary>The provider filters in effect, all of them: "NPI 1003008038 under EIN 11-3613997 with a name containing \"x\"".</summary>
-    private string FilterLabel() => FilterLabel(search.Npi, search.Ein, search.Name, sentenceStart: false);
+    /// <summary>
+    /// The provider filters in effect, all of them: "NPI 1003008038 under EIN 11-3613997 with a name containing \"x\"",
+    /// "providers with a specialty matching \"gastro\" in Manhattan".
+    /// </summary>
+    private string FilterLabel() => FilterLabel(search.Npi, search.Ein, search.Name, search.Specialty, search.County, sentenceStart: false);
 
-    private string FilterLabel(long? npi, string? ein, string? name, bool sentenceStart)
+    /// <summary>The filters whose argument isn't null, worded as the search typed them; the location as the place it matched.</summary>
+    private string FilterLabel(long? npi, string? ein, string? name, string? specialty, string? county, bool sentenceStart)
     {
-        var named = name is null ? "" : $"with a name containing \"{search.NameTyped}\"";
+        var providers = sentenceStart ? "Providers" : "providers";
+        var with = new List<string>();
+        string label;
         if (npi is null && ein is null)
         {
-            return $"{(sentenceStart ? "Providers" : "providers")} whose name contains \"{search.NameTyped}\"";
+            label = name is null ? providers : $"{providers} whose name contains \"{search.NameTyped}\"";
         }
-
-        var id = npi is not null ? $"NPI {search.NpiText}" : TaxIdLabel(ein!, sentenceStart);
-        if (npi is not null && ein is not null)
+        else
         {
-            id += $" under {TaxIdLabel(ein)}";
+            label = IdLabel(npi, ein, sentenceStart);
+            if (name is not null)
+            {
+                with.Add($"a name containing \"{search.NameTyped}\"");
+            }
         }
 
-        return named.Length == 0 ? id : $"{id} {named}";
+        if (specialty is not null)
+        {
+            with.Add($"a specialty matching \"{search.SpecialtyTyped}\"");
+        }
+
+        if (with.Count > 0)
+        {
+            label += $" with {string.Join(" and ", with)}";
+        }
+
+        return county is null ? label : $"{label} in {CountyLabel()}";
+    }
+
+    /// <summary>The place the location filter matched ("Manhattan", "Delaware County"), else the text as typed, quoted.</summary>
+    private string CountyLabel() => search.CountyPlace ?? $"\"{search.CountyTyped}\"";
+
+    /// <summary>The filters a relaxed scope dropped, together: 'under a name containing "x" with a specialty matching "y" in Manhattan'.</summary>
+    private string DroppedPhrase(RevenueScope scope)
+    {
+        var parts = new List<string>();
+        if (scope.OtherName)
+        {
+            parts.Add($"under a name containing \"{search.NameTyped}\"");
+        }
+
+        if (scope.OtherDirectory)
+        {
+            parts.Add(DirectoryPhrase(scope.OtherSpecialty, scope.OtherCounty));
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>"NPI 1003008038", "EIN 11-3613997", or both: "NPI 1003008038 under EIN 11-3613997".</summary>
+    private string IdLabel(long? npi, string? ein, bool sentenceStart)
+    {
+        var id = npi is not null ? $"NPI {search.NpiText}" : TaxIdLabel(ein!, sentenceStart);
+        return npi is not null && ein is not null ? $"{id} under {TaxIdLabel(ein)}" : id;
+    }
+
+    /// <summary>The specialty and location filters as a phrase: "with a specialty matching \"gastro\" in Manhattan".</summary>
+    private string DirectoryPhrase() => DirectoryPhrase(search.SpecialtyTyped is not null, search.CountyTyped is not null);
+
+    private string DirectoryPhrase(bool specialty, bool county)
+    {
+        var parts = new List<string>();
+        if (specialty)
+        {
+            parts.Add($"with a specialty matching \"{search.SpecialtyTyped}\"");
+        }
+
+        if (county)
+        {
+            parts.Add($"in {CountyLabel()}");
+        }
+
+        return string.Join(" ", parts);
     }
 
     /// <summary>"EIN 11-3471596"; "this tax ID" for a masked key; "tax ID npi:1234567890" for a tax ID that isn't an EIN.</summary>
@@ -844,13 +1207,16 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
     private sealed record RevenueHint(SearchHint Hint, bool ProviderScoped, bool ProviderHasDirect);
 
     /// <summary>Which provider filters a revenue code lookup applies, and which of the searched ones it dropped.</summary>
-    private sealed record RevenueScope(long? Npi, string? Ein, string? Name, string? Product)
+    private sealed record RevenueScope(long? Npi, string? Ein, string? Name, string? Specialty, string? County, string? Product)
     {
         public bool OtherProduct { get; init; }
         public bool OtherName { get; init; }
         public bool OtherEin { get; init; }
-        public bool Relaxed => OtherProduct || OtherName || OtherEin;
-        public bool HasProvider => Npi is not null || Ein is not null || Name is not null;
+        public bool OtherSpecialty { get; init; }
+        public bool OtherCounty { get; init; }
+        public bool OtherDirectory => OtherSpecialty || OtherCounty;
+        public bool Relaxed => OtherProduct || OtherName || OtherEin || OtherDirectory;
+        public bool HasProvider => Npi is not null || Ein is not null || Name is not null || Specialty is not null || County is not null;
     }
 
     private sealed record CodeKind(string CodeType, string Code)
@@ -869,6 +1235,8 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         bool ForEin);
 
     private sealed record SimilarCodeRow(string CodeType, string Code, long Rates, string? Name);
+
+    private sealed record DirectoryCountsRow(long Npis, long SpecialtyNpis, long CountyNpis);
 
     private sealed record RevenueProcedureRow(
         string RevenueCode, string CodeType, string Code, long Rates, long Providers, string? Products, string? TaxIds);

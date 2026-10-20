@@ -7,6 +7,7 @@ COPY global.json Directory.Build.props ./
 COPY src/PriceExplorer.Api/PriceExplorer.Api.csproj src/PriceExplorer.Api/
 RUN dotnet restore src/PriceExplorer.Api/PriceExplorer.Api.csproj
 COPY src/ src/
+COPY reference/ reference/
 RUN dotnet publish src/PriceExplorer.Api/PriceExplorer.Api.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

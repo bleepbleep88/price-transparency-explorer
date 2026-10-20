@@ -2,11 +2,12 @@
 -- type. One row per kind:
 --   Searchable: some rate is stored under that code, so searching it finds rates. A revenue code whose facility rates
 --   are all filed under the procedure code in their notes field is listed too, but isn't searchable.
---   ForProvider: with provider filters, one of those searchable rates has a provider group matching them all (NPI, EIN
---   and name in the same group, as in SearchRates.sql); always true without provider filters.
+--   ForProvider: with provider filters, one of those searchable rates has a provider group matching them all (NPI, EIN,
+--   name, specialty and location in the same group, as in SearchRates.sql); always true without provider filters.
 --   InProduct: one of those searchable rates is in the selected product (always true without one).
 --   ForProviderInProduct: both at once, on the same rate.
---   ForId / ForNpi / ForEin: like ForProvider, for the NPI and EIN without the name, the NPI alone, and the EIN alone.
+--   ForId / ForNpi / ForEin: like ForProvider, for the NPI and EIN without the other filters, the NPI alone, and the EIN
+--   alone.
 WITH target_files AS (
     SELECT file_id, product_key
     FROM source_files
@@ -31,7 +32,8 @@ SELECT
     k.code_type          AS CodeType,
     k.code               AS Code,
     bool_or(k.searchable) AS Searchable,
-    bool_or(k.searchable AND (($npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL) OR EXISTS (
+    bool_or(k.searchable AND (($npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL
+         AND $specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL) OR EXISTS (
         SELECT 1
         FROM rate_provider_refs rr
         JOIN provider_groups pg ON pg.file_id = rr.file_id AND pg.provider_ref_id = rr.provider_ref_id
@@ -41,10 +43,16 @@ SELECT
               WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
                 AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
           AND ($ein::VARCHAR IS NULL OR pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR)
-          AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))))) AS ForProvider,
+          AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))
+          AND (($specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL) OR EXISTS (
+              SELECT 1 FROM group_npis gn
+              JOIN directory_matches($specialty::VARCHAR, $county::VARCHAR) dm ON dm.npi = gn.npi
+              WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id AND gn.group_idx = pg.group_idx
+                AND ($specialty::VARCHAR IS NULL OR dm.specialty_match) AND ($county::VARCHAR IS NULL OR dm.county_match)))))) AS ForProvider,
     bool_or(k.searchable AND ($product::VARCHAR IS NULL OR k.product_key = $product::VARCHAR)) AS InProduct,
     bool_or(k.searchable AND ($product::VARCHAR IS NULL OR k.product_key = $product::VARCHAR)
-        AND (($npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL) OR EXISTS (
+        AND (($npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL
+         AND $specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL) OR EXISTS (
             SELECT 1
             FROM rate_provider_refs rr
             JOIN provider_groups pg ON pg.file_id = rr.file_id AND pg.provider_ref_id = rr.provider_ref_id
@@ -54,7 +62,12 @@ SELECT
                   WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
                     AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
               AND ($ein::VARCHAR IS NULL OR pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR)
-              AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))))) AS ForProviderInProduct,
+              AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))
+              AND (($specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL) OR EXISTS (
+                  SELECT 1 FROM group_npis gn
+                  JOIN directory_matches($specialty::VARCHAR, $county::VARCHAR) dm ON dm.npi = gn.npi
+                  WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id AND gn.group_idx = pg.group_idx
+                    AND ($specialty::VARCHAR IS NULL OR dm.specialty_match) AND ($county::VARCHAR IS NULL OR dm.county_match)))))) AS ForProviderInProduct,
     bool_or(k.searchable AND ($npi::BIGINT IS NOT NULL OR $ein::VARCHAR IS NOT NULL) AND EXISTS (
         SELECT 1
         FROM rate_provider_refs rr

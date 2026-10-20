@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using PriceExplorer.Api.Core.Domain;
 
 namespace PriceExplorer.Api.Core.Models.Rates;
@@ -13,6 +14,10 @@ public sealed record RateSearchResult(
     SearchQuality Quality);
 
 /// <summary>The search as the server understood it (normalized), so the UI can show exactly what ran.</summary>
+/// <param name="Specialty">The specialty filter as typed.</param>
+/// <param name="County">The location filter as typed.</param>
+/// <param name="CountyPlace">The place the location filter matched, the way to show it ("Manhattan", "Delaware County",
+/// "New York City"); null without a location filter or when it matches no one.</param>
 public sealed record RateSearchEcho(
     string Code,
     IReadOnlyList<string> MatchedCodes,
@@ -23,6 +28,9 @@ public sealed record RateSearchEcho(
     string? Setting,
     string? FeeType,
     string? Provider,
+    string? Specialty,
+    string? County,
+    string? CountyPlace,
     string? Group,
     string Sort,
     int Page,
@@ -153,7 +161,48 @@ public sealed record RateRow(
     long FirstRateId,
     bool Matched,
     IReadOnlyList<long> RateIds,
-    long? WholeTaxIdRateId);
+    long? WholeTaxIdRateId)
+{
+    /// <summary>Who the NPIs behind the row are, from the national provider registry. Null when no registry is loaded or the row lists no NPIs.</summary>
+    public ProviderProfile? Profile { get; init; }
+
+    /// <summary>"Check this" notes: the rate may be listed for a provider who doesn't perform the service.</summary>
+    public IReadOnlyList<RowFlag> Flags { get; init; } = [];
+}
+
+/// <summary>Who the NPIs behind a row are, from the national provider registry (NPPES) via the bundled directory.</summary>
+/// <param name="Npis">Distinct NPIs listed for the row's rates (the row's NPI count).</param>
+/// <param name="NpisInDirectory">How many of them the registry has, deactivated ones included.</param>
+/// <param name="Individuals">Active NPIs registered to individual clinicians; the others are organizations or deactivated.</param>
+/// <param name="Deactivated">NPIs deactivated in the registry.</param>
+/// <param name="Specialties">Each specialty with its NPI count: those matching the specialty filter first, then the most NPIs.</param>
+/// <param name="Locations">Up to 3 practice places ("Manhattan, NY", "Rome, NY (Oneida County)"): those in the filtered
+/// location first, then the most NPIs.</param>
+/// <param name="LocationCount">How many places there are in all.</param>
+public sealed record ProviderProfile(
+    int Npis,
+    int NpisInDirectory,
+    int Individuals,
+    int Deactivated,
+    IReadOnlyList<SpecialtyCount> Specialties,
+    IReadOnlyList<string> Locations,
+    int LocationCount)
+{
+    /// <summary>Active radiologists, nuclear medicine physicians and radiology centers among the NPIs (for the imaging flag).</summary>
+    [JsonIgnore]
+    public int ImagingReaders { get; init; }
+
+    /// <summary>Active cardiologists among the NPIs: they read cardiac CT, MRI and PET too.</summary>
+    [JsonIgnore]
+    public int CardiacReaders { get; init; }
+}
+
+/// <param name="Group">The NUCC grouping, e.g. "Hospitals" or "Ambulatory Health Care Facilities".</param>
+public sealed record SpecialtyCount(string Specialty, string? Group, int Npis);
+
+/// <summary>A "check this" note on a row.</summary>
+/// <param name="Kind">Stable identifier, e.g. "imaging_without_radiologist".</param>
+public sealed record RowFlag(string Kind, string Message);
 
 /// <param name="Kind">Stable identifier the UI can switch on, e.g. "code_not_found", "npi_check_digit".</param>
 /// <param name="Severity">"info" or "warning".</param>

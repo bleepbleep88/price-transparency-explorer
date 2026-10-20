@@ -16,6 +16,7 @@ export const datasetKeys = {
   snapshots: () => [...datasetKeys.all, 'snapshots'] as const,
   plans: (snapshotId: number) => [...datasetKeys.all, 'plans', snapshotId] as const,
   reference: () => [...datasetKeys.all, 'reference'] as const,
+  specialties: (q: string) => [...datasetKeys.all, 'specialties', q] as const,
 }
 
 export const statusKeys = {

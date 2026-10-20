@@ -76,6 +76,12 @@ h2,
   padding-left: 10px;
 }
 
+/* Specialty or location matches: grouped the same way, in a neutral colour (copper is for the provider searched). */
+.match-rule {
+  border-left: 3px solid rgba(var(--v-theme-on-surface), 0.2);
+  padding-left: 10px;
+}
+
 .v-table tr.row-yours > td:first-child {
   box-shadow: inset 3px 0 0 rgb(var(--v-theme-copper));
 }

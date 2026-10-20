@@ -87,6 +87,45 @@ public sealed class SyntheticHintTests(SyntheticHintTests.Factory factory) : ICl
             .Should().Contain(m => m!.StartsWith("Providers whose name contains \"gamma\" (1 tax ID) have 1 facility rate"));
     }
 
+    /// <summary>
+    /// Yorkville Endoscopy (NPI 1174873780, Manhattan, in the real Ambetter slice) has revenue code 0490 rates filed only
+    /// under CPT 45378, while Beta bills 0490 directly: with a specialty or location that hides them, the hints must not
+    /// say Yorkville has no 0490 rate.
+    /// </summary>
+    [Theory(Timeout = 60_000)]
+    [InlineData("code=0490&npi=1174873780&specialty=gastro", "NPI 1174873780 has", ", but none with a specialty matching \"gastro\".")]
+    [InlineData("code=0490&npi=1174873780&county=Queens", "NPI 1174873780 has", ", but none in Queens.")]
+    [InlineData("code=0490&provider=yorkville&county=Queens", "Providers whose name contains \"yorkville\" have", ", but none in Queens.")]
+    public async Task Rates_filed_under_procedure_codes_are_found_when_a_specialty_or_location_hides_them(string search, string starts, string ends)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var result = await SearchAsync(ct, search);
+
+        var messages = result.GetProperty("hints").EnumerateArray().Select(h => h.GetProperty("message").GetString()!).ToList();
+        var hint = Message(result, "revenue_code_procedures")!;
+        hint.Should().StartWith(starts).And.Contain(" filed under the procedure code in the notes field ").And.Contain(ends);
+        messages.Should().NotContain(m => m.Contains("no rate for RC 0490", StringComparison.Ordinal) || m.Contains("has a rate for RC 0490", StringComparison.Ordinal));
+
+        // Its link searches the procedure code without the filter that hid the rates, and finds them.
+        var link = result.GetProperty("hints").EnumerateArray().Single(h => h.GetProperty("kind").GetString() == "revenue_code_procedures")
+            .GetProperty("links")[0].GetProperty("query");
+        var followed = search.Split('&').Select(pair => pair.Split('=', 2)).ToDictionary(pair => pair[0], pair => pair[1]);
+        foreach (var value in link.EnumerateObject())
+        {
+            if (value.Value.ValueKind == JsonValueKind.Null)
+            {
+                followed.Remove(value.Name);
+            }
+            else
+            {
+                followed[value.Name] = value.Value.GetString()!;
+            }
+        }
+
+        var next = await SearchAsync(ct, string.Join("&", followed.Select(kv => $"{kv.Key}={Uri.EscapeDataString(kv.Value)}")));
+        next.GetProperty("rows").GetProperty("total").GetInt32().Should().BePositive();
+    }
+
     [Fact(Timeout = 60_000)]
     public async Task A_wrong_code_type_link_keeps_the_npi_when_only_its_ein_is_wrong()
     {

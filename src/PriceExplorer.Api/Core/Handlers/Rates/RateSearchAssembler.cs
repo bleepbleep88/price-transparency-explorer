@@ -7,7 +7,10 @@ using PriceExplorer.Api.Core.Reference;
 
 namespace PriceExplorer.Api.Core.Handlers.Rates;
 
-/// <summary>One unique rate, at one place of service, for one provider (tax ID). Rows come from SearchRates.sql.</summary>
+/// <summary>
+/// One unique rate, at one place of service, for one provider (tax ID). Rows come from SearchRates.sql, which explains
+/// each match flag; flags for filters that aren't set are true.
+/// </summary>
 internal sealed record RateFactRow(
     long RateId,
     string ProductKey,
@@ -34,7 +37,13 @@ internal sealed record RateFactRow(
     bool NameMatch = true,
     bool NpiMatch = true,
     bool EinMatch = true,
-    string? MatchedBusinessNames = null);
+    string? MatchedBusinessNames = null,
+    bool SpecialtyMatch = true,
+    bool CountyMatch = true,
+    bool WithoutName = true,
+    bool WithoutSpecialty = true,
+    bool WithoutCounty = true,
+    bool WithoutDirectory = true);
 
 internal sealed record AssemblyOptions(
     string? Product,

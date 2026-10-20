@@ -83,7 +83,7 @@ public sealed class ApiContractTests(ExplorerApiFactory factory) : IClassFixture
 
         var search = document.GetProperty("paths").GetProperty("/api/v1/rates").GetProperty("get");
         search.GetProperty("parameters").EnumerateArray().Select(p => p.GetProperty("name").GetString())
-            .Should().Contain(["code", "codeType", "npi", "ein", "product", "setting", "feeType", "provider", "group", "page", "pageSize"])
+            .Should().Contain(["code", "codeType", "npi", "ein", "product", "setting", "feeType", "provider", "specialty", "county", "group", "page", "pageSize"])
             .And.NotContain(name => char.IsUpper(name![0]));
         search.GetProperty("parameters").EnumerateArray().Single(p => p.GetProperty("name").GetString() == "code")
             .GetProperty("required").GetBoolean().Should().BeTrue();
@@ -91,7 +91,7 @@ public sealed class ApiContractTests(ExplorerApiFactory factory) : IClassFixture
             .Should().Equal("application/problem+json");
         search.GetProperty("responses").GetProperty("200").GetProperty("content").EnumerateObject().Select(c => c.Name)
             .Should().Equal("application/json");
-        foreach (var typeahead in new[] { "/api/v1/codes", "/api/v1/providers" })
+        foreach (var typeahead in new[] { "/api/v1/codes", "/api/v1/providers", "/api/v1/specialties" })
         {
             document.GetProperty("paths").GetProperty(typeahead).GetProperty("get").GetProperty("parameters").EnumerateArray()
                 .Single(p => p.GetProperty("name").GetString() == "q").GetProperty("required").GetBoolean().Should().BeTrue(typeahead);
@@ -103,6 +103,10 @@ public sealed class ApiContractTests(ExplorerApiFactory factory) : IClassFixture
 
         document.GetProperty("paths").GetProperty("/api/v1/snapshots/{snapshotId}/plans").GetProperty("get")
             .GetProperty("responses").TryGetProperty("400", out _).Should().BeTrue();
+
+        // The XML-comment generator copies entities as written, so doc comments must not use them.
+        document.GetRawText().Should().NotContain("&amp;").And.NotContain("&lt;").And.NotContain("&gt;");
+        search.GetProperty("summary").GetString().Should().Contain("specialty").And.Contain("New York county");
     }
 
     private async Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct, string accept = "application/json")

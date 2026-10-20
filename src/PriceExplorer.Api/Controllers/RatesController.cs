@@ -12,7 +12,8 @@ public sealed class RatesController(ISender sender) : ControllerBase
 {
     /// <summary>
     /// Rates for a billing code (required), optionally narrowed to a provider by NPI and/or EIN (they must match each other)
-    /// or by name. Results come back as fair comparison groups (one value per provider) plus paged provider rows.
+    /// or by name, or to providers with a specialty or practicing in a New York county or NYC borough. Results come back as
+    /// fair comparison groups (one value per provider) plus paged provider rows.
     /// </summary>
     [HttpGet]
     [ProducesResponseType<RateSearchResult>(StatusCodes.Status200OK, "application/json")]

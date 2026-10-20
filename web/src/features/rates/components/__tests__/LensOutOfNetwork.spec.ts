@@ -43,7 +43,7 @@ function rateGroup(): RateGroup {
 
 function searchResult(): RateSearchResult {
   return {
-    query: { code: '0450', matchedCodes: ['0450', '00450'], codeType: null, npi: null, ein: null, product: null, setting: null, feeType: null, provider: null, group: null, sort: 'rate', page: 1, pageSize: 25 },
+    query: { code: '0450', matchedCodes: ['0450', '00450'], codeType: null, npi: null, ein: null, product: null, setting: null, feeType: null, provider: null, specialty: null, county: null, countyPlace: null, group: null, sort: 'rate', page: 1, pageSize: 25 },
     snapshot: { snapshotId: 1, indexDate: '2026-08-31', isLatest: true },
     code: null,
     groups: [rateGroup()],

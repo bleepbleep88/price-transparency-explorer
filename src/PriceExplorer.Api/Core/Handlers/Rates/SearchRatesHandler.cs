@@ -13,9 +13,11 @@ namespace PriceExplorer.Api.Core.Handlers.Rates;
 
 /// <summary>
 /// Runs a rate search: one query for the facts (SearchRates.sql), pure grouping and statistics (RateSearchAssembler),
-/// exact NPI counts for the page (RowNpis.sql), the code's description, and hints for empty or surprising results.
+/// exact NPI counts and who is behind each row on the page (ProviderProfiles.sql), the code's description, and hints for
+/// empty or surprising results.
 /// </summary>
-public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog, ILogger<SearchRatesHandler> logger)
+public sealed class SearchRatesHandler(
+    DuckDbConnectionFactory connections, ReferenceCatalog catalog, ProviderDirectoryInfo directory, ILogger<SearchRatesHandler> logger)
     : IRequestHandler<SearchRatesQuery, RateSearchResult>
 {
     public async Task<RateSearchResult> Handle(SearchRatesQuery request, CancellationToken cancellationToken)
@@ -25,9 +27,17 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
 
         await using var connection = await connections.OpenAsync(cancellationToken);
         var snapshot = await SnapshotResolver.ResolveAsync(connection, request.Snapshot);
+        if (search.County is not null && directory.IsLoaded)
+        {
+            search = search with
+            {
+                CountyPlace = await connection.QuerySingleOrDefaultAsync<string?>(
+                    SqlFile.For<SearchRatesHandler>("CountyPlace.sql"), new { county = search.County }),
+            };
+        }
 
         var (facts, assembled) = await RunAsync(connection, snapshot, search, sort, request.Page, request.PageSize, catalog);
-        var rows = await CountRowNpisAsync(connection, assembled.Rows);
+        var rows = await ProfileRowsAsync(connection, assembled.Rows, assembled.Groups, search);
 
         var codeInfo = await DescribeCodeAsync(connection, snapshot, facts, assembled.Groups, search.CodeType);
         var hints = await new SearchHints(connection, snapshot, catalog, search).ForAsync(facts, assembled, codeInfo);
@@ -36,7 +46,8 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
 
         var echo = new RateSearchEcho(
             search.Code, search.Candidates, search.CodeType, search.NpiText, search.Ein,
-            search.Product, search.Setting, search.FeeType, search.NameTyped, search.Group, sort, request.Page, request.PageSize);
+            search.Product, search.Setting, search.FeeType, search.NameTyped, search.SpecialtyTyped, search.CountyTyped, search.CountyPlace, search.Group, sort,
+            request.Page, request.PageSize);
 
         return new RateSearchResult(
             echo,
@@ -53,7 +64,8 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
         DuckDBConnection connection, ResolvedSnapshot snapshot, SearchContext search, string sort, int page, int pageSize,
         ReferenceCatalog catalog)
     {
-        var facts = await QueryFactsAsync(connection, snapshot.SnapshotId, search.Candidates, search.Npi, search.Ein, search.Name);
+        var facts = await QueryFactsAsync(
+            connection, snapshot.SnapshotId, search.Candidates, search.Npi, search.Ein, search.Name, search.Specialty, search.County);
 
         // DRG 0470 never means revenue code 0470: a foreign code type only matches rates of that type (none in these files).
         if (search.ForeignCodeType)
@@ -76,25 +88,30 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
 
     /// <summary>
     /// One row per rate × place of service × provider for the codes (stored forms), with each provider filter's match
-    /// flags; null filters match everyone. The saved statistics are built from this same query.
+    /// flags; null filters match everyone. The saved statistics are built from this same query, with no filters.
     /// </summary>
     internal static async Task<List<RateFactRow>> QueryFactsAsync(
         DuckDBConnection connection, int snapshotId, IReadOnlyList<string> codes, long? npi = null, string? ein = null,
-        string? provider = null, DbTransaction? transaction = null) =>
+        string? provider = null, string? specialty = null, string? county = null, DbTransaction? transaction = null) =>
         (await connection.QueryAsync<RateFactRow>(
             SqlFile.For<SearchRatesHandler>("SearchRates.sql"),
-            new { snapshotId, codes, npi, ein, provider },
+            new { snapshotId, codes, npi, ein, provider, specialty, county },
             transaction)).ToList();
 
-    /// <summary>Exact distinct-NPI counts for the rows on this page (the assembler only sees per-rate counts).</summary>
-    private static async Task<RateRowsPage> CountRowNpisAsync(DuckDBConnection connection, RateRowsPage page)
+    /// <summary>
+    /// For the rows on this page: the exact count of distinct NPIs behind each row (the assembler only sees per-rate
+    /// counts) and, with the provider directory loaded, who they are and any "check this" flags. Both cover every rate
+    /// behind a row, so the profile, the NPI count and the NPI list agree.
+    /// </summary>
+    private async Task<RateRowsPage> ProfileRowsAsync(
+        DuckDBConnection connection, RateRowsPage page, IReadOnlyList<RateGroup> groups, SearchContext search)
     {
         if (page.Items.Count == 0)
         {
             return page;
         }
 
-        var parameters = new DynamicParameters();
+        var parameters = new DynamicParameters(new { specialty = search.Specialty, county = search.County });
         var values = new List<string>();
         for (var i = 0; i < page.Items.Count; i++)
         {
@@ -106,11 +123,51 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
             }
         }
 
-        var sql = SqlFile.For<SearchRatesHandler>("RowNpis.sql").Replace("{rows}", string.Join(", ", values), StringComparison.Ordinal);
-        var counts = (await connection.QueryAsync<RowNpiCount>(sql, parameters)).ToDictionary(count => (int)count.RowIndex, count => (int)count.Npis);
+        var sql = SqlFile.For<SearchRatesHandler>("ProviderProfiles.sql").Replace("{rows}", string.Join(", ", values), StringComparison.Ordinal);
+        var lines = (await connection.QueryAsync<ProfileLine>(sql, parameters)).ToLookup(line => (int)line.RowIndex);
+        var groupsByKey = groups.ToDictionary(group => group.Key, StringComparer.Ordinal);
+
         return page with
         {
-            Items = page.Items.Select((row, index) => counts.TryGetValue(index, out var npis) ? row with { NpiCount = npis } : row).ToList(),
+            Items = page.Items.Select((row, index) =>
+            {
+                var rowLines = lines[index].ToList();
+                if (rowLines.FirstOrDefault(line => line.Kind == "totals") is not { } totals)
+                {
+                    return row;
+                }
+
+                var counted = row with { NpiCount = (int)totals.Npis };
+                if (!directory.IsLoaded || totals.Npis == 0)
+                {
+                    return counted;
+                }
+
+                var places = rowLines.Where(line => line.Kind == "place")
+                    .OrderByDescending(line => line.Matches).ThenByDescending(line => line.Npis).ThenBy(line => line.Label, StringComparer.Ordinal)
+                    .ToList();
+                var profile = new ProviderProfile(
+                    (int)totals.Npis,
+                    (int)totals.Found,
+                    (int)totals.Individuals,
+                    (int)totals.Deactivated,
+                    rowLines.Where(line => line.Kind == "specialty")
+                        .OrderByDescending(line => line.Matches).ThenByDescending(line => line.Npis).ThenBy(line => line.Label, StringComparer.Ordinal)
+                        .Select(line => new SpecialtyCount(line.Label!, line.GroupName, (int)line.Npis))
+                        .ToList(),
+                    places.Take(3).Select(line => line.Label!).ToList(),
+                    places.Count)
+                {
+                    ImagingReaders = (int)totals.ImagingReaders,
+                    CardiacReaders = (int)totals.CardiacReaders,
+                };
+
+                return counted with
+                {
+                    Profile = profile,
+                    Flags = groupsByKey.TryGetValue(row.GroupKey, out var group) ? ProviderFlags.For(group, profile) : [],
+                };
+            }).ToList(),
         };
     }
 
@@ -162,5 +219,8 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
 
     private sealed record CodeDescriptionRow(string CodeType, string Code, string? Name, string? Description, int FromSnapshot);
 
-    private sealed record RowNpiCount(long RowIndex, long Npis);
+    /// <summary>One line of ProviderProfiles.sql: a row's totals, or one of its specialties or places.</summary>
+    private sealed record ProfileLine(
+        long RowIndex, string Kind, string? Label, string? GroupName, long Npis, long Found, long Individuals, long Deactivated,
+        long ImagingReaders, long CardiacReaders, bool Matches);
 }

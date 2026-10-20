@@ -1,6 +1,6 @@
 -- Codes in this snapshot that start like the one searched for (suggestions when nothing matched), optionally of one code
--- type. With provider filters, only codes that provider has rates for (NPI, EIN and name in the same provider group, as in
--- SearchRates.sql).
+-- type. With provider filters, only codes that provider has rates for (NPI, EIN, name, specialty and location in the same
+-- provider group, as in SearchRates.sql).
 WITH target_files AS (
     SELECT file_id
     FROM source_files
@@ -13,7 +13,8 @@ candidates AS (
     WHERE starts_with(r.code, $prefix)
       AND ($codeType::VARCHAR IS NULL OR r.code_type = $codeType::VARCHAR)
       AND (r.expiration_date IS NULL OR r.expiration_date >= current_date)
-      AND (($npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL) OR EXISTS (
+      AND (($npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL
+         AND $specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL) OR EXISTS (
           SELECT 1
           FROM rate_provider_refs rr
           JOIN provider_groups pg ON pg.file_id = rr.file_id AND pg.provider_ref_id = rr.provider_ref_id
@@ -23,7 +24,12 @@ candidates AS (
                 WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
                   AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
             AND ($ein::VARCHAR IS NULL OR pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR)
-            AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))))
+            AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))
+            AND (($specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL) OR EXISTS (
+                SELECT 1 FROM group_npis gn
+                JOIN directory_matches($specialty::VARCHAR, $county::VARCHAR) dm ON dm.npi = gn.npi
+                WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id AND gn.group_idx = pg.group_idx
+                  AND ($specialty::VARCHAR IS NULL OR dm.specialty_match) AND ($county::VARCHAR IS NULL OR dm.county_match)))))
 )
 SELECT
     c.code_type              AS CodeType,

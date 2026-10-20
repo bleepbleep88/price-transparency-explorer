@@ -17,7 +17,7 @@ import {
   yearlyLine,
   type PriceSummary,
 } from '@/lib/plainNumbers'
-import type { CodeInfo, ModifierRef, RateGroup, RateSearchResult, SearchQuality } from '../api/types'
+import type { CodeInfo, ModifierRef, RateGroup, RateSearchEcho, RateSearchResult, SearchQuality } from '../api/types'
 import { toApiQuery, type Lens, type SearchParams } from './searchParams'
 
 // Audience lenses read the current search response; they never fetch anything and never change the numbers.
@@ -126,9 +126,51 @@ export function priceSummary(group: RateGroup): PriceSummary {
 
 // ---- Providers ----
 
+/** Any filter that picks providers: NPI, EIN, name, specialty or location. Groups then highlight the matches. */
 export function hasProviderFilter(result: RateSearchResult): boolean {
   const query = result.query
+  return Boolean(query.npi || query.ein || query.provider || query.specialty || query.county)
+}
+
+/** A specialty or location filter: it picks the rows, while typical prices still count every provider. */
+export function hasDirectoryFilter(result: RateSearchResult): boolean {
+  return Boolean(result.query.specialty || result.query.county)
+}
+
+/**
+ * The search names a provider (NPI, EIN or name): only then do its matches get the copper "your provider" mark. A
+ * specialty or location picks a set of providers, not yours.
+ */
+export function marksSearchedProvider(result: RateSearchResult): boolean {
+  const query = result.query
   return Boolean(query.npi || query.ein || query.provider)
+}
+
+/** The place the location filter matched, as the API names it ("Delaware County"), else the text as typed, quoted. */
+export function placePhrase(query: RateSearchEcho): string {
+  return query.countyPlace ?? `"${query.county}"`
+}
+
+/**
+ * The providers a name, specialty or location filter picks, worded like the API's hints:
+ * 'providers whose name contains "heel" with a specialty matching "podiatr" in Brooklyn'.
+ */
+export function filteredProviders(query: RateSearchEcho): string {
+  let text = query.provider ? `providers whose name contains "${query.provider}"` : 'providers'
+  if (query.specialty) text += ` with a specialty matching "${query.specialty}"`
+  if (query.county) text += ` in ${placePhrase(query)}`
+  return text
+}
+
+/**
+ * Under a specialty or location filter the rows narrow, but each group's typical price and spread still count every
+ * provider in it: "Typical prices are for all of New York, not just Manhattan." Null without those filters.
+ */
+export function marketWideNote(query: RateSearchEcho): string | null {
+  if (!query.specialty && !query.county) return null
+  const place = query.county ? placePhrase(query) : null
+  const who = query.specialty ? `providers with a specialty matching "${query.specialty}"${place ? ` in ${place}` : ''}` : place
+  return `Typical prices are for all of New York, not just ${who}.`
 }
 
 /** An NPI or EIN pins one provider, so the reading can say "your". A name filter can match many providers. */
@@ -207,11 +249,11 @@ export function yourRateGroups(result: RateSearchResult): YourRateGroup[] {
     }))
 }
 
-/** Heading over a card's highlights: "your" only when an NPI or EIN pins one provider. */
+/** Heading over a card's highlights: "your" only when an NPI or EIN pins one provider; otherwise it names the filters. */
 export function highlightHeading(result: RateSearchResult): string {
-  return pinsProvider(result) || !result.query.provider
+  return pinsProvider(result) || !hasProviderFilter(result)
     ? 'How your provider compares'
-    : `How providers whose name contains "${result.query.provider}" compare`
+    : `How ${filteredProviders(result.query)} compare`
 }
 
 // ---- Plans ----

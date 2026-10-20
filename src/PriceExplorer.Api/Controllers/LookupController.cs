@@ -36,7 +36,20 @@ public sealed class LookupController(ISender sender) : ControllerBase
         CancellationToken cancellationToken = default) =>
         sender.Send(new SuggestProvidersQuery(q, snapshot, limit), cancellationToken);
 
-    /// <summary>Care settings and sort options for the search filters.</summary>
+    /// <summary>Specialties (NUCC, from the national provider registry) that the specialty filter matches for the text.</summary>
+    /// <param name="q">Required. 2 to 100 characters: words that start words of a specialty name ("gastro", "cardiologist", "ENT"), or a taxonomy code.</param>
+    /// <param name="limit">How many suggestions, 1 to 50.</param>
+    [HttpGet("specialties")]
+    [ProducesResponseType<IReadOnlyList<SpecialtySuggestion>>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    public Task<IReadOnlyList<SpecialtySuggestion>> Specialties([FromQuery] string? q, [FromQuery] int limit = 10,
+        CancellationToken cancellationToken = default) =>
+        sender.Send(new SuggestSpecialtiesQuery(q, limit), cancellationToken);
+
+    /// <summary>
+    /// Care settings and sort options for the search filters, New York counties and NYC boroughs for the location
+    /// filter, and the release of the national provider registry behind specialties and locations.
+    /// </summary>
     [HttpGet("reference")]
     [ProducesResponseType<ReferenceLists>(StatusCodes.Status200OK, "application/json")]
     public Task<ReferenceLists> Reference(CancellationToken cancellationToken) =>

@@ -17,6 +17,8 @@ describe('parseRouteQuery', () => {
       setting: 'asc',
       feeType: 'facility',
       provider: 'nyu',
+      specialty: ' gastro ',
+      county: 'Manhattan',
       group: 'g1',
       sort: '-rate',
       page: '3',
@@ -32,6 +34,8 @@ describe('parseRouteQuery', () => {
       setting: 'asc',
       feeType: 'facility',
       provider: 'nyu',
+      specialty: 'gastro',
+      county: 'Manhattan',
       group: 'g1',
       sort: '-rate',
       page: 3,
@@ -59,6 +63,14 @@ describe('mergeQuery', () => {
 
   it('leaves keys alone when the patch value is undefined', () => {
     expect(mergeQuery({ code: '45378', npi: '1' }, { npi: undefined })).toEqual({ code: '45378', npi: '1' })
+  })
+
+  it('sets and clears the specialty and location like any other filter', () => {
+    const filtered = mergeQuery({ code: '45378' }, { specialty: 'gastro', county: 'Manhattan', page: 1 })
+    expect(filtered).toEqual({ code: '45378', specialty: 'gastro', county: 'Manhattan' })
+    // A hint's "Clear the location filter" link sends { county: null }.
+    const cleared = mergeQuery({ code: '45378', specialty: 'gastro', county: 'Manhattan' }, { county: null, group: null })
+    expect(cleared).toEqual({ code: '45378', specialty: 'gastro' })
   })
 })
 
@@ -96,10 +108,16 @@ describe('toApiQuery', () => {
     const query = toApiQuery(parseRouteQuery({ code: '45378', page: '2' }))
     expect(query).toMatchObject({ code: '45378', page: 2, pageSize: 25, sort: 'rate' })
   })
+
+  it('passes the specialty and location through as typed', () => {
+    const query = toApiQuery(parseRouteQuery({ code: '45378', specialty: 'Gastroenterology Physician', county: 'Monroe' }))
+    expect(query).toMatchObject({ specialty: 'Gastroenterology Physician', county: 'Monroe' })
+    expect(toApiQuery(parseRouteQuery({ code: '45378' }))).toMatchObject({ specialty: undefined, county: undefined })
+  })
 })
 
 describe('validateSearchForm', () => {
-  const valid = { code: '45378', npi: '', ein: '', provider: '' }
+  const valid = { code: '45378', npi: '', ein: '', provider: '', specialty: '', county: '' }
 
   it('accepts a code alone', () => {
     expect(validateSearchForm(valid)).toEqual({})
@@ -116,6 +134,10 @@ describe('validateSearchForm', () => {
     ['npi', '13967478AB', /10 digits/],
     ['ein', '1234', /9 digits/],
     ['provider', 'a', /at least 2/],
+    ['specialty', 'g', /at least 2 characters of a specialty/],
+    ['specialty', 'g'.repeat(101), /at most 100/],
+    ['county', 'x', /New York county or NYC borough/],
+    ['county', 'x'.repeat(61), /at most 60/],
   ] as const)('rejects %s = %s', (field, value, message) => {
     expect(validateSearchForm({ ...valid, [field]: value })[field]).toMatch(message)
   })
@@ -124,12 +146,18 @@ describe('validateSearchForm', () => {
     expect(validateSearchForm({ ...valid, ein })).toEqual({})
   })
 
+  it('accepts the specialty and location when set or left out', () => {
+    expect(validateSearchForm({ ...valid, specialty: 'gastro', county: 'Staten Island' })).toEqual({})
+  })
+
   it('round-trips params into form values', () => {
-    expect(formValuesFrom(parseRouteQuery({ code: '45378', npi: '1396747861' }))).toEqual({
+    expect(formValuesFrom(parseRouteQuery({ code: '45378', npi: '1396747861', county: 'Bronx' }))).toEqual({
       code: '45378',
       npi: '1396747861',
       ein: '',
       provider: '',
+      specialty: '',
+      county: 'Bronx',
     })
   })
 })
