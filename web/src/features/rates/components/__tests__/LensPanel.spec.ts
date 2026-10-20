@@ -48,6 +48,8 @@ function result(groups: RateGroup[], query: Partial<RateSearchResult['query']> =
       setting: null,
       feeType: null,
       provider: null,
+      specialty: null,
+      county: null,
       group: null,
       sort: 'rate',
       page: 1,

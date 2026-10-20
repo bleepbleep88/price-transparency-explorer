@@ -73,6 +73,8 @@ function makeResult(groups: RateGroup[], overrides: Partial<RateSearchResult> = 
       setting: null,
       feeType: null,
       provider: null,
+      specialty: null,
+      county: null,
       group: null,
       sort: 'rate',
       page: 1,

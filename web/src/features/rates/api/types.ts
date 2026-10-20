@@ -161,7 +161,7 @@ export interface RateGroup {
   /** Median minus the 25th percentile (full stats only): how far a typical rate sits above the lower quartile. */
   lowerQuartileGap: number | null
   listedRates: number[]
-  /** Providers matching the NPI/EIN/name filter in this group (0 without one); highlights list the first 5. */
+  /** Providers matching the provider filters (NPI, EIN, name, specialty, location) in this group (0 without one); highlights list the first 5. */
   matchedProviders: number
   highlights: ProviderPosition[]
   notes: string[]
@@ -193,6 +193,43 @@ export interface RateRow {
   rateIds: number[]
   /** The whole-tax-ID contract behind `einLevel`, when it's a different rate than `firstRateId`; null otherwise. */
   wholeTaxIdRateId: number | null
+  /** Who the NPIs behind the row are, from the national provider registry. Null without a registry or NPIs. */
+  profile: ProviderProfile | null
+  /** "Check this" notes: the rate may be listed for a provider who doesn't perform the service. */
+  flags: RowFlag[]
+}
+
+export interface SpecialtyCount {
+  specialty: string
+  group: string | null
+  npis: number
+}
+
+export interface ProviderProfile {
+  /** Distinct NPIs behind the row (the row's NPI count). */
+  npis: number
+  /** How many of them the registry has, deactivated ones included. */
+  npisInDirectory: number
+  /** Active NPIs registered to individual clinicians. */
+  individuals: number
+  deactivated: number
+  /** Specialties matching the specialty filter first, then the most NPIs. */
+  specialties: SpecialtyCount[]
+  /** Up to 3 places ("Manhattan, NY", "Rome, NY · Oneida County"): those in the filtered location first. */
+  locations: string[]
+  /** How many places there are in all. */
+  locationCount: number
+}
+
+export type RowFlagKind =
+  | 'facility_rate_individual_npis'
+  | 'anesthesia_without_anesthesia_clinician'
+  | 'imaging_without_radiologist'
+  | 'deactivated_npis'
+
+export interface RowFlag {
+  kind: RowFlagKind | string
+  message: string
 }
 
 export interface RateRowsPage {
@@ -233,6 +270,10 @@ export interface RateSearchEcho {
   setting: string | null
   feeType: string | null
   provider: string | null
+  /** The specialty filter as typed. */
+  specialty: string | null
+  /** The location filter as typed. */
+  county: string | null
   group: string | null
   sort: string
   page: number
@@ -345,7 +386,33 @@ export interface SettingOption {
   note: string | null
 }
 
+/** A New York county or NYC borough where providers in the files practice. Boroughs come first. */
+export interface LocationOption {
+  /** What the location filter takes: "Manhattan", "Monroe". */
+  label: string
+  isBorough: boolean
+  npis: number
+}
+
+/** Where the provider directory came from. */
+export interface DirectorySource {
+  /** NPPES monthly release, e.g. "October 2026"; null when unknown. */
+  release: string | null
+  builtAt: string | null
+  npisLoaded: number
+  source: string | null
+}
+
 export interface ReferenceLists {
   settings: SettingOption[]
   sorts: string[]
+  /** Empty when no provider directory is loaded. */
+  locations: LocationOption[]
+  directory: DirectorySource | null
+}
+
+export interface SpecialtySuggestion {
+  specialty: string
+  group: string | null
+  npis: number
 }

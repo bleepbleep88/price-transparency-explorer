@@ -2,8 +2,9 @@
 import { computed } from 'vue'
 import { mdiInformationOutline } from '@mdi/js'
 import { plural, shortDate, wholeNumber } from '@/lib/format'
-import type { ProductFileSummary, RateSearchResult, SettingOption } from '../api/types'
+import type { LocationOption, ProductFileSummary, RateSearchResult, SettingOption } from '../api/types'
 import { groupName } from '../lib/lenses'
+import { locationTitle } from '../lib/locations'
 import type { QueryPatch, SearchParams } from '../lib/searchParams'
 
 const props = defineProps<{
@@ -11,6 +12,7 @@ const props = defineProps<{
   params: SearchParams
   products: ProductFileSummary[]
   settings: SettingOption[]
+  locations?: LocationOption[]
 }>()
 const emit = defineEmits<{ update: [patch: QueryPatch] }>()
 
@@ -25,6 +27,9 @@ const activeFilters = computed(() => {
   if (p.npi) chips.push({ key: 'npi', label: `NPI ${p.npi}`, yours: true })
   if (p.ein) chips.push({ key: 'ein', label: p.ein.startsWith('u') ? 'One provider (masked tax ID)' : `EIN ${p.ein}`, yours: true })
   if (p.provider) chips.push({ key: 'provider', label: `Name contains "${p.provider}"`, yours: true })
+  // Specialty and location pick a set of providers, not "your" provider: no copper mark.
+  if (p.specialty) chips.push({ key: 'specialty', label: `Specialty: ${p.specialty}` })
+  if (p.county) chips.push({ key: 'county', label: `Location: ${locationTitle(p.county, props.locations ?? [])}` })
   if (p.product) chips.push({ key: 'product', label: props.products.find((x) => x.productKey === p.product)?.productLabel ?? p.product })
   if (p.setting) chips.push({ key: 'setting', label: props.settings.find((x) => x.key === p.setting)?.label ?? p.setting })
   if (p.feeType) chips.push({ key: 'feeType', label: p.feeType === 'facility' ? 'Facility fees' : "Doctor's fees" })

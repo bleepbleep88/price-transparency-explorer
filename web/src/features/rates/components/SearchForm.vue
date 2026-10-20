@@ -2,8 +2,16 @@
 import { computed, nextTick, reactive, ref, useTemplateRef, watch } from 'vue'
 import { mdiMagnify } from '@mdi/js'
 import { plural } from '@/lib/format'
-import type { CodeSuggestion, ProductFileSummary, ProviderSuggestion, SettingOption } from '../api/types'
-import { useCodeSuggestions, useProviderSuggestions } from '../composables/useRateQueries'
+import type {
+  CodeSuggestion,
+  LocationOption,
+  ProductFileSummary,
+  ProviderSuggestion,
+  SettingOption,
+  SpecialtySuggestion,
+} from '../api/types'
+import { useCodeSuggestions, useProviderSuggestions, useSpecialtySuggestions } from '../composables/useRateQueries'
+import { locationSelectItems } from '../lib/locations'
 import {
   npiCheckDigitWarning,
   validateSearchForm,
@@ -18,6 +26,8 @@ const props = defineProps<{
   params: SearchParams
   products: ProductFileSummary[]
   settings: SettingOption[]
+  /** New York counties and NYC boroughs for the location filter (empty without a provider directory). */
+  locations?: LocationOption[]
   /** Errors from the URL (a pasted link) or the server (400 field errors). */
   externalErrors?: Partial<Record<string, string[] | string>>
   busy?: boolean
@@ -40,10 +50,13 @@ const draft = reactive({
   product: null as string | null,
   setting: null as string | null,
   feeType: null as FeeType | null,
+  specialty: null as string | null,
+  county: null as string | null,
 })
 const localErrors = ref<FormErrors>({})
 const codeSearch = ref('')
 const providerSearch = ref('')
+const specialtySearch = ref('')
 const filtersOpen = ref<number[]>([])
 
 function syncFromParams(params: SearchParams) {
@@ -54,8 +67,11 @@ function syncFromParams(params: SearchParams) {
   draft.product = params.product ?? null
   draft.setting = params.setting ?? null
   draft.feeType = params.feeType ?? null
+  draft.specialty = params.specialty || null
+  draft.county = params.county || null
   localErrors.value = {}
-  filtersOpen.value = params.product || params.setting || params.feeType || params.provider ? [0] : filtersOpen.value
+  const anyFilter = params.product || params.setting || params.feeType || params.provider || params.specialty || params.county
+  filtersOpen.value = anyFilter ? [0] : filtersOpen.value
 }
 // Only a different search re-syncs the form. Each field is its own source, so lens, cases, paging, sorting and
 // group picks (which also change the URL) leave unsearched edits and a collapsed filter panel alone.
@@ -69,6 +85,8 @@ watch(
     () => props.params.product,
     () => props.params.setting,
     () => props.params.feeType,
+    () => props.params.specialty,
+    () => props.params.county,
   ],
   () => syncFromParams(props.params),
   { immediate: true },
@@ -78,6 +96,9 @@ const codeSuggestions = useCodeSuggestions(codeSearch, () => props.params.snapsh
 const providerSuggestions = useProviderSuggestions(providerSearch, () => props.params.snapshot)
 const codeItems = computed<CodeSuggestion[]>(() => codeSuggestions.data.value ?? [])
 const providerItems = computed<ProviderSuggestion[]>(() => providerSuggestions.data.value ?? [])
+const specialtySuggestions = useSpecialtySuggestions(specialtySearch)
+const specialtyItems = computed<SpecialtySuggestion[]>(() => specialtySuggestions.data.value ?? [])
+const locationItems = computed(() => locationSelectItems(props.locations ?? []))
 
 const npiWarning = computed(() => npiCheckDigitWarning(draft.npi))
 const feeTypes = [
@@ -110,7 +131,14 @@ function onComboboxEnter(event: KeyboardEvent) {
 }
 
 function onSubmit() {
-  const values = { code: draft.code ?? '', npi: draft.npi ?? '', ein: draft.ein ?? '', provider: draft.provider ?? '' }
+  const values = {
+    code: draft.code ?? '',
+    npi: draft.npi ?? '',
+    ein: draft.ein ?? '',
+    provider: draft.provider ?? '',
+    specialty: draft.specialty ?? '',
+    county: draft.county ?? '',
+  }
   localErrors.value = validateSearchForm(values)
   if (Object.keys(localErrors.value).length > 0) return
 
@@ -122,6 +150,8 @@ function onSubmit() {
     npi: values.npi.trim() || null,
     ein: values.ein.trim() || null,
     provider: values.provider.trim() || null,
+    specialty: values.specialty.trim() || null,
+    county: values.county.trim() || null,
     product: draft.product,
     setting: draft.setting,
     feeType: draft.feeType,
@@ -194,19 +224,21 @@ function onSubmit() {
 
     <v-expansion-panels v-model="filtersOpen" multiple variant="accordion" flat class="mt-1">
       <v-expansion-panel>
-        <v-expansion-panel-title class="text-body-medium">More filters (product, setting, fee type, provider name)</v-expansion-panel-title>
+        <v-expansion-panel-title class="text-body-medium">
+          More filters (product, setting, fee type, provider name, specialty, location)
+        </v-expansion-panel-title>
         <v-expansion-panel-text>
           <v-row density="compact">
-            <v-col cols="12" sm="6" md="3">
+            <v-col cols="12" sm="6" md="4">
               <v-select v-model="draft.product" :items="productItems" label="Product" clearable placeholder="All products" persistent-placeholder />
             </v-col>
-            <v-col cols="12" sm="6" md="3">
+            <v-col cols="12" sm="6" md="4">
               <v-select v-model="draft.setting" :items="settingItems" label="Setting" clearable placeholder="All settings" persistent-placeholder />
             </v-col>
-            <v-col cols="12" sm="6" md="3">
+            <v-col cols="12" sm="6" md="4">
               <v-select v-model="draft.feeType" :items="feeTypes" label="Fee type" clearable placeholder="Facility and doctor's fees" persistent-placeholder />
             </v-col>
-            <v-col cols="12" sm="6" md="3">
+            <v-col cols="12" sm="6" md="4">
               <v-combobox
                 v-model="draft.provider"
                 v-model:search="providerSearch"
@@ -230,6 +262,47 @@ function onSubmit() {
                   />
                 </template>
               </v-combobox>
+            </v-col>
+            <v-col cols="12" sm="6" md="4">
+              <v-combobox
+                v-model="draft.specialty"
+                v-model:search="specialtySearch"
+                :items="specialtyItems"
+                item-title="specialty"
+                item-value="specialty"
+                :return-object="false"
+                label="Specialty"
+                placeholder="Any specialty, e.g. gastro"
+                persistent-placeholder
+                no-filter
+                hide-no-data
+                clearable
+                autocomplete="off"
+                :error-messages="errorFor('specialty')"
+                data-testid="specialty-input"
+                @keydown.enter="onComboboxEnter"
+              >
+                <template #item="{ props: itemProps, item }">
+                  <v-list-item v-bind="itemProps" :subtitle="`${item.group ?? 'Specialty'} · ${plural(item.npis, 'NPI')}`" />
+                </template>
+              </v-combobox>
+            </v-col>
+            <v-col cols="12" sm="6" md="4">
+              <v-autocomplete
+                v-model="draft.county"
+                :items="locationItems"
+                label="Location"
+                placeholder="Any New York county or NYC borough"
+                persistent-placeholder
+                clearable
+                auto-select-first
+                :error-messages="errorFor('county')"
+                data-testid="county-input"
+              >
+                <template #item="{ props: itemProps, item }">
+                  <v-list-item v-bind="itemProps" :subtitle="item.subtitle" />
+                </template>
+              </v-autocomplete>
             </v-col>
           </v-row>
           <v-btn variant="text" size="small" class="px-0" @click="emit('clear')">Start over</v-btn>

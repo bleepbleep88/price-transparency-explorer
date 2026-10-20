@@ -11,6 +11,7 @@ import type {
   ReferenceLists,
   SnapshotPlans,
   SnapshotSummary,
+  SpecialtySuggestion,
 } from './types'
 
 export const ratesApi = {
@@ -30,6 +31,10 @@ export const ratesApi = {
 
   providers: (q: string, snapshot: number | undefined, signal?: AbortSignal) =>
     requestJson<ProviderSuggestion[]>('/api/v1/providers', { query: { q, snapshot, limit: 8 }, signal }),
+
+  /** Specialties from the national provider registry that the specialty filter matches. */
+  specialties: (q: string, signal?: AbortSignal) =>
+    requestJson<SpecialtySuggestion[]>('/api/v1/specialties', { query: { q, limit: 8 }, signal }),
 
   reference: (signal?: AbortSignal) => requestJson<ReferenceLists>('/api/v1/reference', { signal }),
 

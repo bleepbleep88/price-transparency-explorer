@@ -35,6 +35,7 @@ const currentSnapshot = computed(() => {
 })
 const products = computed(() => currentSnapshot.value?.products ?? [])
 const settings = computed(() => reference.data.value?.settings ?? [])
+const locations = computed(() => reference.data.value?.locations ?? [])
 
 const apiError = computed(() => (search.error.value instanceof ApiError ? search.error.value : null))
 const stillLoading = computed(() => apiError.value?.isLoading ?? false)
@@ -108,6 +109,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
       :params="params"
       :products="products"
       :settings="settings"
+      :locations="locations"
       :external-errors="fieldErrors"
       :busy="search.isFetching.value"
       @submit="update"
@@ -146,7 +148,14 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
       <template v-else-if="result">
         <v-progress-linear v-if="search.isFetching.value" indeterminate color="primary" />
         <div :style="{ opacity: search.isPlaceholderData.value ? 0.6 : 1 }" class="d-flex flex-column ga-4">
-          <ResultSummary :result="result" :params="params" :products="products" :settings="settings" @update="update" />
+          <ResultSummary
+            :result="result"
+            :params="params"
+            :products="products"
+            :settings="settings"
+            :locations="locations"
+            @update="update"
+          />
 
           <!-- No groups, no reading: the hint or the empty state already says why and what to try. -->
           <LensPanel

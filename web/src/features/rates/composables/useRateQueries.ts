@@ -63,6 +63,17 @@ export function useProviderSuggestions(search: MaybeRefOrGetter<string>, snapsho
   })
 }
 
+/** Specialties from the national provider registry; the API needs at least 2 characters. */
+export function useSpecialtySuggestions(search: MaybeRefOrGetter<string>) {
+  const debounced = refDebounced(computed(() => (toValue(search) ?? '').trim()), 250)
+  return useQuery({
+    queryKey: computed(() => datasetKeys.specialties(debounced.value)),
+    queryFn: ({ signal }) => ratesApi.specialties(debounced.value, signal),
+    enabled: computed(() => debounced.value.length >= 2),
+    placeholderData: keepPreviousData,
+  })
+}
+
 export function useSnapshots() {
   return useQuery({ queryKey: datasetKeys.snapshots(), queryFn: ({ signal }) => ratesApi.snapshots(signal) })
 }

@@ -27,6 +27,10 @@ export interface SearchParams {
   setting?: string
   feeType?: FeeType
   provider?: string
+  /** Specialty text matched against the national provider registry, e.g. "gastro". */
+  specialty?: string
+  /** A New York county or NYC borough from the reference list, e.g. "Manhattan" or "Monroe". */
+  county?: string
   group?: string
   sort: SortKey
   page: number
@@ -65,6 +69,8 @@ export function parseRouteQuery(query: LocationQuery): SearchParams {
     setting: first(query.setting),
     feeType: (FEE_TYPES as readonly string[]).includes(feeType ?? '') ? (feeType as FeeType) : undefined,
     provider: first(query.provider),
+    specialty: first(query.specialty),
+    county: first(query.county),
     group: first(query.group),
     sort: (SORTS as readonly string[]).includes(sort ?? '') ? (sort as SortKey) : 'rate',
     page: positiveInteger(first(query.page)) ?? 1,
@@ -103,6 +109,8 @@ export function toApiQuery(params: SearchParams): Record<string, QueryValue> {
     setting: params.setting,
     feeType: params.feeType,
     provider: params.provider,
+    specialty: params.specialty,
+    county: params.county,
     group: params.group,
     sort: params.sort,
     page: params.page,
@@ -136,6 +144,18 @@ export const searchFormSchema = z.object({
     .refine((value) => value === '' || (value.length >= 2 && value.length <= 100), {
       error: "Type at least 2 characters of the provider's name.",
     }),
+  specialty: z
+    .string()
+    .trim()
+    .refine((value) => value === '' || value.length >= 2, { error: "Type at least 2 characters of a specialty, for example 'gastro'." })
+    .refine((value) => value.length <= 100, { error: 'A specialty is at most 100 characters.' }),
+  county: z
+    .string()
+    .trim()
+    .refine((value) => value === '' || value.length >= 2, {
+      error: "Enter a New York county or NYC borough, for example 'Brooklyn' or 'Monroe'.",
+    })
+    .refine((value) => value.length <= 60, { error: 'A location is at most 60 characters.' }),
 })
 
 export type SearchFormValues = z.input<typeof searchFormSchema>
@@ -161,5 +181,12 @@ export function npiCheckDigitWarning(npi: string | null | undefined): string | n
 }
 
 export function formValuesFrom(params: SearchParams): SearchFormValues {
-  return { code: params.code, npi: params.npi ?? '', ein: params.ein ?? '', provider: params.provider ?? '' }
+  return {
+    code: params.code,
+    npi: params.npi ?? '',
+    ein: params.ein ?? '',
+    provider: params.provider ?? '',
+    specialty: params.specialty ?? '',
+    county: params.county ?? '',
+  }
 }
