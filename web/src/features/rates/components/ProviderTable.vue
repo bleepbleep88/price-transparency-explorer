@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import { useDisplay } from 'vuetify'
 import { mdiFileSearchOutline } from '@mdi/js'
-import { money, plural, times } from '@/lib/format'
+import { money, plural } from '@/lib/format'
+import { capitalize, feeLabel, positionParts, typicalPrice } from '@/lib/plainNumbers'
 import type { ModifierRef, RateGroup, RateRow, RateRowsPage } from '../api/types'
 import { modifierText } from '../lib/lenses'
 import type { SortKey } from '../lib/searchParams'
@@ -25,16 +26,16 @@ const { smAndDown } = useDisplay()
 
 const headers = [
   { title: 'Provider', key: 'provider', sortable: true },
-  { title: 'Group', key: 'group', sortable: false },
-  { title: 'Rate', key: 'rate', sortable: true, align: 'end' as const },
-  { title: 'vs median', key: 'vsMedian', sortable: true, align: 'end' as const },
-  { title: 'Position', key: 'band', sortable: false },
+  { title: 'Fee, setting and plan', key: 'group', sortable: false },
+  { title: 'Price', key: 'rate', sortable: true, align: 'end' as const },
+  // Sorts by the price relative to typical (the API's vsMedian), so a row far above typical in a cheap service ranks high too.
+  { title: 'Compared with typical', key: 'vsMedian', sortable: true },
   { title: 'NPIs', key: 'npis', sortable: false, align: 'end' as const },
   { title: 'Source', key: 'actions', sortable: false, align: 'end' as const },
 ]
 
 const groupsByKey = computed(() => new Map(props.groups.map((group) => [group.key, group])))
-const items = computed(() => props.rows.items.map((row) => ({ ...row, id: `${row.groupKey}::${row.providerKey}` })))
+const items = computed(() => props.rows.items.map((row) => ({ ...row, id: `${row.groupKey}::${row.providerKey}`, compared: compared(row) })))
 
 const sortBy = computed(() => {
   const descending = props.sort.startsWith('-')
@@ -44,8 +45,15 @@ const sortBy = computed(() => {
 function groupLabel(row: RateRow): string {
   const group = groupsByKey.value.get(row.groupKey)
   if (!group) return '—'
-  const fee = group.feeType === 'professional' ? 'Professional' : 'Facility'
-  return `${fee} · ${group.settingLabel}`
+  return `${feeLabel(group.feeType)} · ${group.settingLabel}`
+}
+
+/** "Lower than most" plus "$23.34 less than typical" for the row's own price; null under 5 providers. */
+function compared(row: RateRow): { label: string | null; difference: string | null } {
+  const group = groupsByKey.value.get(row.groupKey)
+  const typical = group ? typicalPrice({ ...group.stats, providers: group.providerCount }) : null
+  const { label, difference } = positionParts(row.band, row.rate, typical)
+  return { label, difference: difference ? capitalize(difference) : null }
 }
 
 function modifiersOf(row: RateRow): ModifierRef[] {
@@ -58,11 +66,7 @@ function modifierCodes(modifiers: ModifierRef[]): string {
 }
 
 // Stamped like a ledger mark: outlined in the band's color; typical stays neutral ink.
-const bandView: Record<string, { label: string; color?: string }> = {
-  low: { label: 'Low', color: 'low' },
-  typical: { label: 'Typical' },
-  high: { label: 'High', color: 'high' },
-}
+const bandColor: Record<string, string | undefined> = { low: 'low', typical: undefined, high: 'high' }
 
 function rowProps({ item }: { item: RateRow }) {
   return props.yours && item.matched ? { class: 'row-yours' } : {}
@@ -151,20 +155,23 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
       <div class="text-no-wrap">
         <span class="font-weight-medium" data-testid="row-rate">{{ money(item.rate) }}</span>
         <div v-if="item.multipleRates" class="text-body-small text-medium-emphasis">
-          {{ money(item.rateLow) }} to {{ money(item.rateHigh) }} ({{ plural(item.rateCount, 'rate') }})
+          {{ money(item.rateLow) }} to {{ money(item.rateHigh) }} ({{ plural(item.rateCount, 'price') }})
         </div>
       </div>
     </template>
 
     <template #[`item.vsMedian`]="{ item }">
-      {{ times(item.vsMedian) }}
-    </template>
-
-    <template #[`item.band`]="{ item }">
-      <v-chip v-if="item.band" :color="bandView[item.band]?.color" size="small" variant="outlined" data-testid="band-chip">
-        {{ bandView[item.band]?.label }}
-      </v-chip>
-      <span v-else class="text-body-small text-medium-emphasis">Small group</span>
+      <div class="py-1" data-testid="row-compared">
+        <template v-if="item.compared.label">
+          <v-chip :color="bandColor[item.band ?? '']" size="small" variant="outlined" data-testid="band-chip">
+            {{ item.compared.label }}
+          </v-chip>
+          <div v-if="item.compared.difference" class="text-body-small text-medium-emphasis" data-testid="row-difference">
+            {{ item.compared.difference }}
+          </div>
+        </template>
+        <span v-else class="text-body-small text-medium-emphasis">Too few to compare</span>
+      </div>
     </template>
 
     <template #[`item.npis`]="{ item }">

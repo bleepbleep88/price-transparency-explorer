@@ -12,6 +12,7 @@ import {
   perCaseLine,
   positionLabel,
   positionLine,
+  positionParts,
   rangeLine,
   scorecardLine,
   spreadLine,
@@ -121,6 +122,13 @@ describe('a provider against the others', () => {
     // Bunched-up prices: lower than most, yet only a little.
     expect(positionLine('low', 570, 578.31)).toBe('Lower than most · about the same as typical')
     expect(positionLine(null, 300, null)).toBeNull()
+  })
+
+  it('keeps position and dollars apart for stacked layouts, dropping dollars that only repeat "about typical"', () => {
+    expect(positionParts('low', 143.75, 167.09)).toEqual({ label: 'Lower than most', difference: '$23.34 less than typical' })
+    expect(positionParts('typical', 578.31, 578.31)).toEqual({ label: 'About typical', difference: null })
+    expect(positionParts('low', 570, 578.31)).toEqual({ label: 'Lower than most', difference: 'about the same as typical' })
+    expect(positionParts(null, 300, null)).toEqual({ label: null, difference: null })
   })
 })
 

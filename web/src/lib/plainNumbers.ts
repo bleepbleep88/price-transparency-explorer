@@ -128,15 +128,27 @@ export function differenceLine(rate: number, typical: number | null | undefined)
 }
 
 /**
+ * Position and dollars, kept apart for layouts that stack them. `difference` is null when it would only repeat "About
+ * typical" (a typical price within 5% of typical).
+ */
+export function positionParts(
+  band: string | null | undefined,
+  rate: number,
+  typical: number | null | undefined,
+): { label: string | null; difference: string | null } {
+  const difference = differenceLine(rate, typical)
+  const repeats = band === 'typical' && difference === 'about the same as typical'
+  return { label: positionLabel(band), difference: repeats ? null : difference }
+}
+
+/**
  * Position and dollars together: "Lower than most · $23 less than typical", "Higher than most · about 2.7 times the
  * typical price". "About typical" stands alone when the dollars say the same thing. Null under 5 providers.
  */
 export function positionLine(band: string | null | undefined, rate: number, typical: number | null | undefined, separator = ' · '): string | null {
-  const label = positionLabel(band)
-  const difference = differenceLine(rate, typical)
+  const { label, difference } = positionParts(band, rate, typical)
   if (!label) return difference ? capitalize(difference) : null
-  if (!difference || (band === 'typical' && difference === 'about the same as typical')) return label
-  return `${label}${separator}${difference}`
+  return difference ? `${label}${separator}${difference}` : label
 }
 
 /** "The lower-priced quarter of providers get $454 or less: $124 less than typical." 10+ providers only. */
