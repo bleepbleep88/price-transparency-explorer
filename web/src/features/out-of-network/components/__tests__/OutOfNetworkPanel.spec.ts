@@ -38,7 +38,7 @@ describe('OutOfNetworkPanel', () => {
     window.innerWidth = desktopWidth
   })
 
-  it('has a row per product and fee: payments, allowed, billed and the share allowed', async () => {
+  it('has a row per product and fee: payments, allowed, billed and how billed compares with allowed, in plain words', async () => {
     const wrapper = await mountPanel([oonGroup(), LISTED_CT_READ])
 
     expect(wrapper.text()).toContain('What the plan allowed when it paid providers outside its network for 0450.')
@@ -48,13 +48,15 @@ describe('OutOfNetworkPanel', () => {
     expect(rows[0]!.text()).toContain('Emergency room (hospital)')
     expect(rows[0]!.text()).toContain('20 payments')
     expect(rows[0]!.text()).toContain('5 providers')
-    expect(rows[0]!.get('[data-testid="oon-allowed"]').text()).toBe('median $1,375.18 $60.12 to $187,538.55')
-    expect(rows[0]!.get('[data-testid="oon-billed"]').text()).toBe('median $5,110.00 $551.92 to $1,733,257.00')
-    expect(rows[0]!.get('[data-testid="oon-share"]').text()).toBe('median 21%')
+    expect(rows[0]!.get('[data-testid="oon-allowed"]').text()).toBe('Typical: $1,375 Ran from $60.12 to $187,539')
+    expect(rows[0]!.get('[data-testid="oon-billed"]').text()).toBe('Typical: $5,110 Ran from $552 to $1,733,257')
+    expect(rows[0]!.get('[data-testid="oon-share"]').text()).toBe('usually about 4.8 times')
 
-    // Under 5 amounts: every amount, no midpoint, and no share.
-    expect(rows[1]!.get('[data-testid="oon-allowed"]').text()).toBe('$217.92, $544.80, $762.72 and $8,373.66')
+    // Under 5 amounts: every amount, no midpoint, and nothing to compare.
+    expect(rows[1]!.text()).toContain("Doctor's fee")
+    expect(rows[1]!.get('[data-testid="oon-allowed"]').text()).toBe('$218, $545, $763 and $8,374')
     expect(rows[1]!.get('[data-testid="oon-share"]').text()).toBe('too few to say')
+    expect(wrapper.text()).not.toMatch(/median|percentile|quartile|÷|×/i)
   })
 
   it('says how the files work and what the amounts are, adding the per-unit note only for per-unit codes', async () => {
@@ -84,13 +86,14 @@ describe('OutOfNetworkPanel', () => {
     expect(wrapper.find('table').exists()).toBe(false)
     const rows = wrapper.findAll('[data-testid="oon-row"]')
     expect(rows).toHaveLength(2)
-    expect(rows[0]!.get('[data-testid="oon-allowed"]').text()).toBe('Allowed median $1,375.18 ($60.12 to $187,538.55)')
-    expect(rows[0]!.get('[data-testid="oon-share"]').text()).toBe('Allowed ÷ billed: median 21%')
+    expect(rows[0]!.get('[data-testid="oon-allowed"]').text()).toBe('Typical allowed amount: $1,375. Ran from $60.12 to $187,539.')
+    expect(rows[0]!.get('[data-testid="oon-share"]').text()).toBe('Billed charges were usually about 4.8 times the allowed amount.')
+    expect(rows[1]!.get('[data-testid="oon-allowed"]').text()).toBe('Allowed amounts: $218, $545, $763 and $8,374.')
     expect(rows[1]!.find('[data-testid="oon-share"]').exists()).toBe(false)
   })
 
   it('a billed charge nobody published reads as such', async () => {
-    const wrapper = await mountPanel([oonGroup({ billed: null, allowedShareOfBilled: null })])
+    const wrapper = await mountPanel([oonGroup({ billed: null, billedToAllowed: null })])
 
     expect(wrapper.get('[data-testid="oon-billed"]').text()).toBe('Not published')
   })

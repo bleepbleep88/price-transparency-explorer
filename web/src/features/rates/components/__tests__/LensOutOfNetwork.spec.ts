@@ -72,11 +72,11 @@ async function mountLens(lens: string, outOfNetwork: OutOfNetworkResult | null, 
 }
 
 describe('lenses and out-of-network payments', () => {
-  it('plans: one line on what the plan allowed out of network, as a share of the charge', async () => {
+  it('plans: one line on what providers billed against what the plan allowed out of network', async () => {
     const wrapper = await mountLens('plans', oonResult([oonGroup(), LISTED_CT_READ]))
 
     expect(wrapper.get('[data-testid="lens-oon-line"]').text()).toBe(
-      'Out of network (Essential Plan · Facility fee · RC 0450), the plan allowed a median 21% of what providers billed, over 20 payments.',
+      'Out of network (Essential Plan · Facility fee · RC 0450), billed charges were usually about 4.8 times what the plan allowed, over 20 payments.',
     )
   })
 
@@ -84,7 +84,7 @@ describe('lenses and out-of-network payments', () => {
     const without = await mountLens('providers', oonResult([oonGroup()]))
     const withNpi = await mountLens('providers', oonResult([oonGroup()]), { npi: '1801474036' })
 
-    const line = 'Providers outside the network were allowed a median 21% of what they billed (Essential Plan · Facility fee, 20 payments).'
+    const line = 'Providers outside the network usually billed about 4.8 times what the plan allowed them (Essential Plan · Facility fee, 20 payments).'
     expect(without.get('[data-testid="lens-oon-line"]').text()).toBe(line)
     expect(withNpi.get('[data-testid="lens-oon-line"]').text()).toBe(line)
   })

@@ -10,8 +10,10 @@ import {
   PER_UNIT_NOTE,
   amountHeadline,
   amountRange,
+  amountSentence,
+  billedLine,
+  billedVersusAllowed,
   groupLabel,
-  percent,
   severalCodes,
   visibleGroups,
 } from '../lib/outOfNetworkText'
@@ -43,18 +45,11 @@ const files = computed(() => props.result.files.filter((file) => groups.value.so
           <p class="text-title-small">{{ groupLabel(group, withCode) }}</p>
           <p v-if="group.places.length" class="text-body-small text-medium-emphasis">{{ group.places.map((place) => place.name).join(' · ') }}</p>
           <p class="text-body-medium mt-1">{{ plural(group.payments, 'payment') }} to {{ plural(group.providers, 'provider') }}</p>
-          <p class="text-body-medium" data-testid="oon-allowed">
-            Allowed {{ amountHeadline(group.allowed) }}<template v-if="amountRange(group.allowed)"> ({{ amountRange(group.allowed) }})</template>
-          </p>
+          <p class="text-body-medium" data-testid="oon-allowed">{{ amountSentence(group.allowed, 'allowed amount') }}</p>
           <p class="text-body-medium" data-testid="oon-billed">
-            <template v-if="group.billed">
-              Billed {{ amountHeadline(group.billed) }}<template v-if="amountRange(group.billed)"> ({{ amountRange(group.billed) }})</template>
-            </template>
-            <template v-else>Billed charges not published</template>
+            {{ group.billed ? amountSentence(group.billed, 'billed charge') : 'Billed charges not published.' }}
           </p>
-          <p v-if="group.allowedShareOfBilled != null" class="text-body-medium" data-testid="oon-share">
-            Allowed ÷ billed: median {{ percent(group.allowedShareOfBilled) }}
-          </p>
+          <p v-if="billedLine(group)" class="text-body-medium" data-testid="oon-share">{{ billedLine(group) }}</p>
         </v-sheet>
       </div>
 
@@ -65,7 +60,7 @@ const files = computed(() => props.result.files.filter((file) => groups.value.so
             <th>Payments</th>
             <th>Allowed</th>
             <th>Billed</th>
-            <th class="text-no-wrap">Allowed ÷ billed</th>
+            <th class="text-no-wrap">Billed vs allowed</th>
           </tr>
         </thead>
         <tbody>
@@ -92,7 +87,7 @@ const files = computed(() => props.result.files.filter((file) => groups.value.so
               <template v-else>Not published</template>
             </td>
             <td class="text-no-wrap" data-testid="oon-share">
-              <template v-if="group.allowedShareOfBilled != null">median {{ percent(group.allowedShareOfBilled) }}</template>
+              <template v-if="billedVersusAllowed(group)">usually {{ billedVersusAllowed(group) }}</template>
               <span v-else class="text-medium-emphasis">too few to say</span>
             </td>
           </tr>

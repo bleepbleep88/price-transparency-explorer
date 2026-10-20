@@ -9,9 +9,10 @@ test('a code with out-of-network payments shows the panel, and the innovators le
   await expect(panel.getByRole('heading', { name: 'Out of network' })).toBeVisible()
   await expect(panel.getByTestId('oon-row')).toHaveCount(2)
   await expect(panel.getByTestId('oon-row').first()).toContainText('Facility fee')
-  await expect(panel.getByTestId('oon-share').first()).toContainText(/median \d+%/)
+  await expect(panel.getByTestId('oon-share').first()).toContainText(/usually (about [\d.]+ times|about the same as|less than)/)
+  await expect(panel).not.toContainText(/median|percentile|quartile/i)
   await expect(panel.getByTestId('oon-notes')).toContainText('20 or more claims')
-  await expect(page.getByTestId('lens-oon-line')).toContainText(/^Out of network \(.+\), the plan allowed a median \d+% of what providers billed/)
+  await expect(page.getByTestId('lens-oon-line')).toContainText(/^Out of network \(.+\), billed charges were usually .+ what the plan allowed/)
 
   // A code nobody was paid for out of network has no panel.
   await page.getByRole('combobox', { name: 'Billing code' }).fill('99213')
@@ -29,7 +30,7 @@ test('a code with out-of-network payments shows the panel, and the innovators le
   await expect(files.filter({ hasText: 'In-network rates' })).toHaveCount(2)
   const outOfNetwork = files.filter({ hasText: 'Out-of-network allowed amounts' })
   await expect(outOfNetwork).toHaveCount(2)
-  await expect(outOfNetwork.first()).toContainText(/[\d,]+ published payments became [\d,]+ unique payments\./)
+  await expect(outOfNetwork.first()).toContainText(/[\d,]+ payments in the file became [\d,]+ unique payments after removing exact copies\./)
   await expect(outOfNetwork.first().getByRole('link', { name: 'Open the file' })).toHaveAttribute('href', /allowed-amounts\.json$/)
   await expect(files.first().getByRole('link', { name: 'Open the file' })).toHaveAttribute('href', /in-network\.json$/)
   await expect(files.first()).toContainText(/SHA-256 [0-9a-f]{64}/)

@@ -18,7 +18,7 @@ export function oonGroup(overrides: Partial<OutOfNetworkGroup> = {}): OutOfNetwo
     npis: 7,
     allowed: { count: 20, min: 60.12, median: 1375.18, max: 187538.55, listed: [] },
     billed: { count: 22, min: 551.92, median: 5110, max: 1733257, listed: [] },
-    allowedShareOfBilled: 0.21,
+    billedToAllowed: 4.81,
     ...overrides,
   }
 }
@@ -36,7 +36,7 @@ export const LISTED_CT_READ = oonGroup({
   npis: 1,
   allowed: { count: 4, min: 217.92, median: null, max: 8373.66, listed: [217.92, 544.8, 762.72, 8373.66] },
   billed: { count: 4, min: 3892, median: null, max: 134647.88, listed: [3892, 9730, 13622, 134647.88] },
-  allowedShareOfBilled: null,
+  billedToAllowed: null,
 })
 
 export function oonResult(groups: OutOfNetworkGroup[]): OutOfNetworkResult {

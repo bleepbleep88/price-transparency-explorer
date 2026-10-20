@@ -6,14 +6,13 @@ describe('source readings', () => {
   it('names each kind of file and what a published row is in it', () => {
     expect(kindLabel('in_network')).toBe('In-network rates')
     expect(kindLabel('allowed_amount')).toBe('Out-of-network allowed amounts')
-    expect(publishedLine(sourceFile())).toBe('179,948 published prices became 7,727 unique rates.')
-    expect(publishedLine(ALLOWED_FILE)).toBe('1,033 published payments became 605 unique payments.')
+    expect(publishedLine(sourceFile())).toBe('179,948 prices in the file became 7,727 unique rates after removing exact copies.')
+    expect(publishedLine(ALLOWED_FILE)).toBe('1,033 payments in the file became 605 unique payments after removing exact copies.')
     expect(publishedLine(sourceFile({ counts: null }))).toBeNull()
   })
 
   it('says how a rate file was cleaned, one line per rule that changed something', () => {
     expect(cleaningLines(sourceFile())).toEqual([
-      '172,221 exact duplicates collapsed, each counted once.',
       '119 codes published without their leading zeros, restored (490 → 0490).',
       '1,867 facility rates name the procedure in the notes field; that code is the one searched.',
       '326 tax IDs use a prefix the IRS never issues, so they are masked.',
@@ -24,7 +23,6 @@ describe('source readings', () => {
 
   it('says how an allowed-amount file was cleaned, leaving out what does not apply or did not happen', () => {
     expect(cleaningLines(ALLOWED_FILE)).toEqual([
-      '428 exact duplicates collapsed, each counted once.',
       '15 codes published without their leading zeros, restored (490 → 0490).',
       '6 EINs published as 8 digits, given back their leading zero.',
     ])

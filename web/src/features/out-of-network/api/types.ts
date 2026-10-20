@@ -30,8 +30,8 @@ export interface OutOfNetworkGroup {
   npis: number
   allowed: AmountSummary
   billed: AmountSummary | null
-  /** Median of allowed ÷ billed (0.21 = 21% of the charge), from 5 pairs; null under 5. */
-  allowedShareOfBilled: number | null
+  /** Median of billed ÷ allowed (4.81: providers usually billed about 4.8 times the allowed amount), from 5 pairs; null under 5. */
+  billedToAllowed: number | null
 }
 
 export interface OutOfNetworkFile {

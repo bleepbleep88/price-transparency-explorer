@@ -36,7 +36,7 @@ const timing = computed(() => timingLine(props.file))
         <ul v-if="cleaning.length" class="text-body-medium ps-4" data-testid="source-cleaning">
           <li v-for="line in cleaning" :key="line">{{ line }}</li>
         </ul>
-        <p v-else class="text-body-medium">Nothing needed cleaning.</p>
+        <p v-else class="text-body-medium">Nothing else needed cleaning.</p>
       </section>
 
       <section v-if="file.counts">

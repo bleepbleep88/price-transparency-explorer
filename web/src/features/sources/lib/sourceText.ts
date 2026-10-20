@@ -11,29 +11,26 @@ export function kindLabel(kind: SourceKind): string {
 
 /** What a published row is called in each kind of file. */
 function rowWords(kind: SourceKind): { published: string; unique: string } {
-  return kind === 'allowed_amount'
-    ? { published: 'published payment', unique: 'unique payment' }
-    : { published: 'published price', unique: 'unique rate' }
+  return kind === 'allowed_amount' ? { published: 'payment', unique: 'unique payment' } : { published: 'price', unique: 'unique rate' }
 }
 
-/** "179,948 published prices became 7,727 unique rates." */
+/** "179,948 prices in the file became 7,727 unique rates after removing exact copies." */
 export function publishedLine(file: SourceFile): string | null {
   const counts = file.counts
   if (counts?.published == null || counts.unique == null) return null
   const words = rowWords(file.kind)
-  return `${plural(counts.published, words.published)} became ${plural(counts.unique, words.unique)}.`
+  return `${plural(counts.published, words.published)} in the file became ${plural(counts.unique, words.unique)} after removing exact copies.`
 }
 
 function verb(count: number, one: string, many: string): string {
   return count === 1 ? one : many
 }
 
-/** How the file was cleaned, one line per rule that changed something. */
+/** How the file was cleaned beyond removing exact copies (publishedLine says that), one line per rule that changed something. */
 export function cleaningLines(file: SourceFile): string[] {
   const counts = file.counts
   if (!counts) return []
   const lines: string[] = []
-  if (counts.duplicatesRemoved) lines.push(`${plural(counts.duplicatesRemoved, 'exact duplicate')} collapsed, each counted once.`)
   if (counts.codesWithZerosRestored)
     lines.push(`${plural(counts.codesWithZerosRestored, 'code')} published without ${verb(counts.codesWithZerosRestored, 'its', 'their')} leading zeros, restored (490 → 0490).`)
   if (counts.ratesFromNotes)
@@ -98,7 +95,7 @@ export const STATUS_COLORS: Readonly<Record<string, string>> = {
 /** How every file is cleaned, for the top of the page. */
 export const CLEANING_RULES: readonly string[] = [
   'Every file is read as a stream, and each is saved in one step, so a search never sees half a file.',
-  'Exact duplicates collapse into one, with a count of the copies.',
+  'Exact copies are removed; each rate keeps a count of its copies.',
   'Codes get back the leading zeros the file dropped (490 → 0490); the code as published is kept.',
   'Facility rates filed under a revenue code take the procedure code named in their notes.',
   'Tax IDs with a prefix the IRS never issues are masked: they may be Social Security numbers.',
