@@ -66,13 +66,22 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
             }
         }
 
+        // Facility charges with no procedure named are left out unless asked for (InsightSupport.IsFacilityChargeOnly).
+        // The count is what including them would add under every filter, the category included.
+        bool InCategory(Pair pair) => category is null || pair.Category.Key == category;
+        var facilityCharges = comparable.Count(pair => InsightSupport.IsFacilityChargeOnly(pair.Row.CodeType) && InCategory(pair));
+        if (!request.IncludeFacilityCharges)
+        {
+            comparable = comparable.Where(pair => !InsightSupport.IsFacilityChargeOnly(pair.Row.CodeType)).ToList();
+        }
+
         var categories = comparable
             .GroupBy(pair => pair.Category.Key, StringComparer.Ordinal)
             .Select(same => new CategoryOption(same.Key, same.First().Category.Label, same.Count()))
             .OrderByDescending(option => option.Count)
             .ThenBy(option => option.Label, StringComparer.Ordinal)
             .ToList();
-        var shown = comparable.Where(pair => category is null || pair.Category.Key == category).ToList();
+        var shown = comparable.Where(InCategory).ToList();
 
         var sorted = Sort(shown, sort).ToList();
         var skip = (long)(request.Page - 1) * request.PageSize;
@@ -80,6 +89,11 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
         var names = await InsightSupport.CodeNamesAsync(connection, snapshot.SnapshotId, page.Select(pair => pair.Row.Code), transaction);
 
         var notes = new List<string>();
+        if (!request.IncludeFacilityCharges && facilityCharges > 0)
+        {
+            notes.Add(InsightSupport.FacilityChargesLeftOut(facilityCharges, "pair"));
+        }
+
         if (differentUnits > 0)
         {
             notes.Add($"{Count(differentUnits, "pair")} left out: the two products price {(differentUnits == 1 ? "it" : "them")} in different units.");
@@ -92,21 +106,27 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
 
         return new ProductComparison(
             statistics,
-            new ProductComparisonEcho(InsightSupport.Clean(request.Code), codes, category, InsightSupport.Clean(request.Setting), sort,
-                request.Page, request.PageSize),
+            new ProductComparisonEcho(InsightSupport.Clean(request.Code), codes, category, InsightSupport.Clean(request.Setting),
+                request.IncludeFacilityCharges, sort, request.Page, request.PageSize),
             product,
             versus,
             products,
             categories,
+            facilityCharges,
             Summarize(shown),
             InsightMath.Bands
                 .Select(band => new RatioBand(band.Key, band.Label, band.Direction, shown.Count(pair => InsightMath.BandOf(pair.Ratio) == band.Key)))
                 .ToList(),
             shown
                 .GroupBy(pair => pair.Category.Key, StringComparer.Ordinal)
-                .Select(same => new CategoryComparison(
-                    same.Key, same.First().Category.Label, same.Count(), same.Count(pair => pair.Ratio == 1), same.Count(pair => pair.Ratio < 1),
-                    same.Count(pair => pair.Ratio > 1), RateStatistics.Median(same.Select(pair => pair.Ratio).Order().ToList())))
+                .Select(same =>
+                {
+                    var providers = ProvidersIn(same);
+                    return new CategoryComparison(
+                        same.Key, same.First().Category.Label, same.Count(), providers, same.Count(pair => pair.Ratio == 1),
+                        same.Count(pair => pair.Ratio < 1), same.Count(pair => pair.Ratio > 1),
+                        providers >= RateStatistics.MinimumForBasicStats ? RateStatistics.Median(same.Select(pair => pair.Ratio).Order().ToList()) : null);
+                })
                 .OrderByDescending(entry => entry.Pairs)
                 .ThenBy(entry => entry.Label, StringComparer.Ordinal)
                 .ToList(),
@@ -154,23 +174,30 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
                 $"{key} isn't a product in this snapshot. Products: {string.Join(", ", products.Select(item => item.Key))}.")]);
     }
 
+    /// <summary>
+    /// The pairs in numbers. Like a group's statistics, the middle (25th to 75th) needs 5 providers and the 10th and 90th
+    /// need 10, counted as distinct providers; with fewer, only the counts.
+    /// </summary>
     private static ComparisonSummary Summarize(IReadOnlyList<Pair> pairs)
     {
         var ratios = pairs.Select(pair => pair.Ratio).Order().ToList();
-        decimal? Quantile(double q) => ratios.Count == 0 ? null : RateStatistics.Quantile(ratios, q);
+        var providers = ProvidersIn(pairs);
+        decimal? Quantile(double q, int minimumProviders) => providers < minimumProviders ? null : RateStatistics.Quantile(ratios, q);
         return new ComparisonSummary(
             pairs.Count,
-            pairs.Select(pair => pair.Row.ProviderKey).Distinct(StringComparer.Ordinal).Count(),
+            providers,
             pairs.Select(pair => (pair.Row.CodeType, pair.Row.Code)).Distinct().Count(),
             pairs.Count(pair => pair.Ratio == 1),
             pairs.Count(pair => pair.Ratio < 1),
             pairs.Count(pair => pair.Ratio > 1),
-            Quantile(0.10),
-            Quantile(0.25),
-            Quantile(0.50),
-            Quantile(0.75),
-            Quantile(0.90));
+            Quantile(0.10, RateStatistics.MinimumForFullStats),
+            Quantile(0.25, RateStatistics.MinimumForBasicStats),
+            Quantile(0.50, RateStatistics.MinimumForBasicStats),
+            Quantile(0.75, RateStatistics.MinimumForBasicStats),
+            Quantile(0.90, RateStatistics.MinimumForFullStats));
     }
+
+    private static int ProvidersIn(IEnumerable<Pair> pairs) => pairs.Select(pair => pair.Row.ProviderKey).Distinct(StringComparer.Ordinal).Count();
 
     /// <summary>Every sort ends on code, provider and group, so equal ratios keep one order and pages never overlap.</summary>
     private static IEnumerable<Pair> Sort(IEnumerable<Pair> pairs, string sort)
@@ -179,7 +206,7 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
         {
             "ratio" => pairs.OrderBy(pair => pair.Ratio),
             "-ratio" => pairs.OrderByDescending(pair => pair.Ratio),
-            _ => pairs.OrderByDescending(pair => InsightMath.Distance(pair.Ratio)),
+            _ => pairs.OrderByDescending(pair => InsightMath.Distance(pair.Row.ProductValue, pair.Row.VersusValue)),
         };
         return sorted
             .ThenByDescending(pair => Math.Abs(pair.Row.ProductValue - pair.Row.VersusValue))
@@ -214,6 +241,7 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
             row.VersusValue,
             RateStatistics.Ratio(row.ProductValue, row.VersusValue)!.Value,
             row.ProductValue - row.VersusValue,
+            row.ProductValue == row.VersusValue,
             InsightSupport.SearchLink(snapshot, row.CodeType, row.Code, row.ProductGroupKey, row.ProviderKey),
             InsightSupport.SearchLink(snapshot, row.CodeType, row.Code, row.VersusGroupKey, row.ProviderKey));
     }

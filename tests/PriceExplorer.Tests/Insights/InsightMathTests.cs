@@ -62,11 +62,13 @@ public sealed class InsightMathTests
     }
 
     [Fact]
-    public void Half_and_double_are_equally_far_from_the_same_rate()
+    public void Two_rates_are_as_far_apart_whichever_way_round_they_come()
     {
-        InsightMath.Distance(0.5m).Should().Be(InsightMath.Distance(2m));
-        InsightMath.Distance(1m).Should().Be(1m);
-        InsightMath.Distance(0.9m).Should().BeGreaterThan(InsightMath.Distance(1.1m), "10% lower is 1.11× apart, 10% higher 1.10×");
+        InsightMath.Distance(50m, 100m).Should().Be(InsightMath.Distance(100m, 50m)).And.Be(2m);
+        InsightMath.Distance(80m, 80m).Should().Be(1m);
+        // A mirror-image pair from the real files: inverting a rounded ratio made these differ, so their tie-break was skipped.
+        InsightMath.Distance(94.5m, 136.91m).Should().Be(InsightMath.Distance(136.91m, 94.5m));
+        InsightMath.Distance(90m, 100m).Should().BeGreaterThan(InsightMath.Distance(110m, 100m), "10% lower is 1.11× apart, 10% higher 1.10×");
     }
 
     [Fact]

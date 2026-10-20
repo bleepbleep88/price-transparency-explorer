@@ -16,7 +16,8 @@ namespace PriceExplorer.Api.Core.Queries.Insights;
 /// <param name="Code">Optional billing code as typed ("45378", "0490", "812").</param>
 /// <param name="IncludeFacilityCharges">Also rank charges filed under a revenue code with no procedure named (RC 0360
 /// "Operating room"). Off by default: hospitals bundle different services under them, so they don't compare like for like.</param>
-/// <param name="Sort">gap (largest gap to the lower quartile first; the default) | spread (largest 90th ÷ 10th percentile first).</param>
+/// <param name="Sort">gap (largest gap to the lower quartile first; the default) | spread (largest 90th ÷ 10th percentile
+/// first) | range (largest 90th − 10th percentile, in dollars, first). Groups with no gap are never ranked.</param>
 /// <param name="Snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
 public sealed record GetGapLeaderboardQuery(
     string? Product = null,
@@ -33,7 +34,11 @@ public sealed record GetGapLeaderboardQuery(
 /// <summary>One provider (tax ID) across every comparison group it has a rate in, with its price index.</summary>
 /// <param name="Provider">Required. An EIN (11-3471596) or a provider key from results.</param>
 /// <param name="Snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
-public sealed record GetProviderScorecardQuery(string? Provider = null, int? Snapshot = null) : IRequest<ProviderScorecard>, IRequiresData;
+/// <param name="IncludeFacilityCharges">Also count charges filed under a revenue code with no procedure named in the
+/// price index and the highest and lowest lists. Off by default: they don't compare like for like. They're always in
+/// the list of groups.</param>
+public sealed record GetProviderScorecardQuery(string? Provider = null, int? Snapshot = null, bool IncludeFacilityCharges = false)
+    : IRequest<ProviderScorecard>, IRequiresData;
 
 /// <summary>
 /// The same provider in the same comparison group under two products: product ÷ versus. Without products, the
@@ -44,6 +49,8 @@ public sealed record GetProviderScorecardQuery(string? Provider = null, int? Sna
 /// <param name="Code">Optional billing code as typed ("45378", "0490", "812").</param>
 /// <param name="Category">Optional category of service key, e.g. "surgery" (the response lists the keys).</param>
 /// <param name="Setting">Optional care setting key, e.g. "asc".</param>
+/// <param name="IncludeFacilityCharges">Also compare charges filed under a revenue code with no procedure named. Off by
+/// default: they don't compare like for like.</param>
 /// <param name="Sort">difference (biggest difference either way first; the default) | ratio (lowest first) | -ratio (highest first).</param>
 /// <param name="Snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
 public sealed record GetProductComparisonQuery(
@@ -52,6 +59,7 @@ public sealed record GetProductComparisonQuery(
     string? Code = null,
     string? Category = null,
     string? Setting = null,
+    bool IncludeFacilityCharges = false,
     string? Sort = null,
     int? Snapshot = null,
     int Page = 1,
@@ -91,7 +99,7 @@ internal static partial class InsightInput
 
 public sealed class GetGapLeaderboardQueryValidator : AbstractValidator<GetGapLeaderboardQuery>
 {
-    public static readonly string[] Sorts = ["gap", "spread"];
+    public static readonly string[] Sorts = ["gap", "spread", "range"];
 
     public GetGapLeaderboardQueryValidator(ReferenceCatalog catalog)
     {

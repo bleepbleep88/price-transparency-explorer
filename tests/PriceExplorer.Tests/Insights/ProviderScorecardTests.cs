@@ -52,6 +52,37 @@ public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassF
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task Facility_charges_with_no_procedure_named_stay_listed_but_count_only_when_asked_for()
+    {
+        // H30: RC 0360 at 1000 (typical 1450) and CPT 99215 at 100 (typical 100).
+        var plain = await GetAsync($"/api/v1/insights/scorecard?provider={Key(30)}", TestContext.Current.CancellationToken);
+        var all = await GetAsync($"/api/v1/insights/scorecard?provider={Key(30)}&includeFacilityCharges=true", TestContext.Current.CancellationToken);
+
+        plain.GetProperty("facilityCharges").GetInt32().Should().Be(1);
+        plain.GetProperty("index").GetProperty("groupsCounted").GetInt32().Should().Be(1);
+        plain.GetProperty("lowest").GetArrayLength().Should().Be(0);
+        plain.GetProperty("notes").EnumerateArray().Single().GetString().Should().StartWith("1 group of facility charges");
+        plain.GetProperty("groups").EnumerateArray().Where(group => group.GetProperty("facilityCharge").GetBoolean())
+            .Select(group => group.GetProperty("code").GetString()).Should().Equal("0360", "0360");
+
+        all.GetProperty("includeFacilityCharges").GetBoolean().Should().BeTrue();
+        all.GetProperty("index").GetProperty("groupsCounted").GetInt32().Should().Be(2);
+        all.GetProperty("lowest").EnumerateArray().Single().GetProperty("code").GetString().Should().Be("0360");
+        all.GetProperty("notes").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_price_within_5_percent_of_typical_is_never_listed_as_most_above_or_below()
+    {
+        // H36: 99215 at $104 against a typical $100 is "high" by position but only 4% above typical.
+        var scorecard = await GetAsync($"/api/v1/insights/scorecard?provider={Key(36)}", TestContext.Current.CancellationToken);
+
+        scorecard.GetProperty("highest").GetArrayLength().Should().Be(0);
+        scorecard.GetProperty("groups").EnumerateArray().Single(group => group.GetProperty("code").GetString() == "99215")
+            .GetProperty("band").GetString().Should().Be("high");
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task The_provider_is_named_with_its_npis_products_and_whole_tax_id_contracts()
     {
         var a03 = (await GetAsync($"/api/v1/insights/scorecard?provider={Key(3)}", TestContext.Current.CancellationToken)).GetProperty("provider");

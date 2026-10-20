@@ -54,7 +54,49 @@ public sealed class GapLeaderboardTests(InsightsApiFactory factory) : IClassFixt
         first.GetProperty("codeName").GetString().Should().Be("Operating room");
         Keys(all).Should().HaveCount(5);
         Categories(all).Should().Contain(("facility", 1));
-        all.GetProperty("notes").GetArrayLength().Should().Be(1);
+        all.GetProperty("notes").EnumerateArray().Select(note => note.GetString())
+            .Should().NotContain(note => note!.Contains("facility charges", StringComparison.Ordinal));
+    }
+
+    [Theory(Timeout = 60_000)]
+    [InlineData("category=drugs", 0)]
+    [InlineData("category=surgery", 0)]
+    [InlineData("category=facility", 1)]
+    [InlineData("setting=office", 0)]
+    public async Task The_facility_charge_count_is_what_including_them_would_add_under_every_filter(string filter, int count)
+    {
+        var plain = await GetAsync($"/api/v1/insights/gaps?{filter}", TestContext.Current.CancellationToken);
+        var all = await GetAsync($"/api/v1/insights/gaps?{filter}&includeFacilityCharges=true", TestContext.Current.CancellationToken);
+
+        plain.GetProperty("facilityCharges").GetInt32().Should().Be(count);
+        (all.GetProperty("rows").GetProperty("total").GetInt32() - plain.GetProperty("rows").GetProperty("total").GetInt32()).Should().Be(count);
+        plain.GetProperty("notes").EnumerateArray().Select(note => note.GetString())
+            .Count(note => note!.Contains("facility charges", StringComparison.Ordinal)).Should().Be(count > 0 ? 1 : 0);
+    }
+
+    [Theory(Timeout = 60_000)]
+    [InlineData("gap")]
+    [InlineData("spread")]
+    [InlineData("range")]
+    public async Task Groups_where_the_lower_priced_quarter_get_the_typical_price_are_never_ranked(string sort)
+    {
+        var result = await GetAsync($"/api/v1/insights/gaps?sort={sort}", TestContext.Current.CancellationToken);
+
+        // CPT 99215 for H30–H39: 100 for six, 104 for four, so the lower-priced quarter get the typical price.
+        Keys(result).Should().NotContain(key => key.Contains("|99215|", StringComparison.Ordinal));
+        Items(result).Should().OnlyContain(row => row.GetProperty("lowerQuartileGap").GetDecimal() > 0);
+        result.GetProperty("noDifference").GetInt32().Should().Be(1);
+        result.GetProperty("notes").EnumerateArray().Select(note => note.GetString())
+            .Should().Contain(note => note!.StartsWith("1 group where the lower-priced quarter of providers get the typical price", StringComparison.Ordinal));
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task Range_ranks_by_how_many_dollars_most_providers_prices_span()
+    {
+        var result = await GetAsync("/api/v1/insights/gaps?sort=range", TestContext.Current.CancellationToken);
+
+        // 90th − 10th: 930 − 445, 159 − 91, 147 − 80, 11.10 − 1.90.
+        Keys(result).Should().Equal(AmbetterColonoscopy, AmbetterVisit, EssentialVisit, AmbetterBotox);
     }
 
     [Fact(Timeout = 60_000)]
@@ -76,6 +118,7 @@ public sealed class GapLeaderboardTests(InsightsApiFactory factory) : IClassFixt
     [InlineData("code=CPT%2099213&product=ambetter-from-fidelis-care", new[] { "ambetter-from-fidelis-care|CPT|99213|professional|office||negotiated" })]
     [InlineData("code=j0585", new[] { "ambetter-from-fidelis-care|HCPCS|J0585|professional|office||negotiated" })]
     [InlineData("code=99214", new string[0])]
+    [InlineData("code=99215", new string[0])]
     public async Task Filters_narrow_the_ranking(string filter, string[] keys)
     {
         var result = await GetAsync($"/api/v1/insights/gaps?{filter}", TestContext.Current.CancellationToken);
@@ -144,7 +187,7 @@ public sealed class GapLeaderboardTests(InsightsApiFactory factory) : IClassFixt
     }
 
     [Theory(Timeout = 60_000)]
-    [InlineData("sort=savings", "sort")]
+    [InlineData("sort=widest", "sort")]
     [InlineData("feeType=institutional", "feeType")]
     [InlineData("setting=moon", "setting")]
     [InlineData("product=Essential%20Plan", "product")]

@@ -39,6 +39,8 @@ internal static class InsightFiles
     //   CPT 99214 office: A01, A02, T (a list group); J0585 hospital outpatient, billed per unit: A01 at 10
     //   RC 0360 billed directly (no procedure named) at hospital outpatient departments, hospitals H30–H39:
     //                                     1000 1100 … 1900 → p10 1090, p25 1225, median 1450, p90 1810, gap 225
+    //   CPT 99215 office, H30–H39: 100 ×6, 104 ×4 → p25 = median = 100: no gap, so never ranked; H36 at 104 is "high"
+    //                                     but within 5% of typical
     public static readonly string AmbetterFile = File(
         [
             .. Enumerable.Range(1, 12).Select(provider => Reference(provider, "ein", Key(provider), Name(provider), provider switch
@@ -57,6 +59,7 @@ internal static class InsightFiles
             .. Rates("CPT", "99214", Office, (1, 150), (2, 160), (13, 170)),
             .. Rates("HCPCS", "J0585", rate => HospitalOutpatient(rate), (1, 10)),
             .. Rates("RC", "0360", rate => HospitalOutpatient(rate), [.. Enumerable.Range(0, 10).Select(i => (30 + i, 1000m + (100m * i)))]),
+            .. Rates("CPT", "99215", Office, [.. Enumerable.Range(0, 10).Select(i => (30 + i, i < 6 ? 100m : 104m))]),
         ]);
 
     // Essential Plan:
@@ -65,16 +68,19 @@ internal static class InsightFiles
     //     against Ambetter: same ×5 (A01 A02 A03 A07 A09), A04 0.9, A05 0.5, A06 1.1, A08 2.0, A10 0.98
     //   CPT 45378 under RC 0490 at a surgery center, A01–A05: the same rates as Ambetter
     //   J0585 named in an RC 0490 hospital outpatient line for A01: a facility charge, so not comparable with Ambetter's unit price
+    //   RC 0360 billed directly for H30 at 1100 (Ambetter 1000): a pair of facility charges with no procedure named
     public static readonly string EssentialFile = File(
         [
             .. Enumerable.Range(1, 10).Select(provider =>
                 Reference(provider, "ein", Key(provider), Name(provider), Npi(provider), Npi(100 + provider))),
             Reference(20, "ein", MaskedEin, "Masked Solo Practice", Npi(300)),
+            Reference(30, "ein", Key(30), "Hospital H30", Npi(30)),
         ],
         [
             .. Rates("CPT", "99213", Office, (1, 80), (2, 90), (3, 100), (4, 90), (5, 50), (6, 121), (7, 120), (8, 260), (9, 140), (10, 147), (20, 100)),
             .. Rates("RC", "0490", rate => SurgeryCenter(rate, "45378"), (1, 400), (2, 450), (3, 500), (4, 550), (5, 600)),
             .. Rates("RC", "0490", rate => HospitalOutpatient(rate, "J0585"), (1, 550)),
+            .. Rates("RC", "0360", rate => HospitalOutpatient(rate), (30, 1100)),
         ]);
 
     public static string Name(int provider) => $"Clinic A{provider:00}";

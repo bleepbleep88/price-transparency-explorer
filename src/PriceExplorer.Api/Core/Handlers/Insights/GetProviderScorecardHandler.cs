@@ -56,32 +56,39 @@ internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connec
             .ThenBy(group => group.GroupKey, StringComparer.Ordinal)
             .ToList();
 
+        // The index and the lists compare like for like: facility charges with no procedure named stay in the groups but
+        // are left out of them unless asked for (InsightSupport.IsFacilityChargeOnly).
         var withMedian = groups.Where(group => group.Median is > 0).ToList();
+        var facilityCharges = withMedian.Count(group => group.FacilityCharge);
+        var compared = request.IncludeFacilityCharges ? withMedian : withMedian.Where(group => !group.FacilityCharge).ToList();
         var index = new PriceIndex(
-            InsightMath.PriceIndex(groups.Select(group => group.VsMedian)),
-            withMedian.Count,
+            InsightMath.PriceIndex(compared.Select(group => group.VsMedian)),
+            compared.Count,
             groups.Count,
             InsightMath.MinimumGroupsForIndex,
             RateStatistics.MinimumForBasicStats,
-            withMedian.Count(group => group.Value < group.Median),
-            withMedian.Count(group => group.Value == group.Median),
-            withMedian.Count(group => group.Value > group.Median));
+            compared.Count(group => group.Value < group.Median),
+            compared.Count(group => group.Value == group.Median),
+            compared.Count(group => group.Value > group.Median));
 
-        // Furthest from the median by the exact ratio; ties go to the bigger group, then the group key.
-        var highest = withMedian.Where(group => group.Value > group.Median)
+        // Furthest from the median by the exact ratio; ties go to the bigger group, then the group key. Within 5% the page
+        // says "about the same as typical", so those never count as most above or below.
+        var highest = compared.Where(group => group.Value >= group.Median!.Value * (1 + InsightMath.AboutTheSame))
             .OrderByDescending(group => group.Value / group.Median!.Value)
             .ThenByDescending(group => group.ProviderCount)
             .ThenBy(group => group.GroupKey, StringComparer.Ordinal)
             .Take(Extremes)
             .ToList();
-        var lowest = withMedian.Where(group => group.Value < group.Median)
+        var lowest = compared.Where(group => group.Value <= group.Median!.Value * (1 - InsightMath.AboutTheSame))
             .OrderBy(group => group.Value / group.Median!.Value)
             .ThenByDescending(group => group.ProviderCount)
             .ThenBy(group => group.GroupKey, StringComparer.Ordinal)
             .Take(Extremes)
             .ToList();
 
-        return new ProviderScorecard(statistics, Describe(providerKey, who, rows), index, highest, lowest, groups);
+        return new ProviderScorecard(
+            statistics, Describe(providerKey, who, rows), index, highest, lowest, groups, request.IncludeFacilityCharges, facilityCharges,
+            !request.IncludeFacilityCharges && facilityCharges > 0 ? [InsightSupport.FacilityChargesLeftOut(facilityCharges, "group")] : []);
     }
 
     private ScorecardGroup Place(
@@ -117,6 +124,7 @@ internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connec
             Percentile: basic ? RateStatistics.PercentRank(peerValues!, row.Value, row.Value) : null,
             VsMedian: RateStatistics.Ratio(row.Value, row.Median),
             Band: basic && row is { P25: { } p25, Median: { } median, P75: { } p75 } ? RateStatistics.Band(row.Value, p25, median, p75) : null,
+            FacilityCharge: InsightSupport.IsFacilityChargeOnly(row.CodeType),
             Search: InsightSupport.SearchLink(snapshot, row.CodeType, row.Code, row.GroupKey, providerKey));
     }
 

@@ -15,6 +15,19 @@ namespace PriceExplorer.Api.Core.Handlers.Insights;
 internal static class InsightSupport
 {
     /// <summary>
+    /// A charge filed under a revenue code with no procedure named (RC 0360 "Operating room") covers whatever each
+    /// hospital bundles under it, so it doesn't compare like for like (decision 89). Every insight leaves these out of its
+    /// rankings, readings and summaries unless asked to include them.
+    /// </summary>
+    public static bool IsFacilityChargeOnly(string codeType) => codeType == BillingCodes.RevenueCode;
+
+    /// <summary>The note every insight adds when it left facility charges with no procedure named out.</summary>
+    public static string FacilityChargesLeftOut(int count, string what) =>
+        $"{(count == 1 ? $"1 {what}" : $"{count:N0} {what}s")} of facility charges filed under a revenue code with no procedure named " +
+        $"{(count == 1 ? "is" : "are")} left out: hospitals bundle different services under them, so they don't compare like for like. " +
+        "Ask with includeFacilityCharges=true to include them.";
+
+    /// <summary>
     /// Which saved statistics an insight reads, and whether they're current by the statistics' own rule
     /// (<see cref="SavedStatistics"/>: built from the rate files saved now, by this build, with no rate expired since).
     /// Read in the handler's transaction, so the flag and the rows describe the same moment.

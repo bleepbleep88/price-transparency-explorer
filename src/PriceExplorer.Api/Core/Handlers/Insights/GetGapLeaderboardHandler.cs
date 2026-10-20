@@ -46,12 +46,19 @@ internal sealed class GetGapLeaderboardHandler(DuckDbConnectionFactory connectio
             .Select(group => (Group: group, Category: ServiceCategories.Classify(group.CodeType, group.Code)))
             .ToList();
 
-        // A charge filed under a revenue code with no procedure named covers whatever each hospital bundles under it
-        // (RC 0360 "Operating room"), so ranking those against each other misleads. They're left out unless asked for.
-        var facilityCharges = groups.Count(entry => entry.Group.CodeType == BillingCodes.RevenueCode);
+        // Only groups where the lower-priced quarter really get less than typical are ranked: in a group with no gap
+        // (often a fee schedule) there's no difference to show, under either order.
+        var differ = groups.Where(entry => entry.Group.LowerQuartileGap > 0).ToList();
+        bool InCategory((GapGroupRow Group, ServiceCategory Category) entry) => category is null || entry.Category.Key == category;
+
+        // Facility charges with no procedure named are left out unless asked for (InsightSupport.IsFacilityChargeOnly).
+        // The count is what including them would add under every filter, the category included.
+        var facilityCharges = differ.Count(entry => InsightSupport.IsFacilityChargeOnly(entry.Group.CodeType) && InCategory(entry));
         var comparable = request.IncludeFacilityCharges
-            ? groups
-            : groups.Where(entry => entry.Group.CodeType != BillingCodes.RevenueCode).ToList();
+            ? differ
+            : differ.Where(entry => !InsightSupport.IsFacilityChargeOnly(entry.Group.CodeType)).ToList();
+        var noDifference = groups.Count(entry => entry.Group.LowerQuartileGap <= 0 && InCategory(entry)
+            && (request.IncludeFacilityCharges || !InsightSupport.IsFacilityChargeOnly(entry.Group.CodeType)));
 
         // Each category's count is under the other filters, so the reader sees what picking it would leave.
         var categories = comparable
@@ -61,7 +68,7 @@ internal sealed class GetGapLeaderboardHandler(DuckDbConnectionFactory connectio
             .ThenBy(option => option.Label, StringComparer.Ordinal)
             .ToList();
 
-        var ranked = Rank(comparable.Where(entry => category is null || entry.Category.Key == category), sort).ToList();
+        var ranked = Rank(comparable.Where(InCategory), sort).ToList();
         var skip = (long)(request.Page - 1) * request.PageSize;
         var page = skip >= ranked.Count ? [] : ranked.Skip((int)skip).Take(request.PageSize).ToList();
         var names = await InsightSupport.CodeNamesAsync(connection, snapshot.SnapshotId, page.Select(entry => entry.Group.Code), transaction);
@@ -101,21 +108,40 @@ internal sealed class GetGapLeaderboardHandler(DuckDbConnectionFactory connectio
             RateStatistics.MinimumForFullStats,
             categories,
             facilityCharges,
+            noDifference,
             new GapRowsPage(ranked.Count, request.Page, request.PageSize, rows),
-            request.IncludeFacilityCharges || facilityCharges == 0 ? [NoClaimCounts] : [NoClaimCounts, FacilityChargesLeftOut(facilityCharges)]);
+            Notes(request.IncludeFacilityCharges ? 0 : facilityCharges, noDifference));
     }
 
-    private static string FacilityChargesLeftOut(int count) =>
-        $"{(count == 1 ? "1 group of facility charges" : $"{count:N0} groups of facility charges")} filed under a revenue code with " +
-        "no procedure named are left out: hospitals bundle different services under them, so they don't compare like for like. " +
-        "Ask with includeFacilityCharges=true to rank them too.";
+    private static List<string> Notes(int facilityChargesLeftOut, int noDifference)
+    {
+        var notes = new List<string> { NoClaimCounts };
+        if (facilityChargesLeftOut > 0)
+        {
+            notes.Add(InsightSupport.FacilityChargesLeftOut(facilityChargesLeftOut, "group"));
+        }
 
-    /// <summary>Largest first. Ties go to the group with more providers, then the group key, so pages never overlap.</summary>
+        if (noDifference > 0)
+        {
+            notes.Add($"{(noDifference == 1 ? "1 group" : $"{noDifference:N0} groups")} where the lower-priced quarter of providers get the " +
+                "typical price (no gap to the lower quartile) " + (noDifference == 1 ? "is" : "are") + " not ranked: there's no difference to show.");
+        }
+
+        return notes;
+    }
+
+    /// <summary>
+    /// Largest first: the gap to the lower quartile (gap), the 90th ÷ 10th percentile (spread), or the 90th − 10th
+    /// percentile in dollars (range). Ties go to the group with more providers, then the group key, so pages never overlap.
+    /// </summary>
     private static IEnumerable<(GapGroupRow Group, ServiceCategory Category)> Rank(
         IEnumerable<(GapGroupRow Group, ServiceCategory Category)> groups, string sort) =>
-        (sort == "spread"
-            ? groups.OrderByDescending(entry => entry.Group.P90ToP10).ThenByDescending(entry => entry.Group.LowerQuartileGap)
-            : groups.OrderByDescending(entry => entry.Group.LowerQuartileGap).ThenByDescending(entry => entry.Group.P90ToP10))
+        (sort switch
+        {
+            "spread" => groups.OrderByDescending(entry => entry.Group.P90ToP10).ThenByDescending(entry => entry.Group.LowerQuartileGap),
+            "range" => groups.OrderByDescending(entry => entry.Group.P90 - entry.Group.P10).ThenByDescending(entry => entry.Group.LowerQuartileGap),
+            _ => groups.OrderByDescending(entry => entry.Group.LowerQuartileGap).ThenByDescending(entry => entry.Group.P90ToP10),
+        })
         .ThenByDescending(entry => entry.Group.ProviderCount)
         .ThenBy(entry => entry.Group.GroupKey, StringComparer.Ordinal);
 

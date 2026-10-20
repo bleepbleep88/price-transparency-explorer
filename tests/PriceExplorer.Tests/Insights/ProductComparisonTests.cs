@@ -77,6 +77,50 @@ public sealed class ProductComparisonTests(InsightsApiFactory factory) : IClassF
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task Facility_charge_pairs_are_left_out_unless_asked_for_and_counted_under_every_filter()
+    {
+        var plain = await GetAsync("/api/v1/insights/compare", TestContext.Current.CancellationToken);
+        var all = await GetAsync("/api/v1/insights/compare?includeFacilityCharges=true", TestContext.Current.CancellationToken);
+        var surgery = await GetAsync("/api/v1/insights/compare?category=surgery", TestContext.Current.CancellationToken);
+
+        plain.GetProperty("facilityCharges").GetInt32().Should().Be(1);
+        plain.GetProperty("summary").GetProperty("pairs").GetInt32().Should().Be(15);
+        plain.GetProperty("notes").EnumerateArray().Select(note => note.GetString())
+            .Should().Contain(note => note!.StartsWith("1 pair of facility charges", StringComparison.Ordinal));
+        all.GetProperty("query").GetProperty("includeFacilityCharges").GetBoolean().Should().BeTrue();
+        all.GetProperty("summary").GetProperty("pairs").GetInt32().Should().Be(16);
+        surgery.GetProperty("facilityCharges").GetInt32().Should().Be(0, "a facility charge is never surgery");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task Figures_need_5_providers_and_the_10_to_90_range_needs_10()
+    {
+        var five = (await GetAsync("/api/v1/insights/compare?setting=asc", TestContext.Current.CancellationToken)).GetProperty("summary");
+        var one = await GetAsync("/api/v1/insights/compare?code=RC%200360&includeFacilityCharges=true", TestContext.Current.CancellationToken);
+
+        (five.GetProperty("providers").GetInt32(), five.GetProperty("median").GetDecimal()).Should().Be((5, 1m));
+        five.GetProperty("p10").ValueKind.Should().Be(JsonValueKind.Null);
+        five.GetProperty("p90").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var summary = one.GetProperty("summary");
+        summary.GetProperty("pairs").GetInt32().Should().Be(1);
+        new[] { "p10", "p25", "median", "p75", "p90" }.Should().OnlyContain(name => summary.GetProperty(name).ValueKind == JsonValueKind.Null);
+        var category = one.GetProperty("byCategory").EnumerateArray().Single();
+        (category.GetProperty("providers").GetInt32(), category.GetProperty("median").ValueKind).Should().Be((1, JsonValueKind.Null));
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_pair_says_same_only_when_the_two_rates_are_equal()
+    {
+        var result = await GetAsync("/api/v1/insights/compare?pageSize=100", TestContext.Current.CancellationToken);
+
+        result.GetProperty("pairs").GetProperty("items").EnumerateArray()
+            .Should().OnlyContain(pair => pair.GetProperty("same").GetBoolean() == (pair.GetProperty("productValue").GetDecimal() == pair.GetProperty("versusValue").GetDecimal()));
+        result.GetProperty("pairs").GetProperty("items").EnumerateArray().Count(pair => pair.GetProperty("same").GetBoolean())
+            .Should().Be(result.GetProperty("summary").GetProperty("identical").GetInt32());
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task Pairs_priced_in_different_units_are_left_out_and_the_notes_say_so()
     {
         var result = await GetAsync("/api/v1/insights/compare?code=J0585", TestContext.Current.CancellationToken);

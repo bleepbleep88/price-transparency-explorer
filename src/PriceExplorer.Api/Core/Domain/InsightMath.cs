@@ -21,11 +21,21 @@ internal static class InsightMath
         return ratios.Count >= MinimumGroupsForIndex ? RateStatistics.Median(ratios) : null;
     }
 
+    /// <summary>
+    /// Within this share of the typical price the pages say "about the same as typical" (web/src/lib/plainNumbers.ts,
+    /// ABOUT_THE_SAME), so a scorecard's most-above and most-below lists only hold groups at least this far away.
+    /// </summary>
+    public const decimal AboutTheSame = 0.05m;
+
     /// <summary>product ÷ versus, unrounded; null when versus isn't above zero.</summary>
     public static decimal? ExactRatio(decimal product, decimal versus) => versus > 0 ? product / versus : null;
 
-    /// <summary>How far a ratio is from 1 in either direction: 0.5 and 2 are equally far (2); 1 isn't far at all (1).</summary>
-    public static decimal Distance(decimal ratio) => ratio >= 1 ? ratio : 1 / ratio;
+    /// <summary>
+    /// How far apart two rates are in either direction: the higher ÷ the lower (1 when equal), so $50 against $100 and
+    /// $100 against $50 are equally far. Worked out from the rates, not by inverting a rounded ratio, so mirror-image
+    /// pairs tie exactly. Both rates must be above zero.
+    /// </summary>
+    public static decimal Distance(decimal a, decimal b) => Math.Max(a, b) / Math.Min(a, b);
 
     /// <summary>The bands of product ÷ versus, lowest first. A band's edge belongs to the band further from 1.</summary>
     public static readonly IReadOnlyList<Band> Bands =
