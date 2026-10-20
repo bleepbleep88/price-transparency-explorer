@@ -49,7 +49,7 @@ internal static partial class ProviderDirectoryBuilder
         var counties = ReadZipCounties(zipCounties);
         Console.WriteLine($"NUCC taxonomy codes: {taxonomy.Count:N0}; ZIP codes mapped to counties: {counties.Count:N0}");
 
-        var providers = ReadNppes(nppesZip, npis, taxonomy, counties);
+        var providers = FillCountiesFromCities(ReadNppes(nppesZip, npis, taxonomy, counties));
         Console.WriteLine($"Matched {providers.Count:N0} of {npis.Count:N0} NPIs ({providers.Count * 100.0 / Math.Max(1, npis.Count):F1}%)");
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
@@ -211,6 +211,7 @@ internal static partial class ProviderDirectoryBuilder
             City = Column("Provider Business Practice Location Address City Name"),
             State = Column("Provider Business Practice Location Address State Name"),
             Postal = Column("Provider Business Practice Location Address Postal Code"),
+            Country = Column("Provider Business Practice Location Address Country Code (If outside U.S.)"),
             Deactivated = Column("NPI Deactivation Date"),
             Reactivated = Column("NPI Reactivation Date"),
             Updated = Column("Last Update Date"),
@@ -239,7 +240,9 @@ internal static partial class ProviderDirectoryBuilder
                 ?? "";
             var (specialty, group) = taxonomy.TryGetValue(taxonomyCode, out var found) ? found : ("", "");
             var zip5 = Field(columns.Postal) is { Length: >= 5 } postal ? postal[..5] : "";
-            var (countyFips, countyName) = counties.TryGetValue(zip5, out var county) ? county : ("", "");
+            // A practice outside the US has a foreign postal code, which may look like a US ZIP (Rota, Spain: 11530).
+            var abroad = Field(columns.Country) is { Length: > 0 } country && country != "US";
+            var (countyFips, countyName) = !abroad && counties.TryGetValue(zip5, out var county) ? county : ("", "");
             // Deactivated NPIs keep only their number and dates in the registry, so their entity type is blank.
             var entityType = Field(columns.EntityType) switch
             {
@@ -273,6 +276,49 @@ internal static partial class ProviderDirectoryBuilder
         Console.WriteLine($"  {lines:N0} registry rows read in total");
         return result;
     }
+
+    /// <summary>
+    /// The Census ZIP file has no unique or PO-box ZIPs (Roswell Park's 14263), and a ZIP from another state can't hold
+    /// this address's county (Valhalla, NY at 22033). Such a record takes the county that 90% or more of the same city's
+    /// other NPIs share, when one does. Otherwise it keeps the ZIP's county: "Liverpool, NJ" at 13090 is a state typo for
+    /// Liverpool, NY, and the ZIP is right.
+    /// </summary>
+    private static List<ProviderRecord> FillCountiesFromCities(List<ProviderRecord> providers)
+    {
+        bool ZipFitsState(ProviderRecord p) =>
+            p.CountyFips.Length == 5 && StateFips.TryGetValue(p.State, out var fips) && p.CountyFips.StartsWith(fips, StringComparison.Ordinal);
+
+        var cityCounties = providers
+            .Where(ZipFitsState)
+            .GroupBy(p => (City: p.City.ToLowerInvariant(), p.State))
+            .Select(city =>
+            {
+                var top = city.GroupBy(p => (p.CountyFips, p.County, p.Borough)).MaxBy(county => county.Count())!;
+                return (city.Key, County: top.Key, Share: top.Count() / (double)city.Count());
+            })
+            .Where(city => city.Share >= 0.9)
+            .ToDictionary(city => city.Key, city => city.County);
+
+        return providers.Select(p =>
+        {
+            var misplaced = p.CountyFips.Length == 0 || (StateFips.ContainsKey(p.State) && !ZipFitsState(p));
+            return misplaced && p.City.Length > 0 && cityCounties.TryGetValue((p.City.ToLowerInvariant(), p.State), out var county)
+                ? p with { CountyFips = county.CountyFips, County = county.County, Borough = county.Borough }
+                : p;
+        }).ToList();
+    }
+
+    /// <summary>US states, DC and territories: USPS code to Census state FIPS code.</summary>
+    private static readonly Dictionary<string, string> StateFips = new(StringComparer.Ordinal)
+    {
+        ["AL"] = "01", ["AK"] = "02", ["AZ"] = "04", ["AR"] = "05", ["CA"] = "06", ["CO"] = "08", ["CT"] = "09", ["DE"] = "10",
+        ["DC"] = "11", ["FL"] = "12", ["GA"] = "13", ["HI"] = "15", ["ID"] = "16", ["IL"] = "17", ["IN"] = "18", ["IA"] = "19",
+        ["KS"] = "20", ["KY"] = "21", ["LA"] = "22", ["ME"] = "23", ["MD"] = "24", ["MA"] = "25", ["MI"] = "26", ["MN"] = "27",
+        ["MS"] = "28", ["MO"] = "29", ["MT"] = "30", ["NE"] = "31", ["NV"] = "32", ["NH"] = "33", ["NJ"] = "34", ["NM"] = "35",
+        ["NY"] = "36", ["NC"] = "37", ["ND"] = "38", ["OH"] = "39", ["OK"] = "40", ["OR"] = "41", ["PA"] = "42", ["RI"] = "44",
+        ["SC"] = "45", ["SD"] = "46", ["TN"] = "47", ["TX"] = "48", ["UT"] = "49", ["VT"] = "50", ["VA"] = "51", ["WA"] = "53",
+        ["WV"] = "54", ["WI"] = "55", ["WY"] = "56", ["AS"] = "60", ["GU"] = "66", ["MP"] = "69", ["PR"] = "72", ["VI"] = "78",
+    };
 
     private static bool TryReadLeadingNpi(string line, out long npi)
     {
