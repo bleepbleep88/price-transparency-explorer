@@ -52,7 +52,8 @@ const isCurrent = (item: { names: string[] }) => item.names.includes(String(rout
       </nav>
 
       <template #append>
-        <SnapshotPicker />
+        <!-- Sources lists every file, so there's nothing to pick there. -->
+        <SnapshotPicker v-if="route.name !== 'sources'" />
         <DataStatusChip class="me-2" />
         <!-- Below the large breakpoint the pages sit in a menu, so the app bar fits a phone. -->
         <v-menu location="bottom end">

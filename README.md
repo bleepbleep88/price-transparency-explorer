@@ -116,7 +116,7 @@ Three monthly files are loaded. The snapshot picker in the app bar switches ever
 
 - **Changes** (`/changes`): the same provider (tax ID) in the same comparison group, between two files. The page says a rate went up or down (in dollars and percent), is new (only in the newer file) or is gone (only in the older one); the API calls these changed, new and dropped. Providers are matched on their tax ID key, never on `provider_group_id`, which the payer renumbers every month. A change means the file lists a different rate. It isn't a claim, and the files don't say how often a service is used.
 - **Listed differently**: a quarter (July to August) to two fifths (August to September) of new and dropped rates are the same provider and code under other modifiers or another setting. Centene reshuffles telehealth modifiers (`95,GQ,GT` becomes `95,GT`). These are marked, and a switch hides them.
-- **Trends**: each group card draws its typical price (the median) across the files, the range most providers get (10th to 90th percentile, from 10 providers) and, with an NPI or EIN, that provider's own rate, with the same numbers in words ("The typical price went from $573 (Jul 27) to $569 (Sep 28): down $4 (under 1%).", worked out from the figures as the card shows them). The trend runs the search itself in each month, so every point equals that month's card.
+- **Trends**: each group card draws its typical price (the median) across the files, the range most providers get (10th to 90th percentile, from 10 providers) and, with an NPI or EIN, that provider's own rate, with the same numbers in words, worked out from the figures as the card shows them. With three files each one is named, so the file on screen is never skipped ("The typical price was $573 (Jul 27), $578 (Aug 31) and $569 (Sep 28)."). The line also says why it moved: how many providers listed in both files got a higher or a lower rate, and how many left or joined; when none changed their rate it says the typical price moved only because different providers are listed. A card names the provider it follows ("The rate for PM Pediatrics ..."); only the providers lens says "your rate". The trend runs the search itself in each month, so every point equals that month's card.
 - **Partial uploads**: Centene has published partial months before (Ambetter files of 9 MB and 4 MB, against about 90 MB). Each product's file is compared with the same product in up to two months on each side: unique rates, EINs and codes, each against the nearby median. Below 0.8 on any of them, the file is flagged partial and left out of changes. The three loaded months all score 0.94 or more.
 
 | Between | Changed (up, down) | New (listed differently) | Dropped (listed differently) | Unchanged |
@@ -124,7 +124,7 @@ Three monthly files are loaded. The snapshot picker in the app bar switches ever
 | 2026-07-27 and 2026-08-31 | 4,619 (2,556, 2,063) | 8,843 (2,268) | 8,232 (2,099) | 48,409 |
 | 2026-08-31 and 2026-09-28 | 3,932 (1,975, 1,957) | 14,632 (5,858) | 16,776 (5,856) | 41,163 |
 
-Counts are of provider values: one per provider per comparison group. When a provider has several rates in a group, its value is their NPI-weighted median, so it can also move when a rate is added or removed; the changes page marks those rows.
+Counts are of provider values: one per provider per comparison group. When a provider has several rates in a group, its value is their NPI-weighted median, so it can also move when a rate is added or removed, or when its clinicians move between its rates; the changes page marks those rows.
 
 ## API
 
@@ -137,8 +137,8 @@ Counts are of provider values: one per provider per comparison group. When a pro
 | `GET /api/v1/snapshots` · `/snapshots/{id}/plans` | Loaded files, their sources and counts, and how complete each looks; plans per product |
 | `GET /api/v1/sources` | Every snapshot and file (rate and allowed-amount files): URL, three dates, size, SHA-256, ETag, counts, rejects by reason, timing |
 | `GET /api/v1/out-of-network?code=&codeType=&snapshot=` | What the plan allowed out of network for a code, per product and fee type |
-| `GET /api/v1/changes?from=&to=&product=&code=&kind=&minChangePct=&listedElsewhere=&sort=&page=&pageSize=` | Rates that changed, appeared or dropped between two snapshots, with counts by kind. Defaults: the newest snapshot against the one before. |
-| `GET /api/v1/rates/trend?code=&npi=&ein=&provider=&specialty=&county=&product=&setting=&feeType=&snapshot=` | Each comparison group a search shows, in every snapshot: provider count, median and quartiles, and the searched provider's rate |
+| `GET /api/v1/changes?from=&to=&product=&code=&kind=&minChangePct=&listedElsewhere=&sort=&page=&pageSize=` | Rates that changed, appeared or dropped between two snapshots, with counts by kind. Defaults: the newest snapshot against the one before, biggest moves first (facility charges filed only under a revenue code, which state no unit, after the rest). `503 statistics_building` with `Retry-After` until both snapshots' saved statistics are built. |
+| `GET /api/v1/rates/trend?code=&npi=&ein=&provider=&specialty=&county=&product=&setting=&feeType=&snapshot=` | Each comparison group a search shows, in every snapshot: provider count, median and quartiles, the searched provider's rate, and (`sincePrevious`) how many providers stayed, got a higher or lower rate, left or joined since the previous complete snapshot |
 | `/health/live` · `/health/ready` | Ready once rate data can be searched |
 
 ## Assumptions and tradeoffs

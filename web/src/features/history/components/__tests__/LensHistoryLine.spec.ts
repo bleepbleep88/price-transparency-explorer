@@ -3,6 +3,7 @@ import type { VueWrapper } from '@vue/test-utils'
 import { notifyManager } from '@tanstack/vue-query'
 import type { ProviderPosition, RateGroup, RateSearchResult, SnapshotSummary } from '@/features/rates/api/types'
 import { parseRouteQuery } from '@/features/rates/lib/searchParams'
+import { ApiError } from '@/lib/apiClient'
 import type { ChangesResult, RateTrendResult } from '../../api/types'
 import type { ChangesParams } from '../../lib/changesParams'
 import { point, SNAPSHOTS, trend } from '../../lib/__tests__/fixtures'
@@ -162,7 +163,7 @@ describe('LensHistoryLine', () => {
     expect(line.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?code=99213')
   })
 
-  it("doesn't show counts from saved statistics that are out of date as current", async () => {
+  it('says counts from numbers being updated may change, as the changes page does', async () => {
     changes.mockResolvedValue({
       current: false,
       counts: { changed: 5, increased: 5, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 9 },
@@ -170,8 +171,18 @@ describe('LensHistoryLine', () => {
 
     await mountLine('plans', result([group(OFFICE, 114)]))
 
-    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('The changes since the Aug 31 file are being updated.')
-    expect(wrapper!.text()).not.toContain('went up')
+    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain(
+      'Since the Aug 31 file, for 99213: 5 rates went up. They may change: the numbers are being updated.',
+    )
+  })
+
+  it('shows no counts until the numbers for both files are saved', async () => {
+    changes.mockRejectedValue(new ApiError(503, 'Statistics are being built', { code: 'statistics_building', retryAfterSeconds: 5 }))
+
+    await mountLine('plans', result([group(OFFICE, 114)]))
+
+    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('The changes since the Aug 31 file show once loading finishes.')
+    expect(wrapper!.text()).not.toMatch(/went up|are new|are gone/)
   })
 
   it('compares an older snapshot with the file before it, and the oldest with nothing', async () => {

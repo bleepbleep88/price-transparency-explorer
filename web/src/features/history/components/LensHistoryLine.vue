@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ApiError } from '@/lib/apiClient'
 import { monthDay } from '@/lib/format'
 import type { RateSearchResult } from '@/features/rates/api/types'
 import { lowerFirst } from '@/lib/plainNumbers'
@@ -59,12 +60,17 @@ const changes = useChanges(
   }),
   () => props.lens === 'plans' && previous.value != null,
 )
-// Counts from saved statistics that are out of date (or not built yet) aren't shown as current.
+// Counts come from numbers saved after loading: none until both files have them (503 statistics_building), and counts
+// from an older save say they may change, as the changes page does.
 const changesText = computed(() => {
-  const data = changes.data.value
-  if (!data || !previous.value) return null
+  if (!previous.value || props.lens !== 'plans') return null
   const since = monthDay(previous.value.indexDate)
-  return data.current ? changesSinceText(data.counts, since, code.value) : `The changes since the ${since} file are being updated.`
+  const error = changes.error.value
+  if (error instanceof ApiError && error.code === 'statistics_building') return `The changes since the ${since} file show once loading finishes.`
+  const data = changes.isError.value ? undefined : changes.data.value
+  if (!data) return null
+  const counts = changesSinceText(data.counts, since, code.value)
+  return data.current ? counts : `${counts} They may change: the numbers are being updated.`
 })
 const line = computed(() => yours.value ?? typical.value)
 const changesLink = computed(() => ({

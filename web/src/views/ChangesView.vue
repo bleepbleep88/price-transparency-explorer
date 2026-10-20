@@ -9,6 +9,7 @@ import ChangesTable from '@/features/history/components/ChangesTable.vue'
 import { useChanges } from '@/features/history/composables/useHistoryQueries'
 import { useSnapshotChoice } from '@/features/history/composables/useSnapshotChoice'
 import {
+  DEFAULT_CHANGE_SORT,
   MAX_CHANGE_PCT,
   mergeChangesQuery,
   parseChangesQuery,
@@ -84,10 +85,9 @@ const summary = computed(() =>
 )
 const listedElsewhere = computed(() => (result.value ? listedElsewhereSummary(result.value.counts) : null))
 const notCompared = computed(() => result.value?.products.filter((product) => !product.compared) ?? [])
-// Changes come from statistics saved after loading: none yet means nothing to show; an old build may be out of date.
-const notBuilt = computed(() =>
-  result.value ? [result.value.from, result.value.to].filter((snapshot) => !snapshot.statisticsBuiltAt).map((s) => shortDate(s.indexDate)) : [],
-)
+// Changes come from numbers saved after loading: the API answers 503 statistics_building until both files have them,
+// and the page refreshes by itself when loading finishes. An older save may be out of date.
+const notBuilt = computed(() => apiError.value?.code === 'statistics_building')
 const outOfDate = computed(() =>
   result.value
     ? [result.value.from, result.value.to]
@@ -201,6 +201,9 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
       </v-card>
 
       <LoadingPanel v-if="apiError?.isLoading" />
+      <v-alert v-else-if="notBuilt" type="info" variant="tonal" data-testid="changes-not-built">
+        Changes show once the numbers for both files are saved, when loading finishes.
+      </v-alert>
       <v-alert v-else-if="apiError?.status === 400" type="warning" variant="tonal">{{ apiError.message }}</v-alert>
       <v-alert v-else-if="apiError" type="error" variant="tonal" data-testid="changes-error">
         <p>{{ apiError.message }}</p>
@@ -209,10 +212,6 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
         </template>
       </v-alert>
       <v-skeleton-loader v-else-if="changes.isPending.value" type="paragraph, table" />
-
-      <v-alert v-else-if="result && notBuilt.length" type="info" variant="tonal" data-testid="changes-not-built">
-        Changes show once the numbers for {{ notBuilt.join(' and ') }} are saved, when loading finishes.
-      </v-alert>
 
       <template v-else-if="result">
         <v-alert v-if="outOfDate.length" type="warning" variant="tonal" data-testid="changes-out-of-date">
@@ -236,6 +235,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
             {{ listedElsewhere }}
           </p>
           <v-chip-group
+            column
             :model-value="params.kind ?? null"
             selected-class="text-primary"
             aria-label="Kind of change"
@@ -256,6 +256,9 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
           </v-chip-group>
         </section>
 
+        <p v-if="params.sort === DEFAULT_CHANGE_SORT" class="text-body-small text-medium-emphasis" data-testid="changes-order">
+          Biggest moves first. Facility charges filed only under a revenue code come after the rest.
+        </p>
         <div :style="{ opacity: changes.isPlaceholderData.value ? 0.6 : 1 }">
           <ChangesTable
             :rows="result.rows"
