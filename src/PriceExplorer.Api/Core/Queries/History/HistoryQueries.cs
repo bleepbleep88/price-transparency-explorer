@@ -76,3 +76,41 @@ public sealed class GetChangesQueryValidator : AbstractValidator<GetChangesQuery
         RuleFor(query => query.PageSize).InclusiveBetween(1, 100).WithMessage("Page size is between 1 and 100.");
     }
 }
+
+/// <summary>
+/// How a search's comparison groups moved across the loaded snapshots: for each group the search shows in
+/// <paramref name="Snapshot"/>, its provider count, median and quartiles in every snapshot, and the searched provider's
+/// rate. Takes the search's own filters.
+/// </summary>
+/// <param name="Code">Required. The billing code, as search takes it.</param>
+/// <param name="Snapshot">The snapshot whose search decides which groups are shown; defaults to the newest.</param>
+public sealed record GetRateTrendQuery(
+    string? Code,
+    string? CodeType = null,
+    string? Npi = null,
+    string? Ein = null,
+    string? Product = null,
+    string? Setting = null,
+    string? FeeType = null,
+    string? Provider = null,
+    int? Snapshot = null) : IRequest<RateTrendResult>, IRequiresData
+{
+    /// <summary>The search each snapshot runs: the same inputs, every group, no paging.</summary>
+    internal SearchRatesQuery AsSearch() => new(Code, CodeType, Npi, Ein, Product, Setting, FeeType, Provider, Group: null, Snapshot);
+}
+
+public sealed class GetRateTrendQueryValidator : AbstractValidator<GetRateTrendQuery>
+{
+    /// <summary>A trend is the search, run in each snapshot, so its inputs follow the search's rules and messages.</summary>
+    public GetRateTrendQueryValidator(ReferenceCatalog catalog)
+    {
+        var search = new SearchRatesQueryValidator(catalog);
+        RuleFor(query => query).Custom((query, context) =>
+        {
+            foreach (var failure in search.Validate(query.AsSearch()).Errors)
+            {
+                context.AddFailure(failure);
+            }
+        });
+    }
+}

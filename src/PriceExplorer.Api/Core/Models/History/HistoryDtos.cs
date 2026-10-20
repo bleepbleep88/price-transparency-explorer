@@ -84,3 +84,36 @@ public sealed record RateChange(
     decimal? ChangePct,
     long? FromRateId,
     long? ToRateId);
+
+/// <summary>
+/// A search's comparison groups across every loaded snapshot. Each point is what that snapshot's search shows for the
+/// group (the search runs in each snapshot), so the newest point always equals the card.
+/// </summary>
+/// <param name="Selected">The snapshot whose search decided which groups are listed (the cards on screen).</param>
+/// <param name="Snapshots">Every snapshot with saved rates, oldest first: the points a trend can have.</param>
+public sealed record RateTrendResult(SnapshotRef Selected, IReadOnlyList<SnapshotRef> Snapshots, IReadOnlyList<GroupTrend> Groups);
+
+/// <param name="Key">The comparison group key, as search returns it.</param>
+/// <param name="Points">One per snapshot where the group has rates, oldest first.</param>
+public sealed record GroupTrend(string Key, string ProductKey, IReadOnlyList<TrendPoint> Points);
+
+/// <summary>A comparison group in one snapshot, as that snapshot's search card shows it.</summary>
+/// <param name="Partial">The product's file in this snapshot looks partial next to nearby snapshots (see /api/v1/snapshots).</param>
+/// <param name="StatsLevel">list (fewer than 5 providers: no median), basic (5–9) or full (10+).</param>
+/// <param name="Provider">The searched provider's rate here, as the card marks it (the first highlighted provider); null
+/// without an NPI, EIN or name filter, or when the provider has no rate in the group in this snapshot.</param>
+public sealed record TrendPoint(
+    int SnapshotId,
+    DateOnly? IndexDate,
+    bool Partial,
+    int ProviderCount,
+    string StatsLevel,
+    decimal Min,
+    decimal? P25,
+    decimal? Median,
+    decimal? P75,
+    decimal Max,
+    TrendProvider? Provider);
+
+/// <param name="Rate">The provider's rate in the group: an NPI's own rate with an NPI filter, as its search row shows.</param>
+public sealed record TrendProvider(string ProviderKey, string DisplayName, decimal Rate);

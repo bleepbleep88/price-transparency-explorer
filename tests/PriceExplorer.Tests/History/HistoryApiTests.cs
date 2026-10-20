@@ -216,6 +216,103 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
         unknown.Should().Be((HttpStatusCode.NotFound, "snapshot_not_found"));
     }
 
+    [Fact(Timeout = 60_000)]
+    public async Task A_trend_lists_the_selected_snapshots_groups_and_each_point_equals_that_snapshots_search()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var ids = await IdsAsync(ct);
+
+        var trend = await GetAsync("/api/v1/rates/trend?code=45378", ct);
+
+        trend.GetProperty("selected").GetProperty("snapshotId").GetInt32().Should().Be(ids[September]);
+        trend.GetProperty("snapshots").EnumerateArray().Select(s => s.GetProperty("indexDate").GetString())
+            .Should().Equal(July, August, September);
+        var latest = await GetAsync("/api/v1/rates?code=45378", ct);
+        Groups(trend).Select(group => group.GetProperty("key").GetString())
+            .Should().Equal(latest.GetProperty("groups").EnumerateArray().Select(group => group.GetProperty("key").GetString()),
+                "the trend lists the cards on screen, in their order");
+
+        foreach (var date in new[] { July, August, September })
+        {
+            var search = await GetAsync($"/api/v1/rates?code=45378&snapshot={ids[date]}", ct);
+            foreach (var card in search.GetProperty("groups").EnumerateArray())
+            {
+                var point = Points(trend, card.GetProperty("key").GetString()!).SingleOrDefault(p => p.GetProperty("indexDate").GetString() == date);
+                if (point.ValueKind == JsonValueKind.Undefined)
+                {
+                    continue; // a group the September search doesn't show
+                }
+
+                var stats = card.GetProperty("stats");
+                point.GetProperty("providerCount").GetInt32().Should().Be(card.GetProperty("providerCount").GetInt32());
+                point.GetProperty("statsLevel").GetString().Should().Be(card.GetProperty("statsLevel").GetString());
+                foreach (var name in new[] { "min", "p25", "median", "p75", "max" })
+                {
+                    point.GetProperty(name).GetRawText().Should().Be(stats.GetProperty(name).GetRawText(), $"{date} {name}");
+                }
+            }
+        }
+
+        Points(trend, AmbetterColonoscopyAsc).Select(p => p.GetProperty("providerCount").GetInt32()).Should().Equal(6, 6, 5);
+        Points(trend, AmbetterColonoscopyHospital).Select(p => p.GetProperty("indexDate").GetString()).Should().Equal(September);
+        Points(trend, EssentialColonoscopyAsc).Select(p => p.GetProperty("partial").GetBoolean())
+            .Should().Equal([true, false, false], "July's Essential Plan file is a partial upload");
+        Points(trend, AmbetterColonoscopyAsc).Should().OnlyContain(p => p.GetProperty("provider").ValueKind == JsonValueKind.Null);
+    }
+
+    [Theory(Timeout = 60_000)]
+    [InlineData("npi=1299999991", "45.00|45.00|50.00")]
+    [InlineData("npi=1299999992", "90.00|90.00|90.00")]
+    [InlineData("ein=88-7777777", "45.00|45.00|50.00")]
+    public async Task A_trend_follows_the_searched_providers_own_rate_as_each_snapshots_card_marks_it(string filter, string rates)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var ids = await IdsAsync(ct);
+
+        var trend = await GetAsync($"/api/v1/rates/trend?code=99213&{filter}", ct);
+        var points = Points(trend, AmbetterOfficeVisit);
+
+        string.Join('|', points.Select(p => p.GetProperty("provider").GetProperty("rate").GetDecimal().ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)))
+            .Should().Be(rates);
+        foreach (var point in points)
+        {
+            var search = await GetAsync($"/api/v1/rates?code=99213&{filter}&snapshot={point.GetProperty("snapshotId").GetInt32()}", ct);
+            var marked = search.GetProperty("groups").EnumerateArray().Single(g => g.GetProperty("key").GetString() == AmbetterOfficeVisit)
+                .GetProperty("highlights")[0];
+            point.GetProperty("provider").GetProperty("rate").GetDecimal().Should().Be(marked.GetProperty("rate").GetDecimal());
+            point.GetProperty("provider").GetProperty("providerKey").GetString().Should().Be("887777777");
+        }
+
+        Groups(trend).Select(group => group.GetProperty("key").GetString()).Should().Equal(
+            [AmbetterOfficeVisit], "with a provider filter, only groups where it has a rate show, as on the cards");
+        trend.GetProperty("selected").GetProperty("snapshotId").GetInt32().Should().Be(ids[September]);
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_trend_for_an_older_snapshot_lists_that_snapshots_groups()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var ids = await IdsAsync(ct);
+
+        var trend = await GetAsync($"/api/v1/rates/trend?code=45378&snapshot={ids[August]}", ct);
+
+        trend.GetProperty("selected").GetProperty("isLatest").GetBoolean().Should().BeFalse();
+        Groups(trend).Select(group => group.GetProperty("key").GetString()).Should().Equal(AmbetterColonoscopyAsc, EssentialColonoscopyAsc);
+        Points(trend, AmbetterColonoscopyAsc).Select(p => p.GetProperty("indexDate").GetString()).Should().Equal(July, August, September);
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_trend_takes_the_searchs_inputs_and_messages()
+    {
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/api/v1/rates/trend?npi=12", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var errors = (await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("errors");
+        errors.GetProperty("code")[0].GetString().Should().Be("Enter a billing code, for example 45378 (colonoscopy) or 0490 (ambulatory surgery).");
+        errors.GetProperty("npi")[0].GetString().Should().Be("An NPI is 10 digits, for example 1396747861.");
+    }
+
     private async Task<JsonElement> GetAsync(string url, CancellationToken ct)
     {
         using var client = factory.CreateClient();
@@ -252,6 +349,11 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     }
 
     private static List<JsonElement> Rows(JsonElement result) => result.GetProperty("rows").GetProperty("items").EnumerateArray().ToList();
+
+    private static List<JsonElement> Groups(JsonElement trend) => trend.GetProperty("groups").EnumerateArray().ToList();
+
+    private static List<JsonElement> Points(JsonElement trend, string key) =>
+        Groups(trend).Single(group => group.GetProperty("key").GetString() == key).GetProperty("points").EnumerateArray().ToList();
 
     /// <summary>The provider's EIN as shown, or "masked".</summary>
     private static string Who(JsonElement row) =>

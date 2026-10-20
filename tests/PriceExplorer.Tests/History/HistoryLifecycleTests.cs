@@ -67,6 +67,28 @@ public sealed class HistoryLifecycleTests
             .Should().OnlyContain(row => row.GetProperty("fromRateId").ValueKind == JsonValueKind.Number);
     }
 
+    [Fact(Timeout = 60_000)]
+    public async Task With_one_snapshot_there_is_nothing_to_compare_and_each_trend_has_one_point()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = new ExplorerApiFactory();
+        using var client = factory.CreateClient();
+        await factory.WaitForIngestionAsync(ct);
+
+        using var changes = await client.GetAsync("/api/v1/changes", ct);
+        var trend = await client.GetFromJsonAsync<JsonElement>("/api/v1/rates/trend?code=45378", ct);
+        var snapshots = await client.GetFromJsonAsync<JsonElement>("/api/v1/snapshots", ct);
+
+        changes.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await changes.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("code").GetString().Should().Be("no_earlier_snapshot");
+        trend.GetProperty("snapshots").GetArrayLength().Should().Be(1);
+        trend.GetProperty("groups").EnumerateArray().Should().NotBeEmpty()
+            .And.OnlyContain(group => group.GetProperty("points").GetArrayLength() == 1);
+        snapshots[0].GetProperty("products").EnumerateArray().Should().OnlyContain(product =>
+            product.GetProperty("completeness").GetProperty("score").ValueKind == JsonValueKind.Null
+            && !product.GetProperty("completeness").GetProperty("partial").GetBoolean());
+    }
+
     /// <summary>The status once loading has started downloading a file of the snapshot dated <paramref name="date"/>.</summary>
     private static async Task<IngestionStatusSnapshot> WaitForDownloadOfAsync(ExplorerApiFactory factory, string date, CancellationToken ct)
     {
