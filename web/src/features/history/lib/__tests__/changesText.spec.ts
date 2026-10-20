@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { ChangeCounts } from '../../api/types'
-import { changeAmounts, changesSinceText, changeText, countsSummary, listedElsewhereSummary } from '../changesText'
+import {
+  changeAmounts,
+  changesSinceText,
+  changeText,
+  countsSummary,
+  listedElsewhereSummary,
+  revenueCodeSwitchLabel,
+  waitingText,
+} from '../changesText'
 import { change } from './fixtures'
 
 // The real 2026-08-31 → 2026-09-28 counts.
@@ -13,10 +21,32 @@ const counts: ChangeCounts = {
   dropped: 16776,
   droppedListedElsewhere: 5856,
   unchanged: 41163,
+  revenueCodeOnly: 2210,
 }
-const none: ChangeCounts = { changed: 0, increased: 0, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 12 }
+const none: ChangeCounts = { changed: 0, increased: 0, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 12, revenueCodeOnly: 0 }
 
 describe('changes in words', () => {
+  it('says why there are no changes yet, naming the files', () => {
+    const side = (snapshotId: number, indexDate: string, statisticsBuiltAt: string | null, statisticsCurrent: boolean) => ({
+      snapshotId,
+      indexDate,
+      isLatest: false,
+      statisticsBuiltAt,
+      statisticsCurrent,
+    })
+    expect(waitingText({ from: side(2, '2026-08-31', null, false), to: side(1, '2026-09-28', '2026-10-20T08:00:00Z', true) })).toBe(
+      'Changes show once loading finishes: the numbers for Aug 31, 2026 are still being saved.',
+    )
+    expect(
+      waitingText({ from: side(2, '2026-08-31', '2026-10-20T08:00:00Z', false), to: side(1, '2026-09-28', '2026-10-20T08:00:00Z', false) }),
+    ).toBe('Changes show once loading finishes: the numbers for Aug 31, 2026 and Sep 28, 2026 are being updated.')
+  })
+
+  it('counts the revenue-code facility charges the switch would add', () => {
+    expect(revenueCodeSwitchLabel(2210)).toBe('Include facility charges filed only under a revenue code (2,210)')
+    expect(revenueCodeSwitchLabel(0)).toBe('Include facility charges filed only under a revenue code')
+  })
+
   it('sums up what the filters cover: up, down, new and gone', () => {
     expect(countsSummary(counts, 'Aug 31, 2026', 'Sep 28, 2026')).toBe(
       'Between Aug 31, 2026 and Sep 28, 2026: 1,975 rates went up, 1,957 went down, 14,632 are new and 16,776 are gone. 41,163 rates stayed the same.',

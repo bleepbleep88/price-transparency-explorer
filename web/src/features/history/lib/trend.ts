@@ -1,4 +1,5 @@
 import { monthDay, wholeNumber } from '@/lib/format'
+import { capitalize } from '@/lib/plainNumbers'
 import type { GroupTrend, RateTrendResult, TrendPoint, TrendStep } from '../api/types'
 import { changeAmounts, sameAsShown, type Shown } from './changesText'
 
@@ -16,8 +17,9 @@ export function comparablePoints(trend: GroupTrend): TrendPoint[] {
   return trend.points.filter((point) => !point.partial)
 }
 
-function joinAnd(parts: string[]): string {
-  return parts.length <= 1 ? parts.join('') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+function joinAnd(parts: readonly string[]): string {
+  const kept = parts.filter(Boolean)
+  return kept.length <= 1 ? kept.join('') : `${kept.slice(0, -1).join(', ')} and ${kept[kept.length - 1]}`
 }
 
 function fileList(values: readonly Value[]): string {
@@ -33,6 +35,21 @@ function oneWay(values: readonly Value[], shown: Shown): boolean {
   return ups.every((sign) => sign >= 0) || ups.every((sign) => sign <= 0)
 }
 
+const text = (value: number, shown: Shown) => changeAmounts(value, value, shown).from
+
+/** "$62 (Jul 27), $71 (Aug 31, this file) and $62 (Sep 28)": every file, the one on screen marked unless it's the last. */
+function valueList(values: readonly Value[], shown: Shown, selectedId: number | null): string {
+  const last = values[values.length - 1]
+  const mark = (entry: Value) => (entry.snapshotId === selectedId && entry !== last ? ', this file' : '')
+  return joinAnd(values.map((entry) => `${text(entry.value, shown)} (${monthDay(entry.date)}${mark(entry)})`))
+}
+
+/** More than three files name the ends; this names the one on screen when it's in between. */
+function onScreenNote(values: readonly Value[], shown: Shown, selectedId: number | null): string {
+  const middle = values.slice(1, -1).find((entry) => entry.snapshotId === selectedId)
+  return middle ? ` In the ${monthDay(middle.date)} file on screen it was ${text(middle.value, shown)}.` : ''
+}
+
 /**
  * Two files: "The typical price went from $573 (Jul 27) to $569 (Sep 28): down $4 (under 1%)." Three: every file named,
  * so the one on screen is never skipped: "The typical price was $62 (Jul 27), $71 (Aug 31, this file) and $62 (Sep 28)."
@@ -43,67 +60,140 @@ export function movementText(subject: string, values: readonly Value[], shown: S
   if (values.length < 2) return null
   const first = values[0]!
   const last = values[values.length - 1]!
-  const text = (value: number) => changeAmounts(value, value, shown).from
-  if (values.every((entry) => sameAsShown(entry.value, first.value, shown))) return `${subject} was ${text(first.value)} in ${fileList(values)}.`
-  if (values.length === 2) {
-    const amounts = changeAmounts(first.value, last.value, shown)
-    return `${subject} went from ${amounts.from} (${monthDay(first.date)}) to ${amounts.to} (${monthDay(last.date)}): ${amounts.change}.`
-  }
-  const mark = (entry: Value) => (entry.snapshotId === selectedId && entry !== last ? ', this file' : '')
-  if (values.length === 3) {
-    const list = joinAnd(values.map((entry) => `${text(entry.value)} (${monthDay(entry.date)}${mark(entry)})`))
-    const total = oneWay(values, shown) ? `: ${changeAmounts(first.value, last.value, shown).change} since ${monthDay(first.date)}` : ''
-    return `${subject} was ${list}${total}.`
-  }
+  if (values.every((entry) => sameAsShown(entry.value, first.value, shown))) return `${subject} was ${text(first.value, shown)} in ${fileList(values)}.`
   const amounts = changeAmounts(first.value, last.value, shown)
-  const middle = values.slice(1, -1).find((entry) => entry.snapshotId === selectedId)
-  const onScreen = middle ? ` In the ${monthDay(middle.date)} file on screen it was ${text(middle.value)}.` : ''
-  return `${subject} went from ${amounts.from} (${monthDay(first.date)}) to ${amounts.to} (${monthDay(last.date)}): ${amounts.change}.${onScreen}`
+  if (values.length === 2) return `${subject} went from ${amounts.from} (${monthDay(first.date)}) to ${amounts.to} (${monthDay(last.date)}): ${amounts.change}.`
+  if (values.length === 3) {
+    const total = oneWay(values, shown) ? `: ${amounts.change} since ${monthDay(first.date)}` : ''
+    return `${subject} was ${valueList(values, shown, selectedId)}${total}.`
+  }
+  return `${subject} went from ${amounts.from} (${monthDay(first.date)}) to ${amounts.to} (${monthDay(last.date)}): ${amounts.change}.${onScreenNote(values, shown, selectedId)}`
 }
 
-/**
- * Why the typical price moved, from the providers behind it (H1 of the #11 review): when every provider listed in two
- * files in a row kept its rate, the move comes only from which providers are listed, and the line says so instead of
- * reading like a price change. Null when the typical price didn't move.
- */
-export function whyText(points: readonly TrendPoint[]): string | null {
-  const steps: TrendStep[] = []
+/** Says where the typical price was, with no amount of change: for moves that come only from who is listed. */
+function wherePriceWas(values: readonly Value[], selectedId: number | null): string {
+  const first = values[0]!
+  const last = values[values.length - 1]!
+  if (values.length === 3) return `was ${valueList(values, 'typical', selectedId)}.`
+  const move = `moved from ${text(first.value, 'typical')} (${monthDay(first.date)}) to ${text(last.value, 'typical')} (${monthDay(last.date)}).`
+  return values.length === 2 ? move : `${move}${onScreenNote(values, 'typical', selectedId)}`
+}
+
+interface Move {
+  before: TrendPoint
+  after: TrendPoint
+  /** How the providers moved between these two files; null when the API gave a step from another file. */
+  step: TrendStep | null
+}
+
+/** The steps between consecutive files where the typical price moved, as the cards show it. */
+function typicalMoves(points: readonly TrendPoint[]): Move[] {
+  const moves: Move[] = []
   for (let index = 1; index < points.length; index++) {
     const [before, after] = [points[index - 1]!, points[index]!]
     if (before.median == null || after.median == null || sameAsShown(before.median, after.median, 'typical')) continue
-    const step = after.sincePrevious
-    // Only a step between these two files explains this move (a file between them without a typical price would make it
-    // another pair); without one, say nothing rather than half the story.
-    if (!step || step.sinceSnapshotId !== before.snapshotId) return null
-    steps.push(step)
+    // A file between these two without a typical price makes the API's step another pair.
+    const step = after.sincePrevious?.sinceSnapshotId === before.snapshotId ? after.sincePrevious : null
+    moves.push({ before, after, step })
   }
-  if (!steps.length) return null
-  const sum = (pick: (step: TrendStep) => number) => steps.reduce((total, step) => total + pick(step), 0)
-  const [raised, lowered, left, joined] = [sum((s) => s.raised), sum((s) => s.lowered), sum((s) => s.left), sum((s) => s.joined)]
-  const pair = points.length === 2 ? 'both files' : 'two files in a row'
-  const churn = joinAnd([left ? `${wholeNumber(left)} left` : '', joined ? `${wholeNumber(joined)} joined` : ''].filter(Boolean))
-  if (raised === 0 && lowered === 0) {
-    return churn
-      ? `Providers listed in ${pair} kept their rates: the typical price moved because different providers are listed (${churn}).`
-      : null
-  }
-  const moved = joinAnd([raised ? `${wholeNumber(raised)} got a higher rate` : '', lowered ? `${wholeNumber(lowered)} a lower one` : ''].filter(Boolean))
-  return `Of the providers listed in ${pair}, ${moved}${churn ? `; ${churn}` : ''}.`
+  return moves
 }
 
-/** The group's typical price over the complete files, and why it moved; null when fewer than two files have one. */
+function pairName(move: Move, onlyTwo: boolean): string {
+  return onlyTwo ? 'both files' : `the ${monthDay(move.before.indexDate)} and ${monthDay(move.after.indexDate)} files`
+}
+
+/** Kept every rate: a provider whose clinicians moved between the same rates still lists the same ones. */
+function ratesKept(step: TrendStep): boolean {
+  return step.raised === 0 && step.lowered === 0
+}
+
+/**
+ * The providers listed in both files come first (H1 of the #11 review): "Of the 37 providers listed in both files, all
+ * kept the same rate." or "..., 28 kept the same rate, 1 got a higher rate and 1 a lower one."
+ */
+export function stayedText(step: TrendStep, pair: string): string {
+  if (step.stayed === 0) return `No provider is listed in ${pair}.`
+  if (step.stayed === 1) {
+    return ratesKept(step)
+      ? `The one provider listed in ${pair} kept the same rate.`
+      : `The one provider listed in ${pair} got a ${step.raised ? 'higher' : 'lower'} rate.`
+  }
+  const kept = step.stayed - step.raised - step.lowered
+  if (ratesKept(step)) return `Of the ${wholeNumber(step.stayed)} providers listed in ${pair}, all kept the same rate.`
+  const parts = [
+    kept ? `${wholeNumber(kept)} kept the same rate` : '',
+    step.raised ? `${wholeNumber(step.raised)} got a higher rate` : '',
+    step.lowered ? `${wholeNumber(step.lowered)} ${step.raised ? 'a lower one' : 'got a lower rate'}` : '',
+  ]
+  return `Of the ${wholeNumber(step.stayed)} providers listed in ${pair}, ${joinAnd(parts)}.`
+}
+
+/** Who came, went, or moved clinicians between the same rates: "87 left and 39 joined"; empty when nobody did. */
+export function listedText(step: Pick<TrendStep, 'left' | 'joined' | 'reweighted'>): string {
+  return joinAnd([
+    step.left ? `${wholeNumber(step.left)} left` : '',
+    step.joined ? `${wholeNumber(step.joined)} joined` : '',
+    step.reweighted ? `${wholeNumber(step.reweighted)} moved clinicians between the same rates` : '',
+  ])
+}
+
+function sum(steps: readonly TrendStep[], pick: (step: TrendStep) => number): number {
+  return steps.reduce((total, step) => total + pick(step), 0)
+}
+
+/**
+ * The group's typical price over the complete files, led by the providers listed in both (H1 of the #11 review). When
+ * every one of them kept its rates, the move is never worded as a price change: "Of the 37 providers listed in both files,
+ * all kept the same rate. 87 left and 39 joined, so the typical price on this card moved from $51.45 (Aug 31) to $114
+ * (Sep 28)." Otherwise: "Of the 30 providers listed in both files, 28 kept the same rate, 1 got a higher rate and 1 a
+ * lower one; 3 left. The typical price went from ..." Null when fewer than two files have a typical price.
+ */
 export function typicalTrendText(trend: GroupTrend, selectedId: number | null = null): string | null {
   const points = comparablePoints(trend).filter((point) => point.median != null)
   const values = points.map((point) => ({ snapshotId: point.snapshotId, date: point.indexDate, value: point.median! }))
   const movement = movementText('The typical price', values, 'typical', selectedId)
   if (!movement) return null
-  const why = whyText(points)
-  return why ? `${movement} ${why}` : movement
+  const moves = typicalMoves(points)
+  // No move, or a move the API can't explain (a file in between had no typical price): the amounts alone.
+  if (!moves.length || moves.some((move) => !move.step)) return movement
+  const steps = moves.map((move) => move.step!)
+  const onlyTwo = points.length === 2
+
+  if (steps.every(ratesKept)) {
+    const lead = moves.map((move) => stayedText(move.step!, pairName(move, onlyTwo))).join(' ')
+    const listed = listedText({ left: sum(steps, (s) => s.left), joined: sum(steps, (s) => s.joined), reweighted: sum(steps, (s) => s.reweighted) })
+    const cause = listed ? `${capitalize(listed)}, so the typical price on this card` : 'So the typical price on this card'
+    return `${lead} ${cause} ${wherePriceWas(values, selectedId)}`
+  }
+  const lead = moves
+    .map((move) => {
+      const listed = listedText(move.step!)
+      const stayed = stayedText(move.step!, pairName(move, onlyTwo))
+      return listed ? `${stayed.slice(0, -1)}; ${listed}.` : stayed
+    })
+    .join(' ')
+  return `${lead} ${movement}`
+}
+
+/** The chart's tooltip for a file whose typical price moved since the one before: who stayed, and who came or went. */
+export function stepNote(trend: GroupTrend, snapshotId: number): string | null {
+  const points = comparablePoints(trend).filter((point) => point.median != null)
+  const move = typicalMoves(points).find((candidate) => candidate.after.snapshotId === snapshotId)
+  if (!move?.step) return null
+  const stayed = stayedText(move.step, `the ${monthDay(move.before.indexDate)} file too`)
+  const listed = listedText(move.step)
+  return listed ? `${stayed} ${capitalize(listed)}.` : stayed
+}
+
+/** "Heel Sole Podiatry PC's rate"; a name ending in s takes only the apostrophe. */
+export function rateOf(name: string): string {
+  return /s$/i.test(name) ? `${name}' rate` : `${name}'s rate`
 }
 
 /**
  * The searched provider's rate over the complete files, naming the files where it has none. The subject is "Your rate"
- * only where the reader is the provider (the providers lens); a card names the provider ("The rate for PM Pediatrics").
+ * only where the reader is the provider (the providers lens); a card names the provider ("Heel Sole Podiatry PC's rate").
  */
 export function providerTrendText(trend: GroupTrend, subject: string, selectedId: number | null = null): string | null {
   const points = comparablePoints(trend)
@@ -113,7 +203,7 @@ export function providerTrendText(trend: GroupTrend, subject: string, selectedId
   if (values.length === 0) return null
   const missing = points.filter((point) => !point.provider).map((point) => monthDay(point.indexDate))
   const absent = missing.length ? ` No rate in the ${missing.join(' or ')} file.` : ''
-  if (values.length === 1) return `${subject}: ${changeAmounts(values[0]!.value, values[0]!.value).from} (${monthDay(values[0]!.date)}).${absent}`
+  if (values.length === 1) return `${subject}: ${text(values[0]!.value, 'rate')} (${monthDay(values[0]!.date)}).${absent}`
   return `${movementText(subject, values, 'rate', selectedId)}${absent}`
 }
 

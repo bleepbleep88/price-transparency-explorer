@@ -14,7 +14,7 @@ export interface SnapshotRef {
 
 export interface HistorySnapshot extends SnapshotRef {
   statisticsBuiltAt: string | null
-  /** False while the saved statistics are rebuilt or before the first build: the changes may be out of date. */
+  /** False while the saved statistics are rebuilt or before the first build: then there are no changes to show. */
   statisticsCurrent: boolean
 }
 
@@ -30,6 +30,7 @@ export interface ChangesEcho {
   sort: string
   page: number
   pageSize: number
+  includeRevenueCodeOnly: boolean
 }
 
 export interface ChangesProduct {
@@ -49,6 +50,11 @@ export interface ChangeCounts {
   dropped: number
   droppedListedElsewhere: number
   unchanged: number
+  /**
+   * Facility charges filed only under a revenue code that match every other filter, kind included: what
+   * includeRevenueCodeOnly adds. They state no unit, so they're left out by default (decision 89).
+   */
+  revenueCodeOnly: number
 }
 
 export interface RateChange {
@@ -80,7 +86,7 @@ export interface RateChange {
   changePct: number | null
   fromRateId: number | null
   toRateId: number | null
-  /** Rates the provider has in the group on each side; with several, its value can move when one is added or removed. */
+  /** Rates the provider has in the group on each side. */
   fromRates: number | null
   toRates: number | null
   /** New or dropped, but the other file lists the provider for the same code under other modifiers or another setting. */
@@ -98,10 +104,13 @@ export interface ChangesResult {
   query: ChangesEcho
   from: HistorySnapshot
   to: HistorySnapshot
-  /** Both snapshots' saved statistics are current. */
+  /** Both snapshots' saved statistics are built and current. Until then there are no counts and no rows. */
   current: boolean
+  /** Why there are no counts or rows yet; null when current. */
+  message: string | null
   products: ChangesProduct[]
-  counts: ChangeCounts
+  /** Null until current. */
+  counts: ChangeCounts | null
   rows: RateChangesPage
 }
 
@@ -134,12 +143,16 @@ export interface TrendPoint {
   sincePrevious: TrendStep | null
 }
 
-/** Providers in both files, how many of those got a higher or lower rate, and how many left or joined. */
+/**
+ * Providers in both files, how many of those the file lists at a different, higher or lower rate, how many kept the same
+ * rates with their clinicians moved between them (reweighted), and how many left or joined.
+ */
 export interface TrendStep {
   sinceSnapshotId: number
   stayed: number
   raised: number
   lowered: number
+  reweighted: number
   left: number
   joined: number
 }

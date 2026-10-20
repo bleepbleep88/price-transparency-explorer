@@ -140,7 +140,7 @@ function direction(row: RateChange): string | undefined {
         </v-tooltip>
         <v-tooltip
           v-else-if="item.kind === 'changed' && ((item.fromRates ?? 0) > 1 || (item.toRates ?? 0) > 1)"
-          text="The provider has several rates here. The one shown is the middle of its clinicians' rates, so it also moves when a rate is added or removed, or when its clinicians move between its rates, not only when a price changes."
+          text="The provider has several rates here. The one shown is its clinicians' typical rate, so it also moves when a rate is added or removed, not only when a price changes."
           max-width="340"
           location="top"
         >

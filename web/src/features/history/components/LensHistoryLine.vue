@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ApiError } from '@/lib/apiClient'
 import { monthDay } from '@/lib/format'
 import type { RateSearchResult } from '@/features/rates/api/types'
 import { lowerFirst } from '@/lib/plainNumbers'
@@ -41,7 +40,7 @@ const typical = computed(() => {
   for (const line of costLines(props.result)) {
     const trend = trendFor(props.trend, line.groupKey)
     const text = hasHistory(trend) ? typicalTrendText(trend, props.trend?.selected.snapshotId ?? null) : null
-    if (text) return { groupKey: line.groupKey, text: `On the card with the most providers, ${lowerFirst(text)}` }
+    if (text) return { groupKey: line.groupKey, text: `On the card with the most providers: ${lowerFirst(text)}` }
   }
   return null
 })
@@ -54,28 +53,33 @@ const changes = useChanges(
     code: code.value,
     product: props.params.product,
     hideListedElsewhere: false,
+    // The searched code's own changes: a revenue code's facility charges are what it was searched for, and nothing is ranked.
+    includeRevenueCodeOnly: true,
     sort: DEFAULT_CHANGE_SORT,
     page: 1,
     pageSize: 1,
   }),
   () => props.lens === 'plans' && previous.value != null,
 )
-// Counts come from numbers saved after loading: none until both files have them (503 statistics_building), and counts
-// from an older save say they may change, as the changes page does.
+// Counts come from numbers saved after loading. As on the changes page, there are none until both files' numbers are
+// saved and current (the API sends current: false and no counts); the line refreshes when loading finishes.
 const changesText = computed(() => {
-  if (!previous.value || props.lens !== 'plans') return null
-  const since = monthDay(previous.value.indexDate)
-  const error = changes.error.value
-  if (error instanceof ApiError && error.code === 'statistics_building') return `The changes since the ${since} file show once loading finishes.`
   const data = changes.isError.value ? undefined : changes.data.value
-  if (!data) return null
-  const counts = changesSinceText(data.counts, since, code.value)
-  return data.current ? counts : `${counts} They may change: the numbers are being updated.`
+  if (!data || !previous.value) return null
+  const since = monthDay(previous.value.indexDate)
+  return data.current && data.counts
+    ? changesSinceText(data.counts, since, code.value)
+    : `The changes since the ${since} file show once loading finishes.`
 })
 const line = computed(() => yours.value ?? typical.value)
 const changesLink = computed(() => ({
   name: 'changes',
-  query: { ...carried.value, code: code.value, ...(props.params.product ? { product: props.params.product } : {}) },
+  query: {
+    ...carried.value,
+    code: code.value,
+    includeRevenueCodeOnly: 'true',
+    ...(props.params.product ? { product: props.params.product } : {}),
+  },
 }))
 </script>
 

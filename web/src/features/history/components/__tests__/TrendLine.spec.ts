@@ -48,23 +48,23 @@ describe('TrendLine', () => {
 
     // A card is read by every audience, so it isn't "your rate".
     expect(line.get('[data-testid="trend-provider"]').text()).toBe(
-      'The rate for PM Pediatrics was $100.36 (Jul 27), $100.36 (Aug 31) and $117.77 (Sep 28): up $17.41 (17%) since Jul 27.',
+      "PM Pediatrics' rate was $100.36 (Jul 27), $100.36 (Aug 31) and $117.77 (Sep 28): up $17.41 (17%) since Jul 27.",
     )
   })
 
-  it('says why the typical price moved when the providers in both files kept their rates', async () => {
+  it('leads with the providers in both files when they all kept their rates, and never calls it a price change', async () => {
     const line = await mountLine(
       trend([
         point(2, '2026-08-31', { median: 573.48 }),
         point(1, '2026-09-28', {
           median: 610,
-          sincePrevious: { sinceSnapshotId: 2, stayed: 40, raised: 0, lowered: 0, left: 87, joined: 39 },
+          sincePrevious: { sinceSnapshotId: 2, stayed: 40, raised: 0, lowered: 0, reweighted: 0, left: 87, joined: 39 },
         }),
       ]),
     )
 
     expect(line.get('[data-testid="trend-typical"]').text()).toBe(
-      'The typical price went from $573 (Aug 31) to $610 (Sep 28): up $37 (6%). Providers listed in both files kept their rates: the typical price moved because different providers are listed (87 left and 39 joined).',
+      'Of the 40 providers listed in both files, all kept the same rate. 87 left and 39 joined, so the typical price on this card moved from $573 (Aug 31) to $610 (Sep 28).',
     )
   })
 

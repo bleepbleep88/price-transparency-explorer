@@ -1,6 +1,6 @@
-import { money, plural, wholeDollars, wholeNumber } from '@/lib/format'
+import { money, plural, shortDate, wholeDollars, wholeNumber } from '@/lib/format'
 import { aboutTimes, capitalize, dollars, shownDollars, TIMES_FROM } from '@/lib/plainNumbers'
-import type { ChangeCounts, RateChange } from '../api/types'
+import type { ChangeCounts, ChangesResult, RateChange } from '../api/types'
 
 // Plain words for the changes feed (decision 89): a rate went up, went down, is new or is gone, in dollars and percent.
 // A change is what the plan's file says, never what anyone paid.
@@ -76,6 +76,23 @@ function countsText(counts: ChangeCounts): string | null {
 export function changesSinceText(counts: ChangeCounts, since: string, code: string): string {
   const text = countsText(counts)
   return text ? `Since the ${since} file, for ${code}: ${text}.` : `No rate for ${code} changed since the ${since} file.`
+}
+
+/**
+ * Why there are no changes to show yet, naming the files: "Changes show once loading finishes: the numbers for Aug 31,
+ * 2026 are still being saved." (or "are being updated" for numbers saved before the files or the app changed).
+ */
+export function waitingText(result: Pick<ChangesResult, 'from' | 'to'>): string {
+  const sides = [result.from, result.to]
+  const unbuilt = sides.filter((side) => !side.statisticsBuiltAt).map((side) => shortDate(side.indexDate))
+  if (unbuilt.length) return `Changes show once loading finishes: the numbers for ${unbuilt.join(' and ')} are still being saved.`
+  const outOfDate = sides.filter((side) => !side.statisticsCurrent).map((side) => shortDate(side.indexDate))
+  return `Changes show once loading finishes: the numbers for ${outOfDate.join(' and ')} are being updated.`
+}
+
+/** The switch that adds facility charges filed only under a revenue code, with how many the other filters match. */
+export function revenueCodeSwitchLabel(count: number | undefined): string {
+  return `Include facility charges filed only under a revenue code${count ? ` (${wholeNumber(count)})` : ''}`
 }
 
 /** The changes page's summary of everything the filters cover. */

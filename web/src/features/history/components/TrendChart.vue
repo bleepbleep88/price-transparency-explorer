@@ -9,7 +9,7 @@ import VChart from 'vue-echarts'
 import { money, plural, shortDate } from '@/lib/format'
 import { dollars } from '@/lib/plainNumbers'
 import type { GroupTrend } from '../api/types'
-import { trendSeries } from '../lib/trend'
+import { followedProvider, stepNote, trendSeries } from '../lib/trend'
 
 // Loaded on demand (defineAsyncComponent in TrendLine), so ECharts only downloads once a trend shows. The text next to
 // the chart says the same numbers, and that is what screen readers get.
@@ -19,8 +19,8 @@ const props = defineProps<{ trend: GroupTrend; selectedId: number | null; showPr
 const theme = useTheme()
 
 const TYPICAL = 'Typical price'
-// Read under every audience, so not "your": the card's line names the provider.
-const YOURS = 'This provider'
+// Read under every audience, so not "your": the legend names the provider, as the card's line does.
+const followed = computed(() => followedProvider(props.trend, props.selectedId) ?? 'This provider')
 const MOST = 'Most providers'
 
 function rgba(hex: string, alpha: number): string {
@@ -43,6 +43,9 @@ function tooltip(index: number): string {
   lines.push(point.median != null ? `${TYPICAL}: ${dollars(point.median)}` : 'Too few providers for a typical price')
   if (point.p10 != null && point.p90 != null) lines.push(`${MOST} get ${dollars(point.p10)} to ${dollars(point.p90)}`)
   lines.push(plural(point.providerCount, 'provider'))
+  // Who stayed and who came or went, so a move that's only a change in who is listed doesn't read as a price change.
+  const note = stepNote(props.trend, point.snapshotId)
+  if (note) lines.push(`<span style="white-space: normal">${note}</span>`)
   if (props.showProvider && point.provider) lines.push(`${point.provider.displayName}: ${money(point.provider.rate)}`)
   return lines.join('<br>')
 }
@@ -63,14 +66,15 @@ const option = computed(() => {
       left: 0,
       itemWidth: 14,
       itemHeight: 8,
-      textStyle: { color: rgba(ink, 0.8), fontSize: 11 },
-      data: [TYPICAL, ...(props.showProvider ? [YOURS] : []), ...(hasBand ? [MOST] : [])],
+      textStyle: { color: rgba(ink, 0.8), fontSize: 11, width: 160, overflow: 'truncate' },
+      data: [TYPICAL, ...(props.showProvider ? [followed.value] : []), ...(hasBand ? [MOST] : [])],
       selectedMode: false,
     },
     grid: { left: 4, right: 4, top: 26, bottom: 4, containLabel: true },
     tooltip: {
       trigger: 'axis',
       confine: true,
+      extraCssText: 'max-width: 280px;',
       formatter: (items: { dataIndex: number }[]) => tooltip(items[0]?.dataIndex ?? -1),
     },
     xAxis: {
@@ -100,7 +104,7 @@ const option = computed(() => {
       ...(props.showProvider
         ? [
             {
-              name: YOURS,
+              name: followed.value,
               type: 'line',
               data: series.provider,
               symbolSize,

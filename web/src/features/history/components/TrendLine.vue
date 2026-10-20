@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue'
 import type { GroupTrend } from '../api/types'
-import { drawableSeries, followedProvider, hasHistory, partialNote, providerTrendText, typicalTrendText } from '../lib/trend'
+import { drawableSeries, followedProvider, hasHistory, partialNote, providerTrendText, rateOf, typicalTrendText } from '../lib/trend'
 
 const TrendChart = defineAsyncComponent(() => import('./TrendChart.vue'))
 
@@ -19,7 +19,7 @@ const typical = computed(() => typicalTrendText(props.trend, props.selectedId))
 // A card is read by every audience, so it names the provider; "your rate" is only for the providers lens.
 const provider = computed(() => {
   const name = props.showProvider ? followedProvider(props.trend, props.selectedId) : null
-  return name ? providerTrendText(props.trend, `The rate for ${name}`, props.selectedId) : null
+  return name ? providerTrendText(props.trend, rateOf(name), props.selectedId) : null
 })
 const partial = computed(() => partialNote(props.trend))
 const drawable = computed(() => drawableSeries(props.trend, props.showProvider))

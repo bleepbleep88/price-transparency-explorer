@@ -16,7 +16,7 @@ import {
   type ChangeSort,
   type ChangesPatch,
 } from '@/features/history/lib/changesParams'
-import { countsSummary, listedElsewhereSummary } from '@/features/history/lib/changesText'
+import { countsSummary, listedElsewhereSummary, revenueCodeSwitchLabel, waitingText } from '@/features/history/lib/changesText'
 import { olderSnapshots } from '@/features/history/lib/snapshots'
 
 const route = useRoute()
@@ -31,6 +31,8 @@ const canCompare = computed(() => older.value.length > 0)
 const changes = useChanges(params, canCompare)
 const apiError = computed(() => (changes.error.value instanceof ApiError ? changes.error.value : null))
 const result = computed(() => (changes.isError.value ? undefined : changes.data.value))
+// Until both files' numbers are saved and current the API sends no counts or rows, only why (refreshed when loading ends).
+const counts = computed(() => (result.value?.current ? result.value.counts : null))
 
 function update(patch: ChangesPatch) {
   const next = 'page' in patch ? patch : { ...patch, page: null }
@@ -70,31 +72,18 @@ function chooseTo(id: unknown) {
   if (snapshot) void choose(snapshot)
 }
 
-const kinds = computed(() => {
-  const counts = result.value?.counts
-  return [
-    { value: 'increased', label: 'Went up', count: counts?.increased },
-    { value: 'decreased', label: 'Went down', count: counts?.decreased },
-    { value: 'new', label: 'New', count: counts?.new },
-    { value: 'dropped', label: 'Gone', count: counts?.dropped },
-  ]
-})
+const kinds = computed(() => [
+  { value: 'increased', label: 'Went up', count: counts.value?.increased },
+  { value: 'decreased', label: 'Went down', count: counts.value?.decreased },
+  { value: 'new', label: 'New', count: counts.value?.new },
+  { value: 'dropped', label: 'Gone', count: counts.value?.dropped },
+])
 
 const summary = computed(() =>
-  result.value ? countsSummary(result.value.counts, shortDate(result.value.from.indexDate), shortDate(result.value.to.indexDate)) : '',
+  result.value && counts.value ? countsSummary(counts.value, shortDate(result.value.from.indexDate), shortDate(result.value.to.indexDate)) : '',
 )
-const listedElsewhere = computed(() => (result.value ? listedElsewhereSummary(result.value.counts) : null))
+const listedElsewhere = computed(() => (counts.value ? listedElsewhereSummary(counts.value) : null))
 const notCompared = computed(() => result.value?.products.filter((product) => !product.compared) ?? [])
-// Changes come from numbers saved after loading: the API answers 503 statistics_building until both files have them,
-// and the page refreshes by itself when loading finishes. An older save may be out of date.
-const notBuilt = computed(() => apiError.value?.code === 'statistics_building')
-const outOfDate = computed(() =>
-  result.value
-    ? [result.value.from, result.value.to]
-        .filter((snapshot) => snapshot.statisticsBuiltAt && !snapshot.statisticsCurrent)
-        .map((s) => shortDate(s.indexDate))
-    : [],
-)
 
 function onTableOptions(options: { page: number; pageSize: number; sort: ChangeSort }) {
   void update({ page: options.page, pageSize: options.pageSize, sort: options.sort })
@@ -192,7 +181,20 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
                   @update:model-value="(hide) => update({ hideListedElsewhere: Boolean(hide) })"
                 />
               </v-col>
-              <v-col cols="12" md="3" class="d-flex justify-md-end">
+              <v-col cols="12" sm="6" md="6">
+                <!-- Decision 89: they state no unit, so they're left out of the order and counts unless asked for. -->
+                <v-switch
+                  :model-value="params.includeRevenueCodeOnly"
+                  :label="revenueCodeSwitchLabel(counts?.revenueCodeOnly)"
+                  hint="They state no unit, so they aren't ranked with the rest."
+                  persistent-hint
+                  color="primary"
+                  density="compact"
+                  data-testid="changes-include-rc"
+                  @update:model-value="(include) => update({ includeRevenueCodeOnly: Boolean(include) })"
+                />
+              </v-col>
+              <v-col cols="12" md="6" class="d-flex justify-md-end align-center">
                 <v-btn type="submit" color="primary" variant="tonal" data-testid="changes-apply">Apply</v-btn>
               </v-col>
             </v-row>
@@ -201,9 +203,6 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
       </v-card>
 
       <LoadingPanel v-if="apiError?.isLoading" />
-      <v-alert v-else-if="notBuilt" type="info" variant="tonal" data-testid="changes-not-built">
-        Changes show once the numbers for both files are saved, when loading finishes.
-      </v-alert>
       <v-alert v-else-if="apiError?.status === 400" type="warning" variant="tonal">{{ apiError.message }}</v-alert>
       <v-alert v-else-if="apiError" type="error" variant="tonal" data-testid="changes-error">
         <p>{{ apiError.message }}</p>
@@ -213,11 +212,11 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
       </v-alert>
       <v-skeleton-loader v-else-if="changes.isPending.value" type="paragraph, table" />
 
-      <template v-else-if="result">
-        <v-alert v-if="outOfDate.length" type="warning" variant="tonal" data-testid="changes-out-of-date">
-          The numbers for {{ outOfDate.join(' and ') }} are being updated, so these changes may be out of date. They refresh
-          when loading finishes.
-        </v-alert>
+      <v-alert v-else-if="result && !result.current" type="info" variant="tonal" data-testid="changes-waiting">
+        {{ waitingText(result) }}
+      </v-alert>
+
+      <template v-else-if="result && counts">
         <v-alert
           v-for="product in notCompared"
           :key="product.productKey"
@@ -256,7 +255,11 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
           </v-chip-group>
         </section>
 
-        <p v-if="params.sort === DEFAULT_CHANGE_SORT" class="text-body-small text-medium-emphasis" data-testid="changes-order">
+        <p
+          v-if="params.sort === DEFAULT_CHANGE_SORT && params.includeRevenueCodeOnly"
+          class="text-body-small text-medium-emphasis"
+          data-testid="changes-order"
+        >
           Biggest moves first. Facility charges filed only under a revenue code come after the rest.
         </p>
         <div :style="{ opacity: changes.isPlaceholderData.value ? 0.6 : 1 }">

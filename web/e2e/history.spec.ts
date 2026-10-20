@@ -6,8 +6,8 @@ import { expect, test } from '@playwright/test'
 test("the app bar's snapshot picker moves search to the brief's file and back, and each card shows its trend", async ({ page }) => {
   await page.goto('/?code=45378')
   const card = page.getByTestId('group-card').filter({ has: page.getByTestId('trend-line') }).first()
-  // Three files: each one is named, so the one on screen is never skipped.
-  await expect(card.getByTestId('trend-typical')).toContainText(/^The typical price (was \$[\d,.]+ \(Jul 27\), \$[\d,.]+ \(Aug 31\) and \$[\d,.]+ \(Sep 28\)|was \$[\d,.]+ in the)/)
+  // Three files: each one is named, so the one on screen is never skipped; the providers listed in both lead.
+  await expect(card.getByTestId('trend-typical')).toContainText(/\$[\d,.]+ \(Jul 27\), \$[\d,.]+ \(Aug 31\) and \$[\d,.]+ \(Sep 28\)|was \$[\d,.]+ in the/)
   await expect(card.getByTestId('trend-line')).not.toContainText(/median|percentile|quartile/i)
   await expect(page.getByText('Snapshot Sep 28, 2026')).toBeVisible()
 
@@ -60,12 +60,35 @@ test("the changes page compares the newest file with the one before, narrows to 
   await expect(page).toHaveURL(/[?&]group=[^&]+/)
   await expect(page.getByTestId('provider-row').first()).toBeVisible()
   // The card names the provider; "your rate" is only the providers lens speaking to the provider.
-  await expect(page.getByTestId('trend-provider').first()).toContainText(/^The rate for .+?( went from|:| was) \$[\d,.]+/)
+  await expect(page.getByTestId('trend-provider').first()).toContainText(/^.+'s? rate( went from|:| was) \$[\d,.]+/)
+})
+
+test('a card whose typical price moved only because different providers are listed never calls it a price change', async ({ page }) => {
+  // Ambetter 99213 office with modifier 25: all 37 providers in both the Aug 31 and Sep 28 files kept their rate (#11 review, H1).
+  await page.goto('/?code=99213&product=ambetter-from-fidelis-care&setting=office')
+  const card = page.locator('[data-group-key="ambetter-from-fidelis-care|CPT|99213|professional|office|25|negotiated"]')
+  const line = card.getByTestId('trend-typical')
+  await expect(line).toContainText(
+    'Of the 37 providers listed in the Aug 31 and Sep 28 files, all kept the same rate. 87 left and 39 joined, so the typical price on this card was',
+  )
+  await expect(line).not.toContainText(/went up|times as much/)
+})
+
+test('the changes page leaves out revenue-code-only facility charges until the switch adds them', async ({ page }) => {
+  await page.goto('/changes')
+  const toggle = page.getByTestId('changes-include-rc')
+  await expect(toggle).toContainText(/^Include facility charges filed only under a revenue code \([\d,]+\)/)
+  const before = await page.getByTestId('changes-summary').innerText()
+
+  await toggle.locator('input').check()
+  await expect(page).toHaveURL(/[?&]includeRevenueCodeOnly=true(&|$)/)
+  await expect(page.getByTestId('changes-order')).toContainText('Facility charges filed only under a revenue code come after the rest.')
+  await expect(page.getByTestId('changes-summary')).not.toHaveText(before)
 })
 
 // Decision 89, as plain.spec.ts checks the search pages: history speaks in plain words too.
 test('the changes page, the trends and the history lens lines use no statistics words', async ({ page }) => {
-  const banned = /percentile|median|quartile|×|p90|p10|spread multiple|\bindex\b|comparison group/i
+  const banned = /percentile|median|middle half|quartile|×|p90|p10|spread multiple|\bindex\b|comparison group/i
 
   await page.goto('/changes?minChangePct=5')
   await expect(page.getByTestId('change-row').first()).toBeVisible()

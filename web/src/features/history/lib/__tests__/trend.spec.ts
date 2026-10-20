@@ -7,9 +7,10 @@ import {
   movementText,
   partialNote,
   providerTrendText,
+  rateOf,
+  stepNote,
   trendSeries,
   typicalTrendText,
-  whyText,
 } from '../trend'
 import { point, trend } from './fixtures'
 
@@ -20,6 +21,7 @@ const step = (sinceSnapshotId: number, counts: Partial<Omit<TrendStep, 'sinceSna
   stayed: 0,
   raised: 0,
   lowered: 0,
+  reweighted: 0,
   left: 0,
   joined: 0,
   ...counts,
@@ -76,36 +78,70 @@ describe('trend readings', () => {
     )
   })
 
-  it('says when the typical price moved only because different providers are listed', () => {
-    const points = [
-      point(2, '2026-08-31', { median: 573.48 }),
-      point(1, '2026-09-28', { median: 610, sincePrevious: step(2, { stayed: 40, left: 87, joined: 39 }) }),
-    ]
+  it('never calls a move a price change when every provider listed in both files kept its rate', () => {
+    // Ambetter 99213 office, modifier 25, 08-31 to 09-28 (#11 review, H1).
+    const groupTrend = trend([
+      point(2, '2026-08-31', { median: 51.45 }),
+      point(1, '2026-09-28', { median: 113.59, sincePrevious: step(2, { stayed: 37, left: 87, joined: 39 }) }),
+    ])
 
-    expect(whyText(points)).toBe(
-      'Providers listed in both files kept their rates: the typical price moved because different providers are listed (87 left and 39 joined).',
+    const text = typicalTrendText(groupTrend, 1)
+
+    expect(text).toBe(
+      'Of the 37 providers listed in both files, all kept the same rate. 87 left and 39 joined, so the typical price on this card moved from $51.45 (Aug 31) to $114 (Sep 28).',
     )
-    expect(typicalTrendText(trend(points), 1)).toBe(
-      'The typical price went from $573 (Aug 31) to $610 (Sep 28): up $37 (6%). Providers listed in both files kept their rates: the typical price moved because different providers are listed (87 left and 39 joined).',
+    expect(text).not.toMatch(/went up|up \$|times as much/)
+    expect(stepNote(groupTrend, 1)).toBe('Of the 37 providers listed in the Aug 31 file too, all kept the same rate. 87 left and 39 joined.')
+  })
+
+  it('leads with each step that moved, and names every one of three files', () => {
+    const groupTrend = trend([
+      point(3, '2026-07-27', { median: 167.09 }),
+      point(2, '2026-08-31', { median: 205.41, sincePrevious: step(3, { stayed: 5, left: 50 }) }),
+      point(1, '2026-09-28', { median: 190, sincePrevious: step(2, { stayed: 4, left: 1, joined: 2 }) }),
+    ])
+
+    expect(typicalTrendText(groupTrend, 2)).toBe(
+      'Of the 5 providers listed in the Jul 27 and Aug 31 files, all kept the same rate. Of the 4 providers listed in the Aug 31 and Sep 28 files, all kept the same rate. 51 left and 2 joined, so the typical price on this card was $167 (Jul 27), $205 (Aug 31, this file) and $190 (Sep 28).',
     )
   })
 
-  it('says how many providers got a higher or lower rate, summed over every step that moved', () => {
-    const points = [
+  it('says how many providers got a higher or lower rate, then how the typical price moved', () => {
+    const groupTrend = trend([
       point(3, '2026-07-27', { median: 100 }),
       point(2, '2026-08-31', { median: 110, sincePrevious: step(3, { stayed: 20, raised: 5, lowered: 2, left: 3 }) }),
       point(1, '2026-09-28', { median: 110, sincePrevious: step(2, { stayed: 20, raised: 9, lowered: 9, joined: 4 }) }),
-    ]
+    ])
 
     // The Aug 31 to Sep 28 step left the typical price where it was, so it doesn't explain the move.
-    expect(whyText(points)).toBe('Of the providers listed in two files in a row, 5 got a higher rate and 2 a lower one; 3 left.')
+    expect(typicalTrendText(groupTrend)).toBe(
+      'Of the 20 providers listed in the Jul 27 and Aug 31 files, 13 kept the same rate, 5 got a higher rate and 2 a lower one; 3 left. The typical price was $100 (Jul 27), $110 (Aug 31) and $110 (Sep 28): up $10 (10%) since Jul 27.',
+    )
+    expect(
+      typicalTrendText(trend([point(2, '2026-08-31', { median: 100 }), point(1, '2026-09-28', { median: 150, sincePrevious: step(2, { stayed: 1, raised: 1, joined: 3 }) })])),
+    ).toBe('The one provider listed in both files got a higher rate; 3 joined. The typical price went from $100 (Aug 31) to $150 (Sep 28): up $50 (50%).')
   })
 
-  it("says nothing about why when the price didn't move or a step is missing", () => {
-    expect(whyText([point(2, '2026-08-31', { median: 100 }), point(1, '2026-09-28', { median: 100, sincePrevious: step(2, { left: 4 }) })])).toBeNull()
-    expect(whyText([point(2, '2026-08-31', { median: 100 }), point(1, '2026-09-28', { median: 120 })])).toBeNull()
+  it('names clinicians moving between the same rates, and files with no provider in common', () => {
+    expect(
+      typicalTrendText(trend([point(2, '2026-08-31', { median: 100 }), point(1, '2026-09-28', { median: 120, sincePrevious: step(2, { stayed: 10, reweighted: 2 }) })])),
+    ).toBe(
+      'Of the 10 providers listed in both files, all kept the same rate. 2 moved clinicians between the same rates, so the typical price on this card moved from $100 (Aug 31) to $120 (Sep 28).',
+    )
+    expect(
+      typicalTrendText(trend([point(2, '2026-08-31', { median: 100 }), point(1, '2026-09-28', { median: 150, sincePrevious: step(2, { left: 50, joined: 5 }) })])),
+    ).toBe('No provider is listed in both files. 50 left and 5 joined, so the typical price on this card moved from $100 (Aug 31) to $150 (Sep 28).')
+  })
+
+  it("gives only the amounts when the price didn't move or a step is missing", () => {
+    expect(
+      typicalTrendText(trend([point(2, '2026-08-31', { median: 100 }), point(1, '2026-09-28', { median: 100, sincePrevious: step(2, { left: 4 }) })])),
+    ).toBe('The typical price was $100 in the Aug 31 and Sep 28 files.')
     // A step from another file (one in between had no typical price) is another pair.
-    expect(whyText([point(3, '2026-07-27', { median: 100 }), point(1, '2026-09-28', { median: 120, sincePrevious: step(2, { joined: 4 }) })])).toBeNull()
+    expect(
+      typicalTrendText(trend([point(3, '2026-07-27', { median: 100 }), point(1, '2026-09-28', { median: 120, sincePrevious: step(2, { joined: 4 }) })])),
+    ).toBe('The typical price went from $100 (Jul 27) to $120 (Sep 28): up $20 (20%).')
+    expect(stepNote(trend([point(2, '2026-08-31', { median: 100 }), point(1, '2026-09-28', { median: 100, sincePrevious: step(2, { left: 4 }) })]), 1)).toBeNull()
   })
 
   it('leaves out incomplete files and files too small for a typical price', () => {
@@ -128,9 +164,10 @@ describe('trend readings', () => {
     expect(providerTrendText(groupTrend, 'Your rate')).toBe(
       'Your rate went from $100.36 (Aug 31) to $117.77 (Sep 28): up $17.41 (17%). No rate in the Jul 27 file.',
     )
-    expect(providerTrendText(groupTrend, 'The rate for PM Pediatrics')).toBe(
-      'The rate for PM Pediatrics went from $100.36 (Aug 31) to $117.77 (Sep 28): up $17.41 (17%). No rate in the Jul 27 file.',
+    expect(providerTrendText(groupTrend, rateOf('Heel Sole Podiatry PC'))).toBe(
+      "Heel Sole Podiatry PC's rate went from $100.36 (Aug 31) to $117.77 (Sep 28): up $17.41 (17%). No rate in the Jul 27 file.",
     )
+    expect(rateOf('PM PEDIATRICS')).toBe("PM PEDIATRICS' rate")
     expect(providerTrendText(trend([point(3, '2026-07-27'), point(1, '2026-09-28', { provider: yours(80.72) })]), 'Your rate')).toBe(
       'Your rate: $80.72 (Sep 28). No rate in the Jul 27 file.',
     )

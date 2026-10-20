@@ -3,7 +3,6 @@ import type { VueWrapper } from '@vue/test-utils'
 import { notifyManager } from '@tanstack/vue-query'
 import type { ProviderPosition, RateGroup, RateSearchResult, SnapshotSummary } from '@/features/rates/api/types'
 import { parseRouteQuery } from '@/features/rates/lib/searchParams'
-import { ApiError } from '@/lib/apiClient'
 import type { ChangesResult, RateTrendResult } from '../../api/types'
 import type { ChangesParams } from '../../lib/changesParams'
 import { point, SNAPSHOTS, trend } from '../../lib/__tests__/fixtures'
@@ -143,7 +142,7 @@ describe('LensHistoryLine', () => {
     await mountLine('employers', result([group(OFFICE, 114), group(ASC, 200)]))
 
     expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain(
-      'On the card with the most providers, the typical price went from $70 (Jul 27) to $77 (Sep 28): up $7 (10%).',
+      'On the card with the most providers: the typical price went from $70 (Jul 27) to $77 (Sep 28): up $7 (10%).',
     )
     await wrapper!.get('[data-testid="show-trend"]').trigger('click')
     expect(wrapper!.emitted('showTrend')).toEqual([[ASC]])
@@ -160,24 +159,13 @@ describe('LensHistoryLine', () => {
     expect(changes).toHaveBeenCalledWith(expect.objectContaining({ code: '99213', snapshot: undefined, pageSize: 1 }), expect.anything())
     const line = wrapper!.get('[data-testid="lens-history"]')
     expect(line.text()).toContain('Since the Aug 31 file, for 99213: 56 rates went up, 57 went down, 683 are new and 618 are gone.')
-    expect(line.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?code=99213')
+    // The searched code's own changes, revenue-code facility charges included, as the line counts them.
+    expect(line.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?code=99213&includeRevenueCodeOnly=true')
+    expect(changes).toHaveBeenCalledWith(expect.objectContaining({ includeRevenueCodeOnly: true }), expect.anything())
   })
 
-  it('says counts from numbers being updated may change, as the changes page does', async () => {
-    changes.mockResolvedValue({
-      current: false,
-      counts: { changed: 5, increased: 5, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 9 },
-    } as ChangesResult)
-
-    await mountLine('plans', result([group(OFFICE, 114)]))
-
-    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain(
-      'Since the Aug 31 file, for 99213: 5 rates went up. They may change: the numbers are being updated.',
-    )
-  })
-
-  it('shows no counts until the numbers for both files are saved', async () => {
-    changes.mockRejectedValue(new ApiError(503, 'Statistics are being built', { code: 'statistics_building', retryAfterSeconds: 5 }))
+  it('shows no counts until both files\' numbers are saved and current, as the changes page does', async () => {
+    changes.mockResolvedValue({ current: false, message: 'The numbers for 2026-08-31 are being updated.', counts: null } as ChangesResult)
 
     await mountLine('plans', result([group(OFFICE, 114)]))
 
@@ -194,7 +182,7 @@ describe('LensHistoryLine', () => {
     await mountLine('plans', result([group(OFFICE, 114)]), { snapshot: '2' })
     expect(changes).toHaveBeenCalledWith(expect.objectContaining({ snapshot: 2 }), expect.anything())
     expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('No rate for 99213 changed since the Jul 27 file.')
-    expect(wrapper!.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?snapshot=2&code=99213')
+    expect(wrapper!.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?snapshot=2&code=99213&includeRevenueCodeOnly=true')
     wrapper!.unmount()
 
     changes.mockClear()

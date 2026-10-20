@@ -4,7 +4,19 @@ import { mergeChangesQuery, parseChangesQuery, toChangesApiQuery } from '../chan
 describe('changes URL state', () => {
   it('reads every filter from the URL and falls back to defaults for bad values', () => {
     expect(
-      parseChangesQuery({ snapshot: '1', from: '3', product: 'essential-plan', code: '99213', kind: 'changed', minChangePct: '5', listedElsewhere: 'false', sort: '-changePct', page: '2', pageSize: '50' }),
+      parseChangesQuery({
+        snapshot: '1',
+        from: '3',
+        product: 'essential-plan',
+        code: '99213',
+        kind: 'changed',
+        minChangePct: '5',
+        listedElsewhere: 'false',
+        includeRevenueCodeOnly: 'true',
+        sort: '-changePct',
+        page: '2',
+        pageSize: '50',
+      }),
     ).toEqual({
       snapshot: 1,
       from: 3,
@@ -13,6 +25,7 @@ describe('changes URL state', () => {
       kind: 'changed',
       minChangePct: 5,
       hideListedElsewhere: true,
+      includeRevenueCodeOnly: true,
       sort: '-changePct',
       page: 2,
       pageSize: 50,
@@ -25,6 +38,7 @@ describe('changes URL state', () => {
       kind: undefined,
       minChangePct: undefined,
       hideListedElsewhere: false,
+      includeRevenueCodeOnly: false,
       sort: 'largest',
       page: 1,
       pageSize: 25,
@@ -44,6 +58,8 @@ describe('changes URL state', () => {
     expect(mergeChangesQuery({ listedElsewhere: 'false', kind: 'new' }, { hideListedElsewhere: false, kind: undefined, pageSize: 25 })).toEqual({
       kind: 'new',
     })
+    expect(mergeChangesQuery({ code: '0450' }, { includeRevenueCodeOnly: true })).toEqual({ code: '0450', includeRevenueCodeOnly: 'true' })
+    expect(mergeChangesQuery({ includeRevenueCodeOnly: 'true' }, { includeRevenueCodeOnly: false })).toEqual({})
   })
 
   it("sends the page's snapshot as the newer file and only what the API takes", () => {
@@ -56,6 +72,7 @@ describe('changes URL state', () => {
       kind: undefined,
       minChangePct: undefined,
       listedElsewhere: false,
+      includeRevenueCodeOnly: undefined,
       sort: undefined,
       page: 1,
       pageSize: 25,
