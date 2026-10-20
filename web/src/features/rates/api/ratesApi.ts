@@ -4,6 +4,7 @@ import { toApiQuery } from '../lib/searchParams'
 import type {
   CodeSuggestion,
   IngestionStatus,
+  LevelLadder,
   ProviderSuggestion,
   RateNpisPage,
   RateSearchResult,
@@ -18,6 +19,10 @@ export const ratesApi = {
   search: (params: SearchParams, signal?: AbortSignal) =>
     requestJson<RateSearchResult>('/api/v1/rates', { query: toApiQuery(params), signal }),
 
+
+  /** Each level of a visit code's family, like for like (ER 99281–99285, office 99202–99205 and 99211–99215). */
+  levels: (code: string, snapshot: number | undefined, signal?: AbortSignal) =>
+    requestJson<LevelLadder>('/api/v1/rates/levels', { query: { code, snapshot }, signal }),
 
   /** Where a rate came from; with `provider` (the row's provider key), that provider's groups are listed first. */
   source: (rateId: number, provider: string | null, signal?: AbortSignal) =>

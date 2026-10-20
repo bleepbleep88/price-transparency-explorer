@@ -39,6 +39,20 @@ public sealed class RatesController(ISender sender) : ControllerBase
         sender.Send(query, cancellationToken);
 
     /// <summary>
+    /// The level ladder for an ER or office visit code: for each plan, fee type, setting, modifier set and rate type, every
+    /// level's provider count and statistics, the same numbers each level's search shows.
+    /// </summary>
+    /// <param name="code">Required. An ER or office visit code: 99281 to 99285, 99202 to 99205, or 99211 to 99215.</param>
+    /// <param name="snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
+    [HttpGet("levels")]
+    [ProducesResponseType<LevelLadder>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
+    public Task<LevelLadder> Levels([FromQuery] string? code, [FromQuery] int? snapshot, CancellationToken cancellationToken) =>
+        sender.Send(new GetLevelLadderQuery(code, snapshot), cancellationToken);
+
+    /// <summary>
     /// Where a rate came from: file, snapshot, JSON path, values as published, and the provider groups it covers. Pass
     /// <c>provider</c> (the row's provider key) to list that provider's groups first.
     /// </summary>

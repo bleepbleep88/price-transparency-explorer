@@ -40,6 +40,8 @@ export interface SearchParams {
   lens?: Lens
   /** Employers lens: cases a year for the searched code; a search for a different code drops it. */
   cases?: number
+  /** Dose calculator: a dose of the searched drug, in its code's unit; a search for a different code drops it. */
+  dose?: number
 }
 
 /** Keys a link or chip can change. null removes the parameter. */
@@ -55,6 +57,23 @@ function positiveInteger(value: string | undefined, max = Number.MAX_SAFE_INTEGE
   const number = Number(value)
   return Number.isInteger(number) && number >= 1 && number <= max ? number : undefined
 }
+
+/** Decimals a dose can have. */
+export const DOSE_DECIMALS = 6
+
+/**
+ * A dose as typed: a plain decimal ("45", "2.5", ".5"), thousands commas allowed ("2,400,000"), up to 6 decimals.
+ * No signs, exponents or hex ("1e3", "0x10"). Null for anything else, and for 0.
+ */
+export function parseDose(text: string | null | undefined): number | null {
+  const trimmed = (text ?? '').trim()
+  if (!/^(?:\d{1,3}(?:,\d{3})+|\d*)(?:\.\d+)?$/.test(trimmed) || !/\d/.test(trimmed)) return null
+  const [, decimals = ''] = trimmed.split('.')
+  if (decimals.length > DOSE_DECIMALS) return null
+  const value = Number(trimmed.replace(/,/g, ''))
+  return Number.isFinite(value) && value > 0 ? value : null
+}
+
 
 /** Tolerant: unknown or malformed values fall back to defaults instead of breaking the page. */
 export function parseRouteQuery(query: LocationQuery): SearchParams {
@@ -78,6 +97,7 @@ export function parseRouteQuery(query: LocationQuery): SearchParams {
     snapshot: positiveInteger(first(query.snapshot)),
     lens: lensSchema.safeParse(first(query.lens)).data,
     cases: positiveInteger(first(query.cases), MAX_CASES),
+    dose: parseDose(first(query.dose)) ?? undefined,
   }
 }
 
@@ -89,16 +109,18 @@ export function mergeQuery(current: LocationQuery, patch: QueryPatch): LocationQ
     if (value === null || value === '') delete next[key]
     else next[key] = String(value)
   }
-  // Cases a year belong to one service: a different code starts without them (unless the patch sets them).
+  // Cases a year and a dose belong to one service: a different code starts without them (unless the patch sets them).
   const code = typeof patch.code === 'string' ? patch.code.trim() : ''
-  if (code && code.toUpperCase() !== (first(current.code) ?? '').toUpperCase() && !('cases' in patch)) delete next.cases
+  const otherCode = code && code.toUpperCase() !== (first(current.code) ?? '').toUpperCase()
+  if (otherCode && !('cases' in patch)) delete next.cases
+  if (otherCode && !('dose' in patch)) delete next.dose
   if (next.sort === 'rate') delete next.sort
   if (next.page === '1') delete next.page
   if (next.pageSize === String(DEFAULT_PAGE_SIZE)) delete next.pageSize
   return next
 }
 
-/** Only what the API understands; lens and cases are interpretation and never reach it. */
+/** Only what the API understands; lens, cases and dose are interpretation and never reach it. */
 export function toApiQuery(params: SearchParams): Record<string, QueryValue> {
   return {
     code: params.code,

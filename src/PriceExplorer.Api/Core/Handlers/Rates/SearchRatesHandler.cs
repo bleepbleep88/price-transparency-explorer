@@ -17,7 +17,8 @@ namespace PriceExplorer.Api.Core.Handlers.Rates;
 /// empty or surprising results.
 /// </summary>
 public sealed class SearchRatesHandler(
-    DuckDbConnectionFactory connections, ReferenceCatalog catalog, ProviderDirectoryInfo directory, ILogger<SearchRatesHandler> logger)
+    DuckDbConnectionFactory connections, ReferenceCatalog catalog, ProviderDirectoryInfo directory, CodeReference codes,
+    ILogger<SearchRatesHandler> logger)
     : IRequestHandler<SearchRatesQuery, RateSearchResult>
 {
     public async Task<RateSearchResult> Handle(SearchRatesQuery request, CancellationToken cancellationToken)
@@ -206,13 +207,27 @@ public sealed class SearchRatesHandler(
             .Order(StringComparer.Ordinal)
             .ToList();
 
+        // CMS's HCPCS Level II name: the fallback when the plan names nothing, and the standard wording of a drug's unit.
+        var cmsName = primary.CodeType == BillingCodes.Hcpcs
+            ? await connection.QueryFirstOrDefaultAsync<string?>(SqlFile.For<SearchRatesHandler>("HcpcsName.sql"), new { code = primary.Code })
+            : null;
+        var (name, description, source) = described is not null ? (described.Name, described.Description, "payer_file")
+            : cmsName is not null ? (CodeNames.Short(cmsName), CodeNames.Short(cmsName) == cmsName ? null : cmsName, "cms_hcpcs")
+            : (null, null, "none");
+        var category = ServiceCategories.Classify(primary.CodeType, primary.Code);
+        var doseUnit = category.Key == ServiceCategories.DrugsKey
+            ? DoseUnits.Parse(cmsName) ?? DoseUnits.Parse(described?.Name) ?? DoseUnits.Parse(described?.Description)
+            : null;
+
         return new CodeInfo(
             primary.CodeType,
             primary.Code,
-            described?.Name,
-            described?.Description,
-            described is null ? "none" : "payer_file",
-            ServiceCategories.Classify(primary.CodeType, primary.Code),
+            name,
+            description,
+            source,
+            category,
+            codes.Classify(primary.CodeType, primary.Code),
+            doseUnit,
             ServiceCategories.LevelFamily(primary.CodeType, primary.Code),
             foundVia);
     }

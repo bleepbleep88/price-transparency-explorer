@@ -307,6 +307,8 @@ describe('LensPanel', () => {
       description: 'Injection, dexamethasone sodium phosphate, 1 mg',
       descriptionSource: 'payer_file',
       category: { key: 'drugs', label: 'Drugs & biologicals', unit: 'per HCPCS unit', perUnit: true },
+      classification: { key: 'RI', category: 'Treatments', subcategory: 'Injections and Infusions (nononcologic)', family: null, source: 'cms_rbcs' },
+      doseUnit: { amount: 1, unit: 'mg', text: '1 mg' },
       levelFamily: null,
       foundVia: [],
     }

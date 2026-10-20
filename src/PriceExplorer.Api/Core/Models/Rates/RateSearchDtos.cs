@@ -38,7 +38,14 @@ public sealed record RateSearchEcho(
 
 public sealed record SnapshotRef(int SnapshotId, DateOnly? IndexDate, bool IsLatest);
 
-/// <param name="DescriptionSource">"payer_file" when the plan's file describes the code, otherwise "none".</param>
+/// <param name="Name">A short name: the plan's own, else CMS's HCPCS name (cut at a word near 100 characters).</param>
+/// <param name="Description">The plan's description, or CMS's full HCPCS name when the short one was cut.</param>
+/// <param name="DescriptionSource">"payer_file" when the plan's file describes the code, "cms_hcpcs" when the name comes
+/// from CMS's HCPCS Level II list instead, otherwise "none".</param>
+/// <param name="Category">How the code is priced: its kind of service and the unit a rate pays for.</param>
+/// <param name="Classification">What the code is: CMS's RBCS category, subcategory and family, or the code-range category.</param>
+/// <param name="DoseUnit">For drugs: the amount one HCPCS unit holds, read from the code's name ("10 mg" for J2704). Null
+/// when the name doesn't state one.</param>
 /// <param name="FoundVia">How the code appears in the files, e.g. "Billing code" or "Revenue code 0490 (Ambulatory surgery)".</param>
 public sealed record CodeInfo(
     string CodeType,
@@ -47,8 +54,26 @@ public sealed record CodeInfo(
     string? Description,
     string DescriptionSource,
     ServiceCategory Category,
+    CodeClassification Classification,
+    DoseUnit? DoseUnit,
     string? LevelFamily,
     IReadOnlyList<string> FoundVia);
+
+/// <summary>What a code is, for browsing and filtering (GET /api/v1/categories, the category filter on /codes).</summary>
+/// <param name="Key">The most specific category key: an RBCS family ("PG004") or subcategory ("PG"), or a code-range
+/// category ("facility").</param>
+/// <param name="Category">"Procedures", "Visits and care management", or a code-range category ("Facility rate (revenue code only)").</param>
+/// <param name="Subcategory">CMS's RBCS subcategory, e.g. "Digestive/Gastrointestinal"; null for code-range categories.</param>
+/// <param name="Family">CMS's RBCS family, e.g. "Lower GI Endoscopy - Other"; null when CMS gives none.</param>
+/// <param name="Source">"cms_rbcs" (CMS's Restructured BETOS Classification System) or "code_ranges" (CPT sections and
+/// HCPCS letter groups).</param>
+public sealed record CodeClassification(string Key, string Category, string? Subcategory, string? Family, string Source);
+
+/// <summary>How much of a drug one HCPCS unit is, as the code's name states it.</summary>
+/// <param name="Amount">10 for "10 mg"; 1 for "per ml".</param>
+/// <param name="Unit">"mg", "mcg", "g", "ml", "unit" or "meq".</param>
+/// <param name="Text">As written in the name: "10 mg", "per ml", "250 cc", "1 unit".</param>
+public sealed record DoseUnit(decimal Amount, string Unit, string Text);
 
 /// <summary>
 /// A fair comparison group: same code, product, fee type, setting, modifiers and rate type. Stats count each provider (tax ID) once.
@@ -219,3 +244,35 @@ public sealed record SearchQuality(
     int ProvidersWithMultipleRates,
     int MaskedTaxIds,
     int WholeTaxIdContracts);
+
+/// <summary>
+/// A visit code's level ladder: each level of its family side by side, for each plan, fee type, setting, modifier set and
+/// rate type (each line is one search card's numbers per level). Lines where most levels have 5 or more providers come first.
+/// </summary>
+/// <param name="Family">"Office visit, established patient", "Office visit, new patient" or "Emergency room visit".</param>
+/// <param name="Codes">The family's codes, lowest level first.</param>
+public sealed record LevelLadder(SnapshotRef Snapshot, string Family, IReadOnlyList<LevelCode> Codes, IReadOnlyList<LevelLine> Lines);
+
+/// <param name="Level">1 to 5 (99202 is level 2: level 1 of new-patient visits was deleted in 2021).</param>
+public sealed record LevelCode(string Code, int Level);
+
+/// <summary>One plan, fee type, setting, modifier set and rate type, across the levels it has rates for.</summary>
+/// <param name="Key">The search's group key without the code.</param>
+/// <param name="Unit">What one rate pays for, as the search card says ("per visit", "per visit (all-inclusive)").</param>
+/// <param name="Levels">The levels with rates here, lowest first; a level with none is left out.</param>
+public sealed record LevelLine(
+    string Key,
+    string ProductKey,
+    string ProductLabel,
+    string FeeType,
+    string SettingKey,
+    string SettingLabel,
+    IReadOnlyList<ModifierRef> Modifiers,
+    string NegotiatedType,
+    string Unit,
+    IReadOnlyList<LevelStep> Levels);
+
+/// <summary>One level on one line: that level's search card, as numbers.</summary>
+/// <param name="GroupKey">The search's group key for this level (<see cref="RateGroup.Key"/>).</param>
+/// <param name="StatsLevel">"list" (under 5 providers: no statistics), "basic" (5–9: median and range), "full" (10+).</param>
+public sealed record LevelStep(string Code, int Level, string GroupKey, int ProviderCount, string StatsLevel, RateStats Stats);

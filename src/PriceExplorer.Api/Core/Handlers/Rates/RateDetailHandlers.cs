@@ -3,6 +3,7 @@ using MediatR;
 using PriceExplorer.Api.Core.Data;
 using PriceExplorer.Api.Core.Domain;
 using PriceExplorer.Api.Core.Exceptions;
+using PriceExplorer.Api.Core.Handlers.Categories;
 using PriceExplorer.Api.Core.Models.Rates;
 using PriceExplorer.Api.Core.Queries.Rates;
 using PriceExplorer.Api.Core.Reference;
@@ -120,31 +121,56 @@ public sealed class ListRateNpisHandler(DuckDbConnectionFactory connections) : I
     private sealed record NpiRow(long Npi, bool Valid, decimal Rate, decimal RateHigh);
 }
 
-public sealed class SuggestCodesHandler(DuckDbConnectionFactory connections) : IRequestHandler<SuggestCodesQuery, IReadOnlyList<CodeSuggestion>>
+public sealed class SuggestCodesHandler(DuckDbConnectionFactory connections, CodeReference codeReference)
+    : IRequestHandler<SuggestCodesQuery, IReadOnlyList<CodeSuggestion>>
 {
     public async Task<IReadOnlyList<CodeSuggestion>> Handle(SuggestCodesQuery request, CancellationToken cancellationToken)
     {
-        var text = request.Q!.Trim();
+        var text = (request.Q ?? "").Trim();
         var code = CodeInput.Clean(text);
         var digits = code.All(char.IsAsciiDigit) ? code.TrimStart('0') : "";
 
         await using var connection = await connections.OpenAsync(cancellationToken);
         var snapshot = await SnapshotResolver.ResolveAsync(connection, request.Snapshot);
+
+        // The category filter needs CMS's RBCS classes and the code-range fallback, so the category's codes are picked here.
+        string? inCategory = null;
+        if (request.Category is { } category)
+        {
+            var codes = (await SnapshotCodes.ListAsync(connection, snapshot.SnapshotId))
+                .Where(c => codeReference.PathOf(c.CodeType, c.Code).Any(level => string.Equals(level.Key, category, StringComparison.OrdinalIgnoreCase)))
+                .Select(c => $"{c.CodeType}:{c.Code}")
+                .ToList();
+            if (codes.Count == 0)
+            {
+                return [];
+            }
+
+            inCategory = string.Join(',', codes);
+        }
+
         var rows = await connection.QueryAsync<SuggestionRow>(
             SqlFile.For<SuggestCodesHandler>("SuggestCodes.sql"),
-            new { snapshotId = snapshot.SnapshotId, code, digits, text = text.ToLowerInvariant(), limit = request.Limit });
+            new { snapshotId = snapshot.SnapshotId, code, digits, text = text.ToLowerInvariant(), limit = request.Limit, inCategory });
 
         return rows.Select(row =>
         {
-            var category = ServiceCategories.Classify(row.CodeType, row.Code);
+            var pricing = ServiceCategories.Classify(row.CodeType, row.Code);
+            var classification = codeReference.Classify(row.CodeType, row.Code);
+            var (name, description) = row.Name is not null || row.Description is not null || row.CmsName is null
+                ? (row.Name, row.Description)
+                : (CodeNames.Short(row.CmsName), CodeNames.Short(row.CmsName) == row.CmsName ? null : row.CmsName);
             return new CodeSuggestion(
-                row.CodeType, row.Code, row.Name, row.Description, category.Label, category.Unit, row.Direct,
+                row.CodeType, row.Code, name, description,
+                CodeReference.Label(classification),
+                pricing.Unit, row.Direct,
                 (row.RevenueCodes ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal).ToList(),
                 row.Rates);
         }).ToList();
     }
 
-    private sealed record SuggestionRow(string CodeType, string Code, string? Name, string? Description, long Rates, bool Direct, string? RevenueCodes);
+    private sealed record SuggestionRow(
+        string CodeType, string Code, string? Name, string? Description, string? CmsName, long Rates, bool Direct, string? RevenueCodes);
 }
 
 public sealed class SuggestProvidersHandler(DuckDbConnectionFactory connections) : IRequestHandler<SuggestProvidersQuery, IReadOnlyList<ProviderSuggestion>>

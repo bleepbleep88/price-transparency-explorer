@@ -128,13 +128,25 @@ Three monthly files are loaded. The snapshot picker in the app bar switches ever
 
 These include facility charges with no procedure named (3,335 and 3,816 of the changed, new and dropped rows), which the page leaves out by default. Counts are of provider values: one per provider per comparison group. When a provider has several rates in a group, its value is their NPI-weighted median, so it also moves when a rate is added or removed; the changes page marks those rows. Same rates with only the NPI counts moved (11 and 33 pairs) are unchanged.
 
+## Extra: what each code is, visit levels and drug doses
+
+Two more small CMS files ship in `reference/` (built by the same tool, see `reference/README.md`): the HCPCS Level II names from the October 2026 quarterly file, and the RBCS (Restructured BETOS) category of every CPT and HCPCS code. Neither holds CPT descriptors (the AMA's) or dental names (the ADA's).
+
+- Each code gets **CMS's category**: "Procedures · Digestive/Gastrointestinal" for 45378, with the RBCS family in a tooltip. Codes RBCS doesn't list, like revenue codes, keep the code-range category, under one root: "Not in CMS's categories". `/api/v1/categories` lists the tree with code and rate counts (a subcategory's codes with no CMS family sit in "Other …", so children add up), and the code typeahead takes `category`.
+- Two key sets, on purpose: a search result's `category` says how a code is priced (`drugs`, `anesthesia`: the unit), and its `classification` says what it is. `classification.key` (`PG004`, `PG`, `P`, `facility`) is what `/api/v1/categories` lists and `/codes?category=` takes, in any letter case; a key that isn't in the tree is a 400.
+- When the plan's file doesn't name a code (a drug named only in a revenue-code rate's notes), the name comes from **CMS's HCPCS list**, and the page says so.
+- **How it's priced** explains each way the prices are paid where it applies: anesthesia units, drugs per HCPCS unit, supplies per item, lab tests per test, facility rates under revenue codes, health centers paid per visit, imaging's reading and scan parts (modifiers 26 and TC), and visit levels.
+- **Visit levels side by side**: office visits (99202–99205, 99211–99215) and ER visits (99281–99285) show each level's typical price on the same plan, setting, fee and modifiers, as a chart and a table. `/api/v1/rates/levels` builds it from the same numbers as each level's search.
+- **What a dose comes to at the plan's rates**, for drugs: the unit comes from the code's name (J3301 is 10 mg; a name with two amounts, like "3 mg and 3 mg", gets no calculator), the dose is rounded up to whole units as billing does (any dose is at least 1), and the cost is units at a card's typical price per unit, every step said in words. Discarded-drug (JW) and percentage cards never price a dose; when nothing else has 5 or more providers, the page says why instead.
+
 ## API
 
 | Endpoint | |
 |---|---|
 | `GET /api/v1/rates?code=&npi=&ein=&provider=&specialty=&county=&product=&setting=&feeType=&group=&sort=&page=&pageSize=&snapshot=` | Comparison groups, provider rows, and hints that explain empty or surprising results. Every hint link is checked to find rates before it's sent. |
 | `GET /api/v1/rates/{id}/source` · `/npis?provider=&alsoRate=` | Where a rate came from; the NPIs behind a result row, each with its rate |
-| `GET /api/v1/codes?q=` · `/providers?q=` · `/specialties?q=` · `/reference` | Typeahead and filter options (including New York counties and the registry release) |
+| `GET /api/v1/codes?q=&category=` · `/providers?q=` · `/specialties?q=` · `/reference` | Typeahead and filter options (including New York counties and the registry release) |
+| `GET /api/v1/categories` · `/rates/levels?code=` | Category tree (CMS RBCS, with code-range fallback) with code and rate counts; each visit level, like for like |
 | `GET /api/v1/status` · `/status/stream` | Loading progress (the stream uses server-sent events) |
 | `GET /api/v1/snapshots` · `/snapshots/{id}/plans` | Loaded files, their sources and counts, and how complete each looks; plans per product |
 | `GET /api/v1/sources` | Every snapshot and file (rate and allowed-amount files): URL, three dates, size, SHA-256, ETag, counts, rejects by reason, timing |
