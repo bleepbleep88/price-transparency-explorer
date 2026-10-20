@@ -86,7 +86,10 @@ public sealed record ProviderSuggestion(
     IReadOnlyList<string> OtherNames,
     long Rates);
 
-public sealed record ReferenceLists(IReadOnlyList<SettingOption> Settings, IReadOnlyList<string> Sorts);
+/// <param name="Locations">New York counties and NYC boroughs for the location filter; empty without a provider directory.</param>
+/// <param name="Directory">Where the provider directory came from; null when none is loaded.</param>
+public sealed record ReferenceLists(
+    IReadOnlyList<SettingOption> Settings, IReadOnlyList<string> Sorts, IReadOnlyList<LocationOption> Locations, DirectorySource? Directory);
 
 public sealed record SettingOption(string Key, string Label, string? Note);
 
@@ -96,3 +99,12 @@ public sealed record SettingOption(string Key, string Label, string? Note);
 /// <param name="NpisLoaded">NPIs in the loaded directory.</param>
 /// <param name="Source">The NPPES download it was built from.</param>
 public sealed record DirectorySource(string? Release, DateTimeOffset? BuiltAt, long NpisLoaded, string? Source);
+
+/// <summary>A New York county or NYC borough where NPIs in the files practice.</summary>
+/// <param name="Label">What the location filter accepts: "Manhattan", "Monroe".</param>
+/// <param name="Npis">NPIs practicing there.</param>
+public sealed record LocationOption(string Label, bool IsBorough, long Npis);
+
+/// <param name="Group">The NUCC grouping, e.g. "Allopathic &amp; Osteopathic Physicians".</param>
+/// <param name="Npis">NPIs in the files with this specialty.</param>
+public sealed record SpecialtySuggestion(string Specialty, string? Group, long Npis);

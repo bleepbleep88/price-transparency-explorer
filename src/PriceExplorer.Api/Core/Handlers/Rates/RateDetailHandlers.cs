@@ -176,10 +176,34 @@ public sealed class SuggestProvidersHandler(DuckDbConnectionFactory connections)
     private sealed record ProviderRow(string ProviderKey, string? Ein, bool EinUnverified, string? BusinessNames, long Rates);
 }
 
-public sealed class GetReferenceListsHandler(ReferenceCatalog catalog) : IRequestHandler<GetReferenceListsQuery, ReferenceLists>
+public sealed class GetReferenceListsHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog, ProviderDirectoryInfo directory)
+    : IRequestHandler<GetReferenceListsQuery, ReferenceLists>
 {
-    public Task<ReferenceLists> Handle(GetReferenceListsQuery request, CancellationToken cancellationToken) =>
-        Task.FromResult(new ReferenceLists(
+    public async Task<ReferenceLists> Handle(GetReferenceListsQuery request, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<LocationOption> locations = [];
+        if (directory.IsLoaded)
+        {
+            await using var connection = await connections.OpenAsync(cancellationToken);
+            locations = (await connection.QueryAsync<LocationOption>(SqlFile.For<GetReferenceListsHandler>("Locations.sql"))).ToList();
+        }
+
+        return new ReferenceLists(
             catalog.Settings.Select(setting => new SettingOption(setting.Key, setting.Label, setting.Note)).ToList(),
-            SearchRatesQueryValidator.Sorts));
+            SearchRatesQueryValidator.Sorts,
+            locations,
+            directory.Source);
+    }
+}
+
+public sealed class SuggestSpecialtiesHandler(DuckDbConnectionFactory connections)
+    : IRequestHandler<SuggestSpecialtiesQuery, IReadOnlyList<SpecialtySuggestion>>
+{
+    public async Task<IReadOnlyList<SpecialtySuggestion>> Handle(SuggestSpecialtiesQuery request, CancellationToken cancellationToken)
+    {
+        await using var connection = await connections.OpenAsync(cancellationToken);
+        return (await connection.QueryAsync<SpecialtySuggestion>(
+            SqlFile.For<SuggestSpecialtiesHandler>("SuggestSpecialties.sql"),
+            new { text = request.Q!.Trim(), limit = request.Limit })).ToList();
+    }
 }

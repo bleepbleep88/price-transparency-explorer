@@ -27,8 +27,11 @@ public sealed record SuggestCodesQuery(string? Q, int? Snapshot = null, int Limi
 public sealed record SuggestProvidersQuery(string? Q, int? Snapshot = null, int Limit = 10)
     : IRequest<IReadOnlyList<ProviderSuggestion>>, IRequiresData;
 
-/// <summary>Option lists for the search filters.</summary>
+/// <summary>Option lists for the search filters, and where the provider directory came from.</summary>
 public sealed record GetReferenceListsQuery : IRequest<ReferenceLists>;
+
+/// <summary>Typeahead: specialties (NUCC, from the national provider registry) among the NPIs in the files.</summary>
+public sealed record SuggestSpecialtiesQuery(string? Q, int Limit = 10) : IRequest<IReadOnlyList<SpecialtySuggestion>>;
 
 /// <summary>Input rules shared by the rate detail and typeahead queries.</summary>
 internal static class InputRules
@@ -87,6 +90,25 @@ public sealed class SuggestCodesQueryValidator : AbstractValidator<SuggestCodesQ
             .WithMessage("Search text can't contain control characters.");
         RuleFor(query => query.Limit).InclusiveBetween(1, 50).WithMessage("Limit is between 1 and 50.");
         RuleFor(query => query.Snapshot).GreaterThan(0).When(query => query.Snapshot is not null).WithMessage("Snapshot id must be a positive number.");
+    }
+}
+
+public sealed class SuggestSpecialtiesQueryValidator : AbstractValidator<SuggestSpecialtiesQuery>
+{
+    public SuggestSpecialtiesQueryValidator()
+    {
+        RuleFor(query => query.Q)
+            .Must(q => q is not null && q.Trim().Length >= 2)
+            .WithMessage("Type at least 2 characters of a specialty, for example 'gastro'.");
+        RuleFor(query => query.Q)
+            .Must(q => !InputRules.HasControlCharacters(q!))
+            .When(query => query.Q is not null)
+            .WithMessage("Search text can't contain control characters.");
+        RuleFor(query => query.Q)
+            .Must(q => q!.Trim().Length <= 100)
+            .When(query => query.Q is not null)
+            .WithMessage("Search text is at most 100 characters.");
+        RuleFor(query => query.Limit).InclusiveBetween(1, 50).WithMessage("Limit is between 1 and 50.");
     }
 }
 
