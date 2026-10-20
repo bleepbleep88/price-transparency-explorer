@@ -144,6 +144,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
               :groups="result.groups"
               :sort="params.sort"
               :loading="search.isFetching.value"
+              :yours="Boolean(result.query.npi || result.query.ein || result.query.provider)"
               @update-options="onTableOptions"
               @open-source="openSource"
               @open-npis="openNpis"

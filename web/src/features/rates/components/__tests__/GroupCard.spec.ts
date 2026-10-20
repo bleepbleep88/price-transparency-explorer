@@ -123,6 +123,8 @@ describe('GroupCard', () => {
     expect(highlights.text()).toContain('Example Surgery Center')
     expect(highlights.text()).toContain('75th percentile')
     expect(highlights.text()).toContain(`${money(173.06)} above the 25th percentile`)
+    // The provider's own rate is the copper chip.
+    expect(highlights.get('[data-testid="your-rate"]').text()).toBe(money(627.5))
 
     await wrapper.findAll('button').find((button) => button.text() === 'Show these providers')!.trigger('click')
     expect(wrapper.emitted('showProviders')).toEqual([[group.key]])

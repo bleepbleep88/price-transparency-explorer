@@ -72,6 +72,6 @@ const label = computed(() => {
   margin-left: -5px;
   border-radius: 50%;
   border: 2px solid rgb(var(--v-theme-surface));
-  background: rgb(var(--v-theme-warning));
+  background: rgb(var(--v-theme-copper));
 }
 </style>

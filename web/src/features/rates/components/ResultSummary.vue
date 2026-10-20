@@ -18,11 +18,12 @@ const code = computed(() => props.result.code)
 // Removable chips for everything that narrows the results.
 const activeFilters = computed(() => {
   const p = props.params
-  const chips: { key: keyof SearchParams; label: string }[] = []
+  // yours: the chip names the provider being looked up, so it carries the copper mark.
+  const chips: { key: keyof SearchParams; label: string; yours?: boolean }[] = []
   if (p.codeType) chips.push({ key: 'codeType', label: `Code type: ${p.codeType}` })
-  if (p.npi) chips.push({ key: 'npi', label: `NPI ${p.npi}` })
-  if (p.ein) chips.push({ key: 'ein', label: p.ein.startsWith('u') ? 'One provider (masked tax ID)' : `EIN ${p.ein}` })
-  if (p.provider) chips.push({ key: 'provider', label: `Name contains "${p.provider}"` })
+  if (p.npi) chips.push({ key: 'npi', label: `NPI ${p.npi}`, yours: true })
+  if (p.ein) chips.push({ key: 'ein', label: p.ein.startsWith('u') ? 'One provider (masked tax ID)' : `EIN ${p.ein}`, yours: true })
+  if (p.provider) chips.push({ key: 'provider', label: `Name contains "${p.provider}"`, yours: true })
   if (p.product) chips.push({ key: 'product', label: props.products.find((x) => x.productKey === p.product)?.productLabel ?? p.product })
   if (p.setting) chips.push({ key: 'setting', label: props.settings.find((x) => x.key === p.setting)?.label ?? p.setting })
   if (p.feeType) chips.push({ key: 'feeType', label: p.feeType === 'facility' ? 'Facility fees' : 'Professional fees' })
@@ -95,6 +96,8 @@ const qualityChips = computed(() => {
         :key="chip.key"
         closable
         :close-label="`Remove ${chip.label}`"
+        :class="{ 'copper-mark': chip.yours }"
+        :variant="chip.yours ? 'outlined' : undefined"
         data-testid="active-filter"
         @click:close="emit('update', { [chip.key]: null })"
       >

@@ -6,7 +6,14 @@ import { money, plural, times } from '@/lib/format'
 import type { RateGroup, RateRow, RateRowsPage } from '../api/types'
 import type { SortKey } from '../lib/searchParams'
 
-const props = defineProps<{ rows: RateRowsPage; groups: RateGroup[]; sort: SortKey; loading?: boolean }>()
+const props = defineProps<{
+  rows: RateRowsPage
+  groups: RateGroup[]
+  sort: SortKey
+  loading?: boolean
+  /** The search named a provider (NPI, EIN or name): its rows get the copper "your provider" edge. */
+  yours?: boolean
+}>()
 const emit = defineEmits<{
   updateOptions: [options: { page: number; pageSize: number; sort: SortKey }]
   openSource: [row: RateRow]
@@ -41,10 +48,15 @@ function groupLabel(row: RateRow): string {
   return `${fee} · ${group.settingLabel}${modifiers}`
 }
 
-const bandView: Record<string, { label: string; color: string }> = {
-  low: { label: 'Low', color: 'success' },
-  typical: { label: 'Typical', color: 'default' },
-  high: { label: 'High', color: 'warning' },
+// Stamped like a ledger mark: outlined in the band's color; typical stays neutral ink.
+const bandView: Record<string, { label: string; color?: string }> = {
+  low: { label: 'Low', color: 'low' },
+  typical: { label: 'Typical' },
+  high: { label: 'High', color: 'high' },
+}
+
+function rowProps({ item }: { item: RateRow }) {
+  return props.yours && item.matched ? { class: 'row-yours' } : {}
 }
 
 function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key: string; order?: boolean | 'asc' | 'desc' }[] }) {
@@ -70,6 +82,7 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
     :mobile="smAndDown"
     density="compact"
     hover
+    :row-props="rowProps"
     data-testid="provider-table"
     @update:options="onOptions"
   >
@@ -129,7 +142,7 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
     </template>
 
     <template #[`item.band`]="{ item }">
-      <v-chip v-if="item.band" :color="bandView[item.band]?.color" size="small" variant="tonal">
+      <v-chip v-if="item.band" :color="bandView[item.band]?.color" size="small" variant="outlined" data-testid="band-chip">
         {{ bandView[item.band]?.label }}
       </v-chip>
       <span v-else class="text-body-small text-medium-emphasis">Small group</span>

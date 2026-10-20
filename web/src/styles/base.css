@@ -61,6 +61,25 @@ h2,
   font-weight: 600;
 }
 
+/* ---- Copper marks the provider you searched: rows, the range-bar marker, and its rate chips. ---- */
+
+/* Copper fill with ink text and a copper border (copper text would be too faint on paper). */
+.v-chip.copper-mark {
+  color: rgb(var(--v-theme-on-surface));
+  border-color: rgb(var(--v-theme-copper));
+  background-color: rgba(var(--v-theme-copper), 0.22);
+  font-weight: 600;
+}
+
+.yours-rule {
+  border-left: 3px solid rgb(var(--v-theme-copper));
+  padding-left: 10px;
+}
+
+.v-table tr.row-yours > td:first-child {
+  box-shadow: inset 3px 0 0 rgb(var(--v-theme-copper));
+}
+
 /* ---- Ledger rules ---- */
 
 /* A firmer rule under table headers; rows keep Vuetify's hairline. */

@@ -13,8 +13,9 @@ const showNotes = ref(false)
 const stats = computed(() => props.group.stats)
 const facilityBilling = computed(() => props.group.billedAs.filter((billed) => billed.billingCodeType === 'RC'))
 
+/** Everything after the copper rate chip: percentile, multiple of the median, distance from the 25th percentile. */
 function positionText(position: ProviderPosition): string {
-  const parts = [money(position.rate)]
+  const parts: string[] = []
   if (position.percentile != null) parts.push(`${ordinal(position.percentile)} percentile`)
   if (position.vsMedian != null) parts.push(`${times(position.vsMedian)} median`)
   if (position.aboveP25 != null) {
@@ -109,11 +110,13 @@ function positionText(position: ProviderPosition): string {
         </v-sheet>
       </div>
 
-      <div v-if="group.highlights.length" class="d-flex flex-column ga-1" data-testid="group-highlights">
+      <div v-if="group.highlights.length" class="yours-rule d-flex flex-column ga-1" data-testid="group-highlights">
         <p class="text-body-small font-weight-medium">Where your provider sits</p>
-        <p v-for="position in group.highlights" :key="position.providerKey" class="text-body-medium">
-          <strong>{{ position.displayName }}</strong>: {{ positionText(position) }}
-        </p>
+        <div v-for="position in group.highlights" :key="position.providerKey" class="d-flex flex-wrap align-center ga-1 text-body-medium">
+          <v-chip class="copper-mark" variant="outlined" data-testid="your-rate">{{ money(position.rate) }}</v-chip>
+          <strong>{{ position.displayName }}</strong>
+          <span>{{ positionText(position) }}</span>
+        </div>
       </div>
 
       <div v-if="group.notes.length">
