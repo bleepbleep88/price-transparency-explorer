@@ -1,3 +1,5 @@
+using PriceExplorer.Api.Core.Domain;
+
 namespace PriceExplorer.Api.Core.Models.Snapshots;
 
 /// <summary>One loaded index (snapshot) and the rate files it points to.</summary>
@@ -13,6 +15,7 @@ public sealed record SnapshotSummary(
     IReadOnlyList<ProductFileSummary> Products);
 
 /// <summary>A product's in-network rate file, with where it came from and what loading found.</summary>
+/// <param name="Completeness">How complete the product's file looks next to nearby snapshots; null until it's saved.</param>
 public sealed record ProductFileSummary(
     int FileId,
     string ProductKey,
@@ -33,7 +36,8 @@ public sealed record ProductFileSummary(
     long? DuplicatesRemoved,
     int? DistinctNpis,
     int? DistinctEins,
-    DateTimeOffset? LoadedAt);
+    DateTimeOffset? LoadedAt,
+    ProductCompleteness? Completeness);
 
 public sealed record SnapshotPlans(int SnapshotId, IReadOnlyList<ProductPlans> Products);
 
