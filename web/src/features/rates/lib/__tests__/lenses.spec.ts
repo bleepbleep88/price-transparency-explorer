@@ -4,7 +4,9 @@ import {
   apiSearchUrl,
   costLines,
   filedUnderRevenueCode,
+  filteredProviders,
   groupName,
+  hasDirectoryFilter,
   hasFacilityCharges,
   hasProviderFilter,
   highlightHeading,
@@ -159,10 +161,30 @@ describe('providers lens', () => {
     return { ...result, query: { ...result.query, provider } }
   }
 
-  it('needs an NPI, EIN or name filter', () => {
+  const byDirectory = (groups: RateGroup[], filters: { specialty?: string; county?: string; npi?: string }) => {
+    const result = makeResult(groups)
+    return { ...result, query: { ...result.query, ...filters } }
+  }
+
+  it('needs an NPI, EIN, name, specialty or location filter', () => {
     expect(hasProviderFilter(makeResult([office]))).toBe(false)
     expect(hasProviderFilter(byNpi([office]))).toBe(true)
     expect(hasProviderFilter(byName([office], 'heel'))).toBe(true)
+    expect(hasProviderFilter(byDirectory([office], { county: 'Brooklyn' }))).toBe(true)
+    expect(hasDirectoryFilter(byDirectory([office], { specialty: 'podiatr' }))).toBe(true)
+    expect(hasDirectoryFilter(byName([office], 'heel'))).toBe(false)
+  })
+
+  it('names the specialty and location as the API does, and says "your" only for an NPI or EIN', () => {
+    expect(highlightHeading(byDirectory([office], { county: 'Brooklyn' }))).toBe('Where providers in "Brooklyn" sit')
+    expect(highlightHeading(byDirectory([office], { specialty: 'podiatr', county: 'Brooklyn' }))).toBe(
+      'Where providers with a specialty matching "podiatr" in "Brooklyn" sit',
+    )
+    expect(highlightHeading(byDirectory([office], { npi: '1801474036', county: 'Brooklyn' }))).toBe('Where your provider sits')
+    expect(filteredProviders({ ...makeResult([]).query, provider: 'heel', specialty: 'podiatr' })).toBe(
+      'providers whose name contains "heel" with a specialty matching "podiatr"',
+    )
+    expect(yourRateLines(byDirectory([office], { county: 'Brooklyn' }))[0]!.text).toMatch(/^Rate \$80\.72/)
   })
 
   it('says "your price" when an NPI or EIN pins one provider, and just "price" for a name search', () => {

@@ -17,7 +17,7 @@ import {
   yearlyLine,
   type PriceSummary,
 } from '@/lib/plainNumbers'
-import type { CodeInfo, ModifierRef, RateGroup, RateSearchResult, SearchQuality } from '../api/types'
+import type { CodeInfo, ModifierRef, RateGroup, RateSearchEcho, RateSearchResult, SearchQuality } from '../api/types'
 import { toApiQuery, type Lens, type SearchParams } from './searchParams'
 
 // Audience lenses read the current search response; they never fetch anything and never change the numbers.
@@ -126,9 +126,26 @@ export function priceSummary(group: RateGroup): PriceSummary {
 
 // ---- Providers ----
 
+/** Any filter that picks providers: NPI, EIN, name, specialty or location. Groups then highlight the matches. */
 export function hasProviderFilter(result: RateSearchResult): boolean {
   const query = result.query
-  return Boolean(query.npi || query.ein || query.provider)
+  return Boolean(query.npi || query.ein || query.provider || query.specialty || query.county)
+}
+
+/** A specialty or location filter: it picks the rows, while percentiles still compare with every provider. */
+export function hasDirectoryFilter(result: RateSearchResult): boolean {
+  return Boolean(result.query.specialty || result.query.county)
+}
+
+/**
+ * The providers a name, specialty or location filter picks, worded like the API's hints:
+ * 'providers whose name contains "heel" with a specialty matching "podiatr" in "Brooklyn"'.
+ */
+export function filteredProviders(query: RateSearchEcho): string {
+  let text = query.provider ? `providers whose name contains "${query.provider}"` : 'providers'
+  if (query.specialty) text += ` with a specialty matching "${query.specialty}"`
+  if (query.county) text += ` in "${query.county}"`
+  return text
 }
 
 /** An NPI or EIN pins one provider, so the reading can say "your". A name filter can match many providers. */
@@ -207,11 +224,11 @@ export function yourRateGroups(result: RateSearchResult): YourRateGroup[] {
     }))
 }
 
-/** Heading over a card's highlights: "your" only when an NPI or EIN pins one provider. */
+/** Heading over a card's highlights: "your" only when an NPI or EIN pins one provider; otherwise it names the filters. */
 export function highlightHeading(result: RateSearchResult): string {
-  return pinsProvider(result) || !result.query.provider
+  return pinsProvider(result) || !hasProviderFilter(result)
     ? 'How your provider compares'
-    : `How providers whose name contains "${result.query.provider}" compare`
+    : `How ${filteredProviders(result.query)} compare`
 }
 
 // ---- Plans ----

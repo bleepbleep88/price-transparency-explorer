@@ -139,6 +139,27 @@ describe('LensPanel', () => {
     expect(wrapper.get('[data-testid="highlight-cap"]').text()).toBe('Showing 5 of 12 matching providers; the table lists them all.')
   })
 
+  it('providers: a location or specialty search names the filters and says the percentiles stay market-wide', () => {
+    const highlights = [{ providerKey: 'k', displayName: 'Yorkville Endoscopy, LLC', rate: 371.78, percentile: 10, vsMedian: 0.64, aboveP25: -82.67, rateLow: 371.78, rateHigh: 371.78 }]
+    const filters = { specialty: 'ambulatory', county: 'Manhattan' }
+    const wrapper = mountPanel(result([group({ matchedProviders: 1, highlights })], filters), { lens: 'providers', ...filters })
+
+    expect(wrapper.get('[data-testid="lens-filtered"]').text()).toBe('Providers with a specialty matching "ambulatory" in "Manhattan":')
+    expect(wrapper.get('[data-testid="your-rate-line"]').text()).toContain('Rate $371.78 is at the 10th percentile')
+    expect(wrapper.get('[data-testid="lens-market-wide"]').text()).toBe(
+      'Percentiles compare with every provider in the group, not only those matching the specialty or location.',
+    )
+    // An NPI still pins "your" provider; the note stays because the percentile still counts everyone.
+    const pinned = mountPanel(result([group({ matchedProviders: 1, highlights })], { npi: '1174873780', county: 'Manhattan' }), {
+      lens: 'providers',
+      npi: '1174873780',
+      county: 'Manhattan',
+    })
+    expect(pinned.find('[data-testid="lens-filtered"]').exists()).toBe(false)
+    expect(pinned.get('[data-testid="your-rate-line"]').text()).toContain('Your rate $371.78')
+    expect(pinned.find('[data-testid="lens-market-wide"]').exists()).toBe(true)
+  })
+
   it('plans: where prices vary most first, and one click shows the highest prices for it', async () => {
     const wrapper = mountPanel(result([group()]), { lens: 'plans' })
     const line = wrapper.get('[data-testid="spread-line"]').text()
