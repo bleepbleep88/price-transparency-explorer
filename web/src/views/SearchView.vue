@@ -19,9 +19,12 @@ import { visibleGroups } from '@/features/out-of-network/lib/outOfNetworkText'
 import type { RateRow } from '@/features/rates/api/types'
 import { useRateSearch, useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import { useSearchRoute } from '@/features/rates/composables/useSearchRoute'
-import { groupName, highlightHeading, marksSearchedProvider } from '@/features/rates/lib/lenses'
+import { groupName, highlightHeading, marksSearchedProvider, pinsProvider } from '@/features/rates/lib/lenses'
 import { LIKE_FOR_LIKE } from '@/lib/plainNumbers'
 import type { QueryPatch, SortKey } from '@/features/rates/lib/searchParams'
+import TrendLine from '@/features/history/components/TrendLine.vue'
+import { useRateTrend } from '@/features/history/composables/useHistoryQueries'
+import { usableSnapshots } from '@/features/history/lib/snapshots'
 
 const { params, hasCode, urlErrors, canSearch, update, replace, startOver } = useSearchRoute()
 const search = useRateSearch(params, canSearch)
@@ -33,6 +36,11 @@ const currentSnapshot = computed(() => {
   const list = snapshots.data.value ?? []
   return list.find((s) => s.snapshotId === params.value.snapshot) ?? list.find((s) => s.isLatest) ?? null
 })
+
+// With more than one snapshot loaded, each card shows how its group moved across them.
+const trend = useRateTrend(params, computed(() => canSearch.value && usableSnapshots(snapshots.data.value ?? []).length > 1))
+const trendResult = computed(() => (trend.isError.value ? null : (trend.data.value ?? null)))
+const trends = computed(() => new Map((trendResult.value?.groups ?? []).map((group) => [group.key, group])))
 const products = computed(() => currentSnapshot.value?.products ?? [])
 const settings = computed(() => reference.data.value?.settings ?? [])
 const locations = computed(() => reference.data.value?.locations ?? [])
@@ -179,8 +187,17 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
                 :selected="params.group === group.key"
                 :highlight-heading="highlightHeading(result)"
                 :yours="marksSearchedProvider(result)"
+                :data-group-key="group.key"
                 @show-providers="showGroup"
-              />
+              >
+                <template v-if="trends.get(group.key)" #trend>
+                  <TrendLine
+                    :trend="trends.get(group.key)!"
+                    :selected-id="trendResult?.selected.snapshotId ?? null"
+                    :show-provider="pinsProvider(result)"
+                  />
+                </template>
+              </GroupCard>
             </v-col>
           </v-row>
 

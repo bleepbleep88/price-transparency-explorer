@@ -120,6 +120,9 @@ function positionText(position: ProviderPosition): string | null {
         </div>
       </div>
 
+      <!-- How the group moved across the plan's monthly files, when more than one is loaded. -->
+      <slot name="trend" />
+
       <div v-if="group.notes.length">
         <v-btn variant="text" size="small" class="px-0" @click="showNotes = !showNotes">
           {{ showNotes ? 'Hide' : 'Show' }} notes ({{ group.notes.length }})
