@@ -63,7 +63,10 @@ export interface StartCard extends LensOption {
   links?: readonly ExternalLink[]
 }
 
-/** Home page: one card per audience. Every example is a search with something to show in the 2026-08-31 files. */
+/**
+ * Home page: one card per audience. Every example finds rates in each loaded file (2026-07-27, 08-31, 09-28), except that
+ * the providers example's NPI has no 99213 rate before 2026-08-31.
+ */
 export const START_HERE: readonly StartCard[] = [
   {
     ...lensOption('providers'),

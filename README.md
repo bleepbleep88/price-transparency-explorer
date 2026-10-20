@@ -2,7 +2,7 @@
 
 Search what a health plan has agreed to pay for a service, and see how each provider's rate compares with every other provider's rate for the same service in the same setting.
 
-It reads Centene's Fidelis Care **Transparency in Coverage** index (`2026-08-31_fidelis_index.json`, from the brief), loads every in-network rate file the index lists (Ambetter from Fidelis Care and the Essential Plan, about 263 MB of JSON) and its out-of-network allowed-amount files, cleans and de-duplicates them into DuckDB, and serves a search API and a Vue web app.
+It reads three monthly **Transparency in Coverage** indexes from Centene's Fidelis Care (2026-07-27, the brief's 2026-08-31, and 2026-09-28), loads every in-network rate file they list (Ambetter from Fidelis Care and the Essential Plan, about 810 MB of JSON in all) and their out-of-network allowed-amount files, cleans and de-duplicates them into DuckDB, and serves a search API and a Vue web app. Pages show the newest month; the app bar switches to any other.
 
 **Search** needs a billing code (CPT, HCPCS or revenue code). NPI and EIN are optional and narrow the results to one provider, which is then shown against the market.
 
@@ -12,9 +12,9 @@ One neutral explorer, with a "start here" card and a short "what this means for 
 
 | Audience | Question it answers |
 |---|---|
-| Providers | Where does my rate sit against other providers for the same service and setting? |
-| Health plans | Where are prices spread widest, and which rates are outliers? |
-| Employers | What does a service typically cost, and how far above the lower quartile is a typical rate? |
+| Providers | Where does my rate sit against other providers for the same service and setting, and how has it moved? |
+| Health plans | Where are prices spread widest, which rates are outliers, and what changed since the last file? |
+| Employers | What does a service typically cost, how far above the lower quartile is a typical rate, and how is the median moving? |
 | Innovators | How clean is this data, and can I trace and build on every number? |
 | Life sciences | What does a drug or device cost per unit, by site of care? |
 
@@ -29,7 +29,7 @@ docker compose up --build
 - App: http://localhost:8080
 - API docs (OpenAPI + Scalar): http://localhost:8080/scalar
 
-The first start downloads the rate files (about 263 MB) and loads them in the background. Parsing takes about 2 s; the rest is download time. The app opens immediately and shows live loading progress, and searches answer as soon as the first file is saved. Restarts reuse the downloaded files: the payer is re-checked with ETags, and unchanged files aren't parsed again. To start fresh, run `docker compose down -v`.
+The first start downloads the rate files (about 810 MB for the three months) and loads them in the background, newest month first. Parsing all six files takes about 5 s and saving the three months' statistics about 8 s; the rest is download time. The app opens immediately and shows live loading progress, and searches answer as soon as the first file is saved. Files load one at a time, so memory stays modest: loading all three months peaked at about 560 MB (working set), against about 470 MB for the brief's month alone. Restarts reuse the downloaded files: the payer is re-checked with ETags, and unchanged files aren't parsed again. To start fresh, run `docker compose down -v`.
 
 ## Develop
 
@@ -110,6 +110,24 @@ The rate files list bare NPIs. `reference/provider_directory.csv.gz` (1.9 MB) gi
 - Filter by **specialty** or by **New York county or NYC borough**. With both, one NPI must have that specialty and practice there. Like an NPI filter, they pick rows; the statistics stay market-wide. A specialty picked from the list finds just that specialty. Typed words match the start of words in specialty names, so "urology" never finds neurologists, and common forms work ("cardiologist", "ENT", "OB/GYN", "orthopaedic"). Locations take county or borough names ("Kings County", "The Bronx") or "NYC".
 - **Check this** flags mark listed rates that look unusual for the provider: a facility rate whose NPIs are all individual clinicians, anesthesia without an anesthesia clinician, a CT, MRI or PET read with no radiologist or nuclear medicine physician (cardiologists count for cardiac scans), deactivated NPIs. The files list contracted rates, not services performed, so a flag is a prompt to verify.
 
+## Price history
+
+Three monthly files are loaded. The snapshot picker in the app bar switches every page to another month, and the choice stays in the URL.
+
+- **Changes** (`/changes`): the same provider (tax ID) in the same comparison group, between two files. The page says a rate went up or down (in dollars and percent), is new (only in the newer file) or is gone (only in the older one); the API calls these changed, new and dropped. Providers are matched on their tax ID key, never on `provider_group_id`, which the payer renumbers every month. A change means the file lists a different rate: a provider whose rates are the same, with only the NPI counts behind them moved, is unchanged. It isn't a claim, and the files don't say how often a service is used.
+- **Facility charges with no procedure named** (filed under a revenue code alone) are left out of the order and the counts unless the switch the insights pages use adds them (decision 89): hospitals bundle different services under them, so they don't compare like for like. The switch shows how many the other filters match. Added, they come after the rest in the default order.
+- **Not before the numbers are saved**: changes read each month's saved statistics. Until both months' are built and current (after loading, or after a file or the app changed), the API answers `current: false` with a message and no counts or rows, and the page and the plans lens say they show once loading finishes.
+- **Listed differently**: a quarter (July to August) to two fifths (August to September) of new and dropped rates are the same provider and code under other modifiers or another setting. Centene reshuffles telehealth modifiers (`95,GQ,GT` becomes `95,GT`). These are marked, and a switch hides them.
+- **Trends**: each group card draws its typical price (the median) across the files, the range most providers get (10th to 90th percentile, from 10 providers) and, with an NPI or EIN, that provider's own rate, with the same numbers in words, worked out from the figures as the card shows them. With three files each one is named, so the file on screen is never skipped ("The typical price was $573 (Jul 27), $578 (Aug 31) and $569 (Sep 28)."). The line leads with the providers listed in both files, so a move that only reflects who is listed is never worded as a price change: "Of the 37 providers listed in the Aug 31 and Sep 28 files, all kept the same rate. 87 left and 39 joined, so the typical price on this card was $51.45 (Jul 27), $51.45 (Aug 31) and $114 (Sep 28)." Otherwise it says how many got a higher or a lower rate, then how the typical price moved. The chart's tooltip and the employers lens line follow the same rule. A card names the provider it follows ("Heel Sole Podiatry PC's rate ..."); only the providers lens says "your rate". The trend runs the search itself in each month, so every point equals that month's card.
+- **Partial uploads**: Centene has published partial months before (Ambetter files of 9 MB and 4 MB, against about 90 MB). Each product's file is compared with the same product in up to two months on each side: unique rates, EINs and codes, each against the nearby median. Below 0.8 on any of them, the file is flagged partial and left out of changes. The three loaded months all score 0.94 or more.
+
+| Between | Changed (up, down) | New (listed differently) | Dropped (listed differently) | Unchanged |
+|---|---|---|---|---|
+| 2026-07-27 and 2026-08-31 | 4,608 (2,550, 2,058) | 8,843 (2,268) | 8,232 (2,099) | 48,420 |
+| 2026-08-31 and 2026-09-28 | 3,899 (1,960, 1,939) | 14,632 (5,858) | 16,776 (5,856) | 41,196 |
+
+These include facility charges with no procedure named (3,335 and 3,816 of the changed, new and dropped rows), which the page leaves out by default. Counts are of provider values: one per provider per comparison group. When a provider has several rates in a group, its value is their NPI-weighted median, so it also moves when a rate is added or removed; the changes page marks those rows. Same rates with only the NPI counts moved (11 and 33 pairs) are unchanged.
+
 ## API
 
 | Endpoint | |
@@ -118,16 +136,18 @@ The rate files list bare NPIs. `reference/provider_directory.csv.gz` (1.9 MB) gi
 | `GET /api/v1/rates/{id}/source` · `/npis?provider=&alsoRate=` | Where a rate came from; the NPIs behind a result row, each with its rate |
 | `GET /api/v1/codes?q=` · `/providers?q=` · `/specialties?q=` · `/reference` | Typeahead and filter options (including New York counties and the registry release) |
 | `GET /api/v1/status` · `/status/stream` | Loading progress (the stream uses server-sent events) |
-| `GET /api/v1/snapshots` · `/snapshots/{id}/plans` | Loaded files, their sources and counts; plans per product |
+| `GET /api/v1/snapshots` · `/snapshots/{id}/plans` | Loaded files, their sources and counts, and how complete each looks; plans per product |
 | `GET /api/v1/sources` | Every snapshot and file (rate and allowed-amount files): URL, three dates, size, SHA-256, ETag, counts, rejects by reason, timing |
 | `GET /api/v1/out-of-network?code=&codeType=&snapshot=` | What the plan allowed out of network for a code, per product and fee type |
+| `GET /api/v1/changes?from=&to=&product=&code=&kind=&minChangePct=&listedElsewhere=&includeFacilityCharges=&sort=&page=&pageSize=` | Rates that changed, appeared or dropped between two snapshots, with counts by kind. Defaults: the newest snapshot against the one before, biggest moves first, facility charges with no procedure named left out (`counts.facilityCharges` says how many `includeFacilityCharges=true` adds, as on the insights endpoints). Until both snapshots' saved statistics are built and current: `current: false`, a `message`, `counts: null` and no rows. |
+| `GET /api/v1/rates/trend?code=&npi=&ein=&provider=&specialty=&county=&product=&setting=&feeType=&snapshot=` | Each comparison group a search shows, in every snapshot: provider count, median and quartiles, the searched provider's rate, and (`sincePrevious`) how many providers stayed, got a different higher or lower rate, kept the same rates with their NPIs moved between them (`reweighted`), left or joined since the previous complete snapshot |
 | `/health/live` · `/health/ready` | Ready once rate data can be searched |
 
 ## Assumptions and tradeoffs
 
 - **C# and .NET instead of Go.** I used the patterns I ship every day: MediatR queries with handlers, validators and SQL files. Each one maps one-to-one to a Go handler and query.
 - **DuckDB, embedded.** It's columnar and fast at percentiles, needs no server, and the volume survives restarts. Readers get a consistent view while a file is being written.
-- **Load everything at startup, in the background.** The two files are small enough (17,549 unique rates) that statistics are computed per request. With many payers I'd precompute group statistics at load.
+- **Load everything at startup, in the background.** A month is small (about 17,500 unique rates), so search computes its statistics per request. After loading, each month's statistics are also saved (one value per provider per group), because the changes feed compares every group at once.
 - **Scope**: outpatient and professional rates (that is what these files contain), one payer, no login. MediatR is pinned to 12.5.0, the last Apache-2.0 release.
 - **A negotiated rate is not a patient's cost.** Deductibles, coinsurance and out-of-network rules decide what a person pays.
 

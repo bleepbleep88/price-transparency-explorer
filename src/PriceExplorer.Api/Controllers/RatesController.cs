@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using PriceExplorer.Api.Core.Models.History;
 using PriceExplorer.Api.Core.Models.Rates;
+using PriceExplorer.Api.Core.Queries.History;
 using PriceExplorer.Api.Core.Queries.Rates;
 
 namespace PriceExplorer.Api.Controllers;
@@ -21,6 +23,19 @@ public sealed class RatesController(ISender sender) : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
     public Task<RateSearchResult> Search([FromQuery] SearchRatesQuery query, CancellationToken cancellationToken) =>
+        sender.Send(query, cancellationToken);
+
+    /// <summary>
+    /// How each comparison group a search shows moved across the loaded snapshots: provider count, median and quartiles
+    /// in every snapshot, plus the searched provider's rate. Takes the search's filters; the search runs in each
+    /// snapshot, so each point equals what that snapshot's search shows.
+    /// </summary>
+    [HttpGet("trend")]
+    [ProducesResponseType<RateTrendResult>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
+    public Task<RateTrendResult> Trend([FromQuery] GetRateTrendQuery query, CancellationToken cancellationToken) =>
         sender.Send(query, cancellationToken);
 
     /// <summary>

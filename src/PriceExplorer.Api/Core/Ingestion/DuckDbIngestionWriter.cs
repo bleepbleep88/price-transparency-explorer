@@ -11,7 +11,7 @@ namespace PriceExplorer.Api.Core.Ingestion;
 internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections, TimeProvider time, ILogger<DuckDbIngestionWriter> logger)
 {
     /// <summary>Bump when Schema.sql changes: all tables are rebuilt from the download cache.</summary>
-    public const int SchemaVersion = 5;
+    public const int SchemaVersion = 6;
 
     /// <summary>The meta key holding the per-install secret behind masked provider keys (see <see cref="ProviderKeys"/>).</summary>
     internal const string ProviderKeySecret = "provider_key_secret";

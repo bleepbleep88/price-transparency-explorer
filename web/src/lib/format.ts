@@ -4,6 +4,7 @@ const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD',
 const usdWhole = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 const whole = new Intl.NumberFormat('en-US')
 const calendar = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+const calendarDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 
 export function money(value: number | null | undefined): string {
   return value == null || Number.isNaN(value) ? '—' : usd.format(value)
@@ -28,6 +29,13 @@ export function shortDate(value: string | null | undefined): string {
   const datePart = value.slice(0, 10)
   const parsed = new Date(`${datePart}T00:00:00Z`)
   return Number.isNaN(parsed.getTime()) ? value : calendar.format(parsed)
+}
+
+/** "2026-08-31" → "Aug 31": for lists of dates in one year. */
+export function monthDay(value: string | null | undefined): string {
+  if (!value) return '—'
+  const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`)
+  return Number.isNaN(parsed.getTime()) ? value : calendarDay.format(parsed)
 }
 
 export function megabytes(bytes: number | null | undefined): string {

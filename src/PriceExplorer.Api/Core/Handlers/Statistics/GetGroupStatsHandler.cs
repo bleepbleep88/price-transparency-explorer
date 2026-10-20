@@ -47,7 +47,7 @@ internal sealed class GetGroupStatsHandler(DuckDbConnectionFactory connections) 
                     : values[group.GroupKey].Select(value => new ProviderValue(
                         value.ProviderKey, value.Ein, value.EinDisplay, value.EinMasked, value.EinLevel, value.BusinessName,
                         value.Value, value.Low, value.High, value.RateCount, value.NpiWeight, value.FirstRateId,
-                        value.WholeTaxIdRateId)).ToList()))
+                        value.WholeTaxIdRateId, value.RateSet)).ToList()))
                 .ToList());
     }
 
@@ -59,5 +59,6 @@ internal sealed class GetGroupStatsHandler(DuckDbConnectionFactory connections) 
 
     private sealed record ValueRow(
         string GroupKey, string ProviderKey, string? Ein, string EinDisplay, bool EinMasked, bool EinLevel, string BusinessName,
-        decimal Value, decimal Low, decimal High, int RateCount, long NpiWeight, long FirstRateId, long? WholeTaxIdRateId);
+        decimal Value, decimal Low, decimal High, int RateCount, long NpiWeight, long FirstRateId, long? WholeTaxIdRateId,
+        string RateSet);
 }

@@ -53,6 +53,8 @@ internal sealed record GroupStats(
 /// <see cref="GroupStatsResult.Current"/>.</param>
 /// <param name="WholeTaxIdRateId">When <paramref name="EinLevel"/> comes from a whole-tax-ID contract other than
 /// <paramref name="FirstRateId"/>, that rate; null otherwise. Like <paramref name="FirstRateId"/>, only while current.</param>
+/// <param name="RateSet">Its distinct rates in the group, ascending, as "0.0000" joined by commas. The same set in two files
+/// means the files list the same rates, even when <paramref name="Value"/> moved because the NPI counts behind them did.</param>
 internal sealed record ProviderValue(
     string ProviderKey,
     string? Ein,
@@ -66,4 +68,5 @@ internal sealed record ProviderValue(
     int RateCount,
     long NpiWeight,
     long FirstRateId,
-    long? WholeTaxIdRateId);
+    long? WholeTaxIdRateId,
+    string RateSet);

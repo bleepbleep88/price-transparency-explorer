@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { OutOfNetworkResult } from '@/features/out-of-network/api/types'
+import type { RateTrendResult } from '@/features/history/api/types'
+import LensHistoryLine from '@/features/history/components/LensHistoryLine.vue'
 import type { RateSearchResult } from '../api/types'
 import { LENS_OPTIONS, lensOption, marketWideNote } from '../lib/lenses'
 import type { Lens, QueryPatch, SearchParams } from '../lib/searchParams'
@@ -10,17 +12,23 @@ import LifeSciencesLens from './lenses/LifeSciencesLens.vue'
 import PlansLens from './lenses/PlansLens.vue'
 import ProvidersLens from './lenses/ProvidersLens.vue'
 
-const props = defineProps<{
-  result: RateSearchResult
-  params: SearchParams
-  /** The searched code's out-of-network payments, once loaded: the plans and providers lenses add one line. */
-  outOfNetwork?: OutOfNetworkResult | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    result: RateSearchResult
+    params: SearchParams
+    /** The searched code's out-of-network payments, once loaded: the plans and providers lenses add one line. */
+    outOfNetwork?: OutOfNetworkResult | null
+    /** The groups across the loaded snapshots; null with a single snapshot. */
+    trend?: RateTrendResult | null
+  }>(),
+  { outOfNetwork: null, trend: null },
+)
 const emit = defineEmits<{
   update: [patch: QueryPatch]
   cases: [cases: number | null]
   focusNpi: []
   search: [code: string]
+  showTrend: [groupKey: string]
 }>()
 
 const lens = computed(() => props.params.lens ?? null)
@@ -80,6 +88,14 @@ function choose(next: unknown) {
       <EmployersLens v-else-if="lens === 'employers'" :result="result" :params="params" @cases="emit('cases', $event)" />
       <InnovatorsLens v-else-if="lens === 'innovators'" :result="result" :params="params" />
       <LifeSciencesLens v-else :result="result" @search="emit('search', $event)" />
+      <LensHistoryLine
+        v-if="trend && trend.snapshots.length > 1"
+        :lens="lens"
+        :result="result"
+        :params="params"
+        :trend="trend"
+        @show-trend="emit('showTrend', $event)"
+      />
       <p v-if="marketWide" class="text-body-small text-medium-emphasis" data-testid="lens-market-wide">{{ marketWide }}</p>
     </v-card-text>
   </v-card>

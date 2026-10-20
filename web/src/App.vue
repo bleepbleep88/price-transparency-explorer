@@ -1,33 +1,42 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { ALWAYS_TRUE } from '@/lib/plainNumbers'
-import { mdiAccountSearchOutline, mdiChartBar, mdiCompareHorizontal, mdiDatabaseOutline, mdiMagnify, mdiMenu, mdiThemeLightDark } from '@mdi/js'
+import { mdiAccountSearchOutline, mdiChartBar, mdiCompareHorizontal, mdiDatabaseOutline, mdiHistory, mdiMagnify, mdiMenu, mdiThemeLightDark } from '@mdi/js'
 import { useRoute } from 'vue-router'
-import { useTheme } from 'vuetify'
+import { useDisplay, useTheme } from 'vuetify'
 import DataStatusChip from '@/features/status/components/DataStatusChip.vue'
 import { useDataStatus } from '@/features/status/useDataStatus'
+import SnapshotPicker from '@/features/history/components/SnapshotPicker.vue'
+import { useSnapshotChoice } from '@/features/history/composables/useSnapshotChoice'
 
 const theme = useTheme()
 const route = useRoute()
+// Six pages, the snapshot picker and the status chip: below the extra-large breakpoint the page buttons drop their icons
+// and some padding, so the brand isn't cut off.
+const { xlAndUp } = useDisplay()
 
 // Start the live status stream once for the whole app.
 useDataStatus()
 
-// Each item is current on its own pages: a scorecard (/providers/:key) belongs to Provider scorecards.
-const navItems = [
-  { title: 'Search', to: { name: 'search' }, icon: mdiMagnify, names: ['search'] },
-  { title: 'Price differences', to: { name: 'gaps' }, icon: mdiChartBar, names: ['gaps'] },
-  { title: 'Plan comparison', to: { name: 'compare' }, icon: mdiCompareHorizontal, names: ['compare'] },
-  { title: 'Provider scorecards', to: { name: 'providers' }, icon: mdiAccountSearchOutline, names: ['providers', 'scorecard'] },
-  { title: 'Sources', to: { name: 'sources' }, icon: mdiDatabaseOutline, names: ['sources'] },
-]
-const isCurrent = (item: (typeof navItems)[number]) => item.names.includes(String(route.name))
+// Each item is current on its own pages: a scorecard (/providers/:key) belongs to Provider scorecards. Every page shows
+// the snapshot picked in the app bar, so links between pages keep it.
+const { carried } = useSnapshotChoice()
+const navItems = computed(() => [
+  { title: 'Search', to: { name: 'search', query: carried.value }, icon: mdiMagnify, names: ['search'] },
+  { title: 'Changes', to: { name: 'changes', query: carried.value }, icon: mdiHistory, names: ['changes'] },
+  { title: 'Price differences', to: { name: 'gaps', query: carried.value }, icon: mdiChartBar, names: ['gaps'] },
+  { title: 'Plan comparison', to: { name: 'compare', query: carried.value }, icon: mdiCompareHorizontal, names: ['compare'] },
+  { title: 'Provider scorecards', to: { name: 'providers', query: carried.value }, icon: mdiAccountSearchOutline, names: ['providers', 'scorecard'] },
+  { title: 'Sources', to: { name: 'sources', query: carried.value }, icon: mdiDatabaseOutline, names: ['sources'] },
+])
+const isCurrent = (item: { names: string[] }) => item.names.includes(String(route.name))
 </script>
 
 <template>
   <v-app>
     <v-app-bar flat border="b" density="comfortable">
       <v-app-bar-title>
-        <router-link to="/" class="brand">Price Transparency Explorer</router-link>
+        <router-link :to="{ name: 'search', query: carried }" class="brand">Price Transparency Explorer</router-link>
       </v-app-bar-title>
 
       <nav aria-label="Main" class="d-none d-lg-flex ga-1">
@@ -35,7 +44,8 @@ const isCurrent = (item: (typeof navItems)[number]) => item.names.includes(Strin
           v-for="item in navItems"
           :key="item.title"
           :to="item.to"
-          :prepend-icon="item.icon"
+          :prepend-icon="xlAndUp ? item.icon : undefined"
+          :class="{ 'px-2': !xlAndUp }"
           :active="isCurrent(item)"
           :aria-current="isCurrent(item) ? 'page' : undefined"
           variant="text"
@@ -46,6 +56,8 @@ const isCurrent = (item: (typeof navItems)[number]) => item.names.includes(Strin
       </nav>
 
       <template #append>
+        <!-- Sources lists every file, so there's nothing to pick there. -->
+        <SnapshotPicker v-if="route.name !== 'sources'" />
         <DataStatusChip class="me-2" />
         <!-- Below the large breakpoint the pages sit in a menu, so the app bar fits a phone. -->
         <v-menu location="bottom end">

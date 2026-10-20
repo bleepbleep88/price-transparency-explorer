@@ -4,12 +4,12 @@ import { createVuetify } from 'vuetify'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import StartHere from '../StartHere.vue'
 
-async function mountCards() {
+async function mountCards(query: Record<string, string> = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/', name: 'search', component: { template: '<div />' } }],
   })
-  await router.push('/')
+  await router.push({ path: '/', query })
   await router.isReady()
   const wrapper = mount(StartHere, { global: { plugins: [createVuetify({ theme: { defaultTheme: 'light' } }), router] } })
   await flushPromises()
@@ -33,6 +33,11 @@ describe('StartHere', () => {
     expect(providers.attributes('role')).toBe('link')
     expect(providers.element.parentElement?.getAttribute('role')).toBe('listitem')
     expect(wrapper.get('[data-testid="start-employers-45378"]').attributes('href')).toBe('/?code=45378&lens=employers')
+  })
+
+  it('keeps the snapshot picked in the app bar', async () => {
+    const wrapper = await mountCards({ snapshot: '2' })
+    expect(wrapper.get('[data-testid="start-employers-45378"]').attributes('href')).toBe('/?code=45378&lens=employers&snapshot=2')
   })
 
   it('links innovators to the API reference', async () => {

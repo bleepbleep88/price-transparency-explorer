@@ -8,6 +8,11 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Ingestion__DataDirectory: /data
+      # Three monthly snapshots of the payer's index (the newest shows by default; 2026-08-31 is the brief's).
+      # The first start downloads about 810 MB of rate files.
+      Ingestion__Snapshots__0__IndexUrl: https://www.centene.com/content/dam/centene/Centene%20Corporate/json/DOCUMENT/2026-07-27_fidelis_index.json
+      Ingestion__Snapshots__1__IndexUrl: https://www.centene.com/content/dam/centene/Centene%20Corporate/json/DOCUMENT/2026-08-31_fidelis_index.json
+      Ingestion__Snapshots__2__IndexUrl: https://www.centene.com/content/dam/centene/Centene%20Corporate/json/DOCUMENT/2026-09-28_fidelis_index.json
     volumes:
       # Downloaded rate files + DuckDB database survive restarts; delete the volume to start fresh.
       - explorer-data:/data

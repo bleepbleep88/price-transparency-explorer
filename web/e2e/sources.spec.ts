@@ -28,7 +28,10 @@ test('a code with out-of-network amounts shows the panel, and the innovators len
   await expect(page).toHaveURL(/\/sources$/)
   await expect(page.getByRole('heading', { name: 'Sources and data quality', level: 1 })).toBeVisible()
 
-  const files = page.getByTestId('source-file')
+  // One section per loaded snapshot; the one shown by default has both products' two files.
+  const newest = page.getByTestId('source-snapshot').filter({ hasText: 'Shown by default' })
+  await expect(newest).toHaveCount(1)
+  const files = newest.getByTestId('source-file')
   await expect(files).toHaveCount(4)
   await expect(files.filter({ hasText: 'In-network rates' })).toHaveCount(2)
   const outOfNetwork = files.filter({ hasText: 'Out-of-network allowed amounts' })

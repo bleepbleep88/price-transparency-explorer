@@ -25,9 +25,11 @@ export function useSearchRoute() {
     return router.replace({ name: 'search', query: mergeQuery(route.query, patch) })
   }
 
-  /** A fresh search: everything goes except the lens, unless the patch sets one (Start-here cards do). */
+  /** A fresh search: everything goes except the lens and the snapshot, unless the patch sets them (Start-here cards do). */
   function startOver(code?: string, patch: QueryPatch = {}) {
-    const keep: LocationQuery = params.value.lens ? { lens: params.value.lens } : {}
+    const keep: LocationQuery = {}
+    if (params.value.lens) keep.lens = params.value.lens
+    if (params.value.snapshot) keep.snapshot = String(params.value.snapshot)
     return router.push({ name: 'search', query: mergeQuery(keep, { code, ...patch }) })
   }
 

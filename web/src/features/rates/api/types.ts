@@ -21,6 +21,19 @@ export interface IngestionStatus {
   version: number
 }
 
+/** How complete a product's file looks next to the same product in nearby snapshots (up to two on each side). */
+export interface ProductCompleteness {
+  /** The lowest of the three ratios; null when no nearby snapshot has the product. */
+  score: number | null
+  /** Unique rates, EINs and codes, each ÷ the nearby snapshots' median. */
+  rates: number | null
+  eins: number | null
+  codes: number | null
+  comparedWith: number[]
+  /** Below 0.8 on any measure, or read only in part: left out of changes. */
+  partial: boolean
+}
+
 export interface ProductFileSummary {
   fileId: number
   productKey: string
@@ -42,6 +55,8 @@ export interface ProductFileSummary {
   distinctNpis: number | null
   distinctEins: number | null
   loadedAt: string | null
+  /** Null until the file is saved. */
+  completeness: ProductCompleteness | null
 }
 
 export interface SnapshotSummary {

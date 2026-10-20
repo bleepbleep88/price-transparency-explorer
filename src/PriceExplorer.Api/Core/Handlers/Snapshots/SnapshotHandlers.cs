@@ -20,6 +20,7 @@ public sealed class ListSnapshotsHandler(DuckDbConnectionFactory connections) : 
             .ToList();
 
         var latestId = await connection.ExecuteScalarAsync<int?>(SqlFile.For<DuckDbConnectionFactory>("LatestSnapshot.sql"));
+        var completeness = await Completeness.ReadAsync(connection);
 
         return snapshots.Select(s => new SnapshotSummary(
             s.First.SnapshotId,
@@ -36,7 +37,8 @@ public sealed class ListSnapshotsHandler(DuckDbConnectionFactory connections) : 
                     row.FileId!.Value, row.ProductKey!, row.ProductLabel!, row.Url!, row.FileStatus!, row.Error, row.Warning,
                     row.FileLastUpdatedOn, UtcTimestamps.From(row.HttpLastModified), row.ContentLength, row.Sha256,
                     (int)row.PlanEntries, (int)row.DistinctPlanIds, row.Items, row.PricesPublished, row.UniqueRates,
-                    row.DuplicatesRemoved, row.DistinctNpis, row.DistinctEins, UtcTimestamps.From(row.LoadedAt)))
+                    row.DuplicatesRemoved, row.DistinctNpis, row.DistinctEins, UtcTimestamps.From(row.LoadedAt),
+                    completeness.GetValueOrDefault((row.SnapshotId, row.ProductKey!))))
                 .ToList()))
             .ToList();
     }
