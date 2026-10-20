@@ -35,6 +35,7 @@ describe('dollars', () => {
     expect(dollars(1154.16)).toBe('$1,154')
     expect(dollars(99.99)).toBe('$99.99')
     expect(dollars(12.3)).toBe('$12.30')
+    expect(dollars(48)).toBe('$48')
     expect(dollars(0.17)).toBe('$0.17')
     expect(dollars(-123.86)).toBe('$124')
   })
@@ -135,9 +136,8 @@ describe('a provider against the others', () => {
 describe('the lower-priced quarter', () => {
   it('says what the lower-priced quarter get and how much less than typical, from 10 providers', () => {
     expect(gapLine(colonoscopy)).toBe('The lower-priced quarter of providers get $454 or less: $124 less than typical.')
-    expect(gapLine({ ...colonoscopy, p25: 578.31 })).toBe(
-      'The lower-priced quarter of providers get $578 or less, which is also the typical price.',
-    )
+    // No gap: the line would only repeat the typical price.
+    expect(gapLine({ ...colonoscopy, p25: 578.31 })).toBeNull()
     expect(gapLine(small)).toBeNull()
     expect(gapLine(tiny)).toBeNull()
   })
@@ -164,7 +164,8 @@ describe('how much prices vary', () => {
   it('compares the high end with the low end, leaving out the extremes, from 10 providers', () => {
     expect(spreadLine(colonoscopy)).toBe('Even leaving out the extremes, the high end is about 1.8 times the low end.')
     expect(spreadLine({ ...colonoscopy, p10: 100, p90: 602 })).toBe('Even leaving out the extremes, the high end is about 6 times the low end.')
-    expect(spreadLine({ ...colonoscopy, p10: 167.09, p90: 170 })).toBe('Even leaving out the extremes, most providers get about the same price.')
+    // Within 5%: "Most providers get between $167 and $170." already says it.
+    expect(spreadLine({ ...colonoscopy, p10: 167.09, p90: 170 })).toBeNull()
     expect(spreadLine(small)).toBeNull()
     expect(spreadLine({ ...colonoscopy, p10: 0 })).toBeNull()
   })

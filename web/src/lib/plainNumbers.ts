@@ -40,10 +40,11 @@ export function lowerFirst(text: string): string {
   return text.charAt(0).toLowerCase() + text.slice(1)
 }
 
-/** A dollar amount in a sentence, sign dropped: whole dollars from $100 up ("$454"), cents below ("$12.34", "$0.17"). */
+/** A dollar amount in a sentence, sign dropped: whole dollars from $100 up ("$454"), cents below ("$12.34", "$0.17", but "$48"). */
 export function dollars(value: number): string {
   const amount = Math.abs(value)
-  return amount >= 100 ? wholeDollars(amount) : money(amount)
+  const cents = Math.round(amount * 100)
+  return amount >= 100 || cents % 100 === 0 ? wholeDollars(amount) : money(amount)
 }
 
 /** An estimate, rounded to three figures so it doesn't claim precision: 148,632 → "$149,000". */
@@ -151,14 +152,14 @@ export function positionLine(band: string | null | undefined, rate: number, typi
   return difference ? `${label}${separator}${difference}` : label
 }
 
-/** "The lower-priced quarter of providers get $454 or less: $124 less than typical." 10+ providers only. */
+/**
+ * "The lower-priced quarter of providers get $454 or less: $124 less than typical." 10+ providers only, and only when
+ * they do get less than typical: with no gap the line would only repeat the typical price.
+ */
 export function gapLine(summary: PriceSummary): string | null {
   const { p25, median } = summary
-  if (summary.providers < MIN_PROVIDERS_FOR_RANGE || p25 == null || median == null) return null
-  const gap = median - p25
-  return gap > 0
-    ? `The lower-priced quarter of providers get ${dollars(p25)} or less: ${dollars(gap)} less than typical.`
-    : `The lower-priced quarter of providers get ${dollars(p25)} or less, which is also the typical price.`
+  if (summary.providers < MIN_PROVIDERS_FOR_RANGE || p25 == null || median == null || median - p25 <= 0) return null
+  return `The lower-priced quarter of providers get ${dollars(p25)} or less: ${dollars(median - p25)} less than typical.`
 }
 
 /** "$124 less per case" ("per unit" for drugs and other per-unit prices); "No less" when there's no gap. */
@@ -183,14 +184,14 @@ export function yearlyLine(gap: number | null | undefined, cases: number | null 
 
 /**
  * How much prices vary, leaving out the top and bottom tenth: "Even leaving out the extremes, the high end is about 6
- * times the low end." 10+ providers only.
+ * times the low end." 10+ providers only, and only when the ends differ by 5% or more (otherwise "Most providers get
+ * $167." already says it).
  */
 export function spreadLine(summary: PriceSummary): string | null {
   const { p10, p90 } = summary
   if (summary.providers < MIN_PROVIDERS_FOR_RANGE || p10 == null || p90 == null || p10 <= 0) return null
   const ratio = p90 / p10
-  if (ratio - 1 < ABOUT_THE_SAME) return 'Even leaving out the extremes, most providers get about the same price.'
-  return `Even leaving out the extremes, the high end is ${aboutTimes(ratio)} the low end.`
+  return ratio - 1 < ABOUT_THE_SAME ? null : `Even leaving out the extremes, the high end is ${aboutTimes(ratio)} the low end.`
 }
 
 /**

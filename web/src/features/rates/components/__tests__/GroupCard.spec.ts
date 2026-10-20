@@ -109,13 +109,13 @@ describe('GroupCard', () => {
     )
   })
 
-  it('says when the lower-priced quarter get the typical price', () => {
-    const group = makeGroup()
-    const wrapper = mountCard(makeGroup({ stats: { ...group.stats, p25: 578.31 }, lowerQuartileGap: 0 }))
+  it('says one price once when most providers get it', () => {
+    const flat = { min: 143.75, p10: 167.09, p25: 167.09, median: 167.09, p75: 167.09, p90: 167.09, max: 185.4, spreadMultiple: 1.29, p90ToP10: 1 }
+    const wrapper = mountCard(makeGroup({ providerCount: 51, stats: flat, lowerQuartileGap: 0 }))
 
-    expect(wrapper.get('[data-testid="quartile-gap"]').text()).toBe(
-      'The lower-priced quarter of providers get $578 or less, which is also the typical price.',
-    )
+    expect(wrapper.get('[data-testid="range-line"]').text()).toBe('Most providers get $167.')
+    expect(wrapper.find('[data-testid="spread-line"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="quartile-gap"]').exists()).toBe(false)
   })
 
   it("calls the fee a doctor's fee or a facility fee, and names what it's filed under", () => {
