@@ -1,0 +1,1124 @@
+{
+  "reporting_entity_name": "Centene Management Company LLC",
+  "reporting_entity_type": "Third Party Administrator",
+  "version": "2.0.0",
+  "last_updated_on": "2026-08-31",
+  "out_of_network": [
+    {
+      "name": "ANESTH, LENS SURGERY",
+      "billing_code_type": "CPT",
+      "billing_code_type_version": "2022",
+      "billing_code": "142",
+      "description": "ANESTHESIA FOR PROCEDURES ON EYE; LENS SURGERY",
+      "allowed_amounts": [
+        {
+          "tin": {
+            "type": "ein",
+            "value": "43431956"
+          },
+          "service_code": [
+            "24"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 1700.0,
+              "providers": [
+                {
+                  "billed_charge": 24012.0,
+                  "npi": [
+                    1952548265
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "THER/PROPH/DIAG IV INF INIT",
+      "billing_code_type": "RC",
+      "billing_code_type_version": "2022",
+      "billing_code": "450",
+      "description": "INTRAVENOUS INFUSION, FOR THERAPY, PROPHYLAXIS, OR DIAGNOSIS (SPECIFY SUBSTANCE OR DRUG); INITIAL, U",
+      "allowed_amounts": [
+        {
+          "tin": {
+            "type": "ein",
+            "value": "60646597"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "institutional",
+          "payments": [
+            {
+              "allowed_amount": 115.65,
+              "providers": [
+                {
+                  "billed_charge": 680.0,
+                  "npi": [
+                    1548293343
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 267.13,
+              "providers": [
+                {
+                  "billed_charge": 3398.0,
+                  "npi": [
+                    1548293343
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "221487576"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "institutional",
+          "payments": [
+            {
+              "allowed_amount": 181.32,
+              "providers": [
+                {
+                  "billed_charge": 5390.0,
+                  "npi": [
+                    1457456279
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 3600.93,
+              "providers": [
+                {
+                  "billed_charge": 47091.58,
+                  "npi": [
+                    1457456279
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "222783298"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "institutional",
+          "payments": [
+            {
+              "allowed_amount": 966.18,
+              "providers": [
+                {
+                  "billed_charge": 19269.0,
+                  "npi": [
+                    1689744856
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "60646659"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "institutional",
+          "payments": [
+            {
+              "allowed_amount": 4918.77,
+              "providers": [
+                {
+                  "billed_charge": 61280.01,
+                  "npi": [
+                    1609846088
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "113243405"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "institutional",
+          "payments": [
+            {
+              "allowed_amount": 260.21,
+              "providers": [
+                {
+                  "billed_charge": 1124.0,
+                  "npi": [
+                    1972523348
+                  ]
+                },
+                {
+                  "billed_charge": 786.5,
+                  "npi": [
+                    1881690691
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 2689.49,
+              "providers": [
+                {
+                  "billed_charge": 5886.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 47821.16,
+              "providers": [
+                {
+                  "billed_charge": 462361.92,
+                  "npi": [
+                    1033224704
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 685.76,
+              "providers": [
+                {
+                  "billed_charge": 551.92,
+                  "npi": [
+                    1033224704
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 1353.6,
+              "providers": [
+                {
+                  "billed_charge": 1406.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 187538.55,
+              "providers": [
+                {
+                  "billed_charge": 1733257.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 16028.35,
+              "providers": [
+                {
+                  "billed_charge": 14016.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 36597.8,
+              "providers": [
+                {
+                  "billed_charge": 178200.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 2679.9,
+              "providers": [
+                {
+                  "billed_charge": 12714.7,
+                  "npi": [
+                    1881690691
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 1396.76,
+              "providers": [
+                {
+                  "billed_charge": 1727.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 60.12,
+              "providers": [
+                {
+                  "billed_charge": 1240.0,
+                  "npi": [
+                    1972523348
+                  ]
+                },
+                {
+                  "billed_charge": 869.84,
+                  "npi": [
+                    1033224704
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 6285.0,
+              "providers": [
+                {
+                  "billed_charge": 9310.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 1260.81,
+              "providers": [
+                {
+                  "billed_charge": 1168.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 1152.63,
+              "providers": [
+                {
+                  "billed_charge": 4830.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "THER/PROPH/DIAG IV INF ADDON",
+      "billing_code_type": "RC",
+      "billing_code_type_version": "2022",
+      "billing_code": "450",
+      "description": "INTRAVENOUS INFUSION, FOR THERAPY, PROPHYLAXIS, OR DIAGNOSIS (SPECIFY SUBSTANCE OR DRUG); EACH ADDIT",
+      "allowed_amounts": [
+        {
+          "tin": {
+            "type": "ein",
+            "value": "60646597"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "institutional",
+          "payments": [
+            {
+              "allowed_amount": 115.65,
+              "providers": [
+                {
+                  "billed_charge": 680.0,
+                  "npi": [
+                    1548293343
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 267.13,
+              "providers": [
+                {
+                  "billed_charge": 3398.0,
+                  "npi": [
+                    1548293343
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "221487576"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "institutional",
+          "payments": [
+            {
+              "allowed_amount": 181.32,
+              "providers": [
+                {
+                  "billed_charge": 5390.0,
+                  "npi": [
+                    1457456279
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 3600.93,
+              "providers": [
+                {
+                  "billed_charge": 47091.58,
+                  "npi": [
+                    1457456279
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "222783298"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "institutional",
+          "payments": [
+            {
+              "allowed_amount": 966.18,
+              "providers": [
+                {
+                  "billed_charge": 19269.0,
+                  "npi": [
+                    1689744856
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "60646659"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "institutional",
+          "payments": [
+            {
+              "allowed_amount": 4918.77,
+              "providers": [
+                {
+                  "billed_charge": 61280.01,
+                  "npi": [
+                    1609846088
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "113243405"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "institutional",
+          "payments": [
+            {
+              "allowed_amount": 260.21,
+              "providers": [
+                {
+                  "billed_charge": 1124.0,
+                  "npi": [
+                    1972523348
+                  ]
+                },
+                {
+                  "billed_charge": 786.5,
+                  "npi": [
+                    1881690691
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 2689.49,
+              "providers": [
+                {
+                  "billed_charge": 5886.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 47821.16,
+              "providers": [
+                {
+                  "billed_charge": 462361.92,
+                  "npi": [
+                    1033224704
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 685.76,
+              "providers": [
+                {
+                  "billed_charge": 551.92,
+                  "npi": [
+                    1033224704
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 1353.6,
+              "providers": [
+                {
+                  "billed_charge": 1406.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 187538.55,
+              "providers": [
+                {
+                  "billed_charge": 1733257.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 16028.35,
+              "providers": [
+                {
+                  "billed_charge": 14016.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 36597.8,
+              "providers": [
+                {
+                  "billed_charge": 178200.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 2679.9,
+              "providers": [
+                {
+                  "billed_charge": 12714.7,
+                  "npi": [
+                    1881690691
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 1396.76,
+              "providers": [
+                {
+                  "billed_charge": 1727.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 60.12,
+              "providers": [
+                {
+                  "billed_charge": 1240.0,
+                  "npi": [
+                    1972523348
+                  ]
+                },
+                {
+                  "billed_charge": 869.84,
+                  "npi": [
+                    1033224704
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 6285.0,
+              "providers": [
+                {
+                  "billed_charge": 9310.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 1260.81,
+              "providers": [
+                {
+                  "billed_charge": 1168.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 1152.63,
+              "providers": [
+                {
+                  "billed_charge": 4830.0,
+                  "npi": [
+                    1972523348
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CT ABD & PELV W/CONTRAST",
+      "billing_code_type": "CPT",
+      "billing_code_type_version": "2022",
+      "billing_code": "74177",
+      "description": "COMPUTED TOMOGRAPHY, ABDOMEN AND PELVIS; WITH CONTRAST MATERIAL(S)",
+      "allowed_amounts": [
+        {
+          "tin": {
+            "type": "ein",
+            "value": "112548304"
+          },
+          "service_code": [
+            "23",
+            "21"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 326.88,
+              "providers": [
+                {
+                  "billed_charge": 1845.0,
+                  "npi": [
+                    1730684499
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 544.8,
+              "providers": [
+                {
+                  "billed_charge": 3075.0,
+                  "npi": [
+                    1538690458
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 108.96,
+              "providers": [
+                {
+                  "billed_charge": 615.0,
+                  "npi": [
+                    1538690458
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "412007905"
+          },
+          "service_code": [
+            "22",
+            "23",
+            "21"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 91.25,
+              "providers": [
+                {
+                  "billed_charge": 336.0,
+                  "npi": [
+                    1558455600
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 3310.84,
+              "providers": [
+                {
+                  "billed_charge": 12432.0,
+                  "npi": [
+                    1558455600
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 182.5,
+              "providers": [
+                {
+                  "billed_charge": 670.0,
+                  "npi": [
+                    1558455600
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "113303412"
+          },
+          "service_code": [
+            "23"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 167.29,
+              "providers": [
+                {
+                  "billed_charge": 530.0,
+                  "npi": [
+                    1265529101
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "844522008"
+          },
+          "service_code": [
+            "22",
+            "23",
+            "19",
+            "21"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 64150.47,
+              "providers": [
+                {
+                  "billed_charge": 1452463.76,
+                  "npi": [
+                    1255962783
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 334.58,
+              "providers": [
+                {
+                  "billed_charge": 7784.0,
+                  "npi": [
+                    1649277427
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 1718.53,
+              "providers": [
+                {
+                  "billed_charge": 38920.0,
+                  "npi": [
+                    1245274844
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 3245.42,
+              "providers": [
+                {
+                  "billed_charge": 73948.0,
+                  "npi": [
+                    1255962783
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 2656.87,
+              "providers": [
+                {
+                  "billed_charge": 56807.88,
+                  "npi": [
+                    1255962783
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 273.75,
+              "providers": [
+                {
+                  "billed_charge": 5838.0,
+                  "npi": [
+                    1255962783
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "161201211"
+          },
+          "service_code": [
+            "23",
+            "21"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 91.25,
+              "providers": [
+                {
+                  "billed_charge": 246.0,
+                  "npi": [
+                    1407814825
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 365.0,
+              "providers": [
+                {
+                  "billed_charge": 984.0,
+                  "npi": [
+                    1407814825
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "843038369"
+          },
+          "service_code": [
+            "22",
+            "23",
+            "21"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 91.25,
+              "providers": [
+                {
+                  "billed_charge": 315.0,
+                  "npi": [
+                    1881230563
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 3903.97,
+              "providers": [
+                {
+                  "billed_charge": 13755.0,
+                  "npi": [
+                    1881230563
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 638.75,
+              "providers": [
+                {
+                  "billed_charge": 2205.0,
+                  "npi": [
+                    1881230563
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ANES LWR INTST SCR COLSC",
+      "billing_code_type": "CPT",
+      "billing_code_type_version": "2022",
+      "billing_code": "812",
+      "description": "ANESTHESIA FOR LOWER INTESTINAL ENDOSCOPIC PROCEDURES, ENDOSCOPE INTRODUCED DISTAL TO DUODENUM; SCRE",
+      "allowed_amounts": [
+        {
+          "tin": {
+            "type": "ein",
+            "value": "861908119"
+          },
+          "service_code": [
+            "22",
+            "21"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 109.0,
+              "providers": [
+                {
+                  "billed_charge": 8550.0,
+                  "npi": [
+                    1619633898
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 110.0,
+              "providers": [
+                {
+                  "billed_charge": 4500.0,
+                  "npi": [
+                    1619633898
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "204996308"
+          },
+          "service_code": [
+            "11",
+            "24"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 14737.32,
+              "providers": [
+                {
+                  "billed_charge": 472000.0,
+                  "npi": [
+                    1669607123
+                  ]
+                }
+              ]
+            },
+            {
+              "allowed_amount": 28370.0,
+              "providers": [
+                {
+                  "billed_charge": 260500.0,
+                  "npi": [
+                    1669607123
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "843159441"
+          },
+          "service_code": [
+            "11"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 2918.0,
+              "providers": [
+                {
+                  "billed_charge": 202353.0,
+                  "npi": [
+                    1922751254
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "800797091"
+          },
+          "service_code": [
+            "24"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 60.0,
+              "providers": [
+                {
+                  "billed_charge": 1200.0,
+                  "npi": [
+                    1871869305
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "133903523"
+          },
+          "service_code": [
+            "24"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 2460.0,
+              "providers": [
+                {
+                  "billed_charge": 4800.0,
+                  "npi": [
+                    1508947441
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "862251102"
+          },
+          "service_code": [
+            "24"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 1358.0,
+              "providers": [
+                {
+                  "billed_charge": 68500.0,
+                  "npi": [
+                    1366016677
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tin": {
+            "type": "ein",
+            "value": "113154725"
+          },
+          "service_code": [
+            "24"
+          ],
+          "billing_class": "professional",
+          "payments": [
+            {
+              "allowed_amount": 60.0,
+              "providers": [
+                {
+                  "billed_charge": 2000.0,
+                  "npi": [
+                    1093737801
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
