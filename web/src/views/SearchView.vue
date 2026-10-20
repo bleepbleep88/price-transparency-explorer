@@ -172,7 +172,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
               <span class="text-body-medium text-medium-emphasis">
                 {{ plural(result.rows.total, 'row') }}<template v-if="params.group"> for {{ pickedGroup ?? 'one card' }}</template>
               </span>
-              <v-btn v-if="params.group" variant="text" size="small" @click="update({ group: null })">Show all groups</v-btn>
+              <v-btn v-if="params.group" variant="text" size="small" @click="update({ group: null })">Show all cards</v-btn>
             </div>
             <ProviderTable
               :rows="result.rows"

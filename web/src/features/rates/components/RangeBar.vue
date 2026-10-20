@@ -3,7 +3,8 @@ import { computed } from 'vue'
 import { money } from '@/lib/format'
 import { dollars, MIN_PROVIDERS_FOR_RANGE, rangeLine, typicalPrice, type PriceSummary } from '@/lib/plainNumbers'
 
-const props = defineProps<{ summary: PriceSummary; marker?: number | null }>()
+/** `markerLabel` names whose price the copper dot marks, for screen readers. */
+const props = defineProps<{ summary: PriceSummary; marker?: number | null; markerLabel?: string | null }>()
 
 const span = computed(() => Math.max(props.summary.max - props.summary.min, 0.01))
 const position = (value: number) => `${(((value - props.summary.min) / span.value) * 100).toFixed(2)}%`
@@ -21,7 +22,7 @@ const label = computed(() => {
   const parts = [`Lowest ${dollars(min)}, highest ${dollars(max)}.`]
   if (most.value) parts.push(rangeLine(props.summary)!)
   if (typical.value != null) parts.push(`Typical price: ${dollars(typical.value)}.`)
-  if (props.marker != null) parts.push(`Marked: ${money(props.marker)}.`)
+  if (props.marker != null) parts.push(`Marked: ${props.markerLabel ? `${props.markerLabel}, ` : ''}${money(props.marker)}.`)
   return parts.join(' ')
 })
 </script>

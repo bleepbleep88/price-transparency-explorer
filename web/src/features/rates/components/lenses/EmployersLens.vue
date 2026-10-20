@@ -2,9 +2,9 @@
 import { computed } from 'vue'
 import { useDisplay } from 'vuetify'
 import { plural, wholeNumber } from '@/lib/format'
-import { dollars, lessPerCase, LIKE_FOR_LIKE } from '@/lib/plainNumbers'
+import { dollars, lessPerCase } from '@/lib/plainNumbers'
 import type { RateSearchResult } from '../../api/types'
-import { costLines, EMPLOYER_CAVEATS, yearlyLead, yearlyText, type CostLine } from '../../lib/lenses'
+import { costLines, EMPLOYER_CAVEATS, noYearlyReason, yearlyLead, yearlyText, type CostLine } from '../../lib/lenses'
 import { MAX_CASES, type SearchParams } from '../../lib/searchParams'
 
 const props = defineProps<{ result: RateSearchResult; params: SearchParams }>()
@@ -20,7 +20,7 @@ const anyPerCase = computed(() => lines.value.some((line) => !line.perUnit))
 const lead = computed(() => yearlyLead(lines.value, props.params.group))
 
 const headers = [
-  { title: LIKE_FOR_LIKE, key: 'group', sortable: false },
+  { title: 'Plan, fee and setting', key: 'group', sortable: false },
   { title: 'Providers', key: 'providers', sortable: false, align: 'end' as const },
   { title: 'Typical price', key: 'typical', sortable: false, align: 'end' as const },
   { title: 'At a lower-priced provider', key: 'gap', sortable: false, align: 'end' as const },
@@ -81,7 +81,7 @@ function onCases(value: number | string | null) {
           <p class="text-body-medium font-weight-medium">{{ yearlyText(lead, params.cases) }}</p>
           <p class="text-body-small text-medium-emphasis">{{ lead.group }}</p>
         </div>
-        <p v-else-if="params.cases" class="text-body-medium">No card here has lower-priced providers to compare with.</p>
+        <p v-else-if="params.cases" class="text-body-medium" data-testid="no-yearly">{{ noYearlyReason(lines) }}</p>
       </div>
 
       <ul class="text-body-small text-medium-emphasis ps-4">

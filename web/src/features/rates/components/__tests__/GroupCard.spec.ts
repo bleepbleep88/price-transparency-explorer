@@ -74,6 +74,21 @@ describe('GroupCard', () => {
     expect(wrapper.text()).not.toMatch(/typical/i)
   })
 
+  it('says "its price" for a single provider', () => {
+    const wrapper = mountCard(
+      makeGroup({
+        statsLevel: 'list',
+        providerCount: 1,
+        rateCount: 1,
+        listedRates: [1209.45],
+        stats: { min: 1209.45, p10: null, p25: null, median: null, p75: null, p90: null, max: 1209.45, spreadMultiple: null, p90ToP10: null },
+        lowerQuartileGap: null,
+      }),
+    )
+
+    expect(wrapper.get('[data-testid="stats-list"]').text()).toContain('Only 1 provider: too few to compare. Its price:')
+  })
+
   it('gives the typical price and the full run of prices for 5 to 9 providers, nothing more', () => {
     const wrapper = mountCard(
       makeGroup({
@@ -94,13 +109,14 @@ describe('GroupCard', () => {
     expect(wrapper.find('.range-bar__band').exists()).toBe(false)
   })
 
-  it('adds where most providers are, how much prices vary and the lower-priced quarter from 10 providers', () => {
+  it('adds where most providers are and the lower-priced quarter from 10 providers, saying the range once', () => {
     const wrapper = mountCard(makeGroup())
 
     const full = wrapper.get('[data-testid="stats-full"]')
     expect(full.get('[data-testid="typical-price"]').text()).toBe('$578')
     expect(full.get('[data-testid="range-line"]').text()).toBe('Most providers get between $372 and $664.')
-    expect(full.get('[data-testid="spread-line"]').text()).toBe('Even leaving out the extremes, the high end is about 1.8 times the low end.')
+    // "Most providers get between $372 and $664" already says how much prices vary; no "about 1.8 times" after it.
+    expect(full.find('[data-testid="spread-line"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="quartile-gap"]').text()).toBe(
       'The lower-priced quarter of providers get $454 or less: $124 less than typical.',
     )
@@ -154,11 +170,14 @@ describe('GroupCard', () => {
     expect(highlights.text()).toContain('How your provider compares')
     const lines = highlights.findAll('[data-testid="highlight-line"]')
     expect(lines.map((line) => [line.get('strong').text(), line.get('[data-testid="highlight-position"]').text()])).toEqual([
-      ['Example Surgery Center', 'Higher than most · $49.19 more than typical'],
+      // $627.50 against the "$578" the card shows: $49.50 more.
+      ['Example Surgery Center', 'Higher than most · $49.50 more than typical'],
       ['Example Endoscopy', 'About typical'],
     ])
     // The provider's own price is the copper chip, to the cent.
     expect(highlights.get('[data-testid="your-rate"]').text()).toBe(money(627.5))
+    // Screen readers hear whose price the copper dot marks.
+    expect(wrapper.get('[role="img"]').attributes('aria-label')).toContain('Marked: Example Surgery Center, $627.50.')
 
     await wrapper.findAll('button').find((button) => button.text() === 'Show these providers')!.trigger('click')
     expect(wrapper.emitted('showProviders')).toEqual([[group.key]])

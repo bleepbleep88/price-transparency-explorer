@@ -47,6 +47,28 @@ export function dollars(value: number): string {
   return amount >= 100 || cents % 100 === 0 ? wholeDollars(amount) : money(amount)
 }
 
+/** The amount {@link dollars} shows, as a number: whole dollars from $100 up, cents below. 578.31 → 578; 94.53 → 94.53. */
+export function shownDollars(value: number): number {
+  const amount = Math.abs(value)
+  return Math.sign(value) * (amount >= 100 ? Math.round(amount) : Math.round(amount * 100) / 100)
+}
+
+/** A price as tables and chips show it (always to the cent). */
+function shownPrice(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+/** A difference between shown figures, sign dropped, to the cent unless it's whole: "$76", "$30.47", "$136.50". */
+function differenceDollars(value: number): string {
+  const amount = Math.abs(value)
+  return Math.round(amount * 100) % 100 === 0 ? wholeDollars(amount) : money(amount)
+}
+
+/** Shown figures subtracted, kept to the cent (no floating-point dust). */
+function minus(a: number, b: number): number {
+  return Math.round((a - b) * 100) / 100
+}
+
 /** An estimate, rounded to three figures so it doesn't claim precision: 148,632 → "$149,000". */
 export function aboutDollars(value: number): string {
   const amount = Math.abs(value)
@@ -116,23 +138,39 @@ export function bandFor(rate: number, summary: PriceSummary): Band | null {
   return 'typical'
 }
 
+const ABOUT_THE_SAME_LINE = 'about the same as typical'
+
+/**
+ * "$12 less than typical" / "$29.27 more than typical", from the figures as shown (round first, then subtract): the
+ * price to the cent, the typical price as {@link dollars} shows it. So "$540.25" against a typical "$578" reads "$37.75 less".
+ * Null when the shown figures are equal.
+ */
+function dollarDifference(rate: number, typical: number): string | null {
+  const difference = minus(shownPrice(rate), shownDollars(typical))
+  return difference === 0 ? null : `${differenceDollars(difference)} ${difference < 0 ? 'less' : 'more'} than typical`
+}
+
 /**
  * A price against the typical price: "$12 less than typical", "about the same as typical" (within 5%), "$29 more than
- * typical", or "about 2.4 times the typical price" from twice up. Null without a typical price.
+ * typical", or "about 2.4 times the typical price" from twice up. Dollars come from the figures as shown, so they add
+ * up with the typical price on the card. Null without a typical price.
  */
 export function differenceLine(rate: number, typical: number | null | undefined): string | null {
   if (typical == null || typical <= 0) return null
   const ratio = rate / typical
-  if (Math.abs(ratio - 1) < ABOUT_THE_SAME) return 'about the same as typical'
+  if (Math.abs(ratio - 1) < ABOUT_THE_SAME) return ABOUT_THE_SAME_LINE
   if (ratio >= TIMES_FROM) return `${aboutTimes(ratio)} the typical price`
-  return `${dollars(rate - typical)} ${rate < typical ? 'less' : 'more'} than typical`
+  // 5% away or more, the shown figures can't round to equal: 5% of a typical $100 is $5.
+  return dollarDifference(rate, typical)
 }
 
 /**
  * Position and dollars, kept apart for layouts that stack them. The API's middle band covers the middle half of
  * providers, which can run well past typical ($80.72 against a typical $51.45). "About typical" is said only when the
  * price is within 5% of typical, and then alone; further away the middle band gets just the dollars, because "About
- * typical · $29.27 more than typical" contradicts itself.
+ * typical · $29.27 more than typical" contradicts itself. "Lower than most" and "Higher than most" always come with
+ * their dollars, even within 5% ("Lower than most · $0.91 less than typical", never "about the same as typical"); only
+ * if rounding to the shown typical price leaves no difference, or one the wrong way, is the label left alone.
  */
 export function positionParts(
   band: string | null | undefined,
@@ -140,8 +178,15 @@ export function positionParts(
   typical: number | null | undefined,
 ): { label: string | null; difference: string | null } {
   const difference = differenceLine(rate, typical)
-  if (band !== 'typical' || difference == null) return { label: positionLabel(band), difference }
-  return difference === 'about the same as typical' ? { label: positionLabel(band), difference: null } : { label: null, difference }
+  if (difference !== ABOUT_THE_SAME_LINE) {
+    return band === 'typical' && difference != null ? { label: null, difference } : { label: positionLabel(band), difference }
+  }
+  if ((band === 'low' || band === 'high') && typical != null) {
+    const shown = minus(shownPrice(rate), shownDollars(typical))
+    const agrees = band === 'low' ? shown < 0 : shown > 0
+    return { label: positionLabel(band), difference: agrees ? dollarDifference(rate, typical) : null }
+  }
+  return { label: positionLabel(band), difference: null }
 }
 
 /**
@@ -155,24 +200,38 @@ export function positionLine(band: string | null | undefined, rate: number, typi
 }
 
 /**
+ * How much less the lower-priced quarter of providers get than typical, from the figures as shown (round first, then
+ * subtract): a typical "$236" and a lower quarter at "$114" make $122, so the card's sentence adds up. 0 when they're
+ * shown the same; null under 10 providers.
+ */
+export function gapOf(summary: PriceSummary): number | null {
+  const { p25, median } = summary
+  if (summary.providers < MIN_PROVIDERS_FOR_RANGE || p25 == null || median == null) return null
+  return Math.max(0, minus(shownDollars(median), shownDollars(p25)))
+}
+
+/**
  * "The lower-priced quarter of providers get $454 or less: $124 less than typical." 10+ providers only, and only when
  * they do get less than typical: with no gap the line would only repeat the typical price.
  */
 export function gapLine(summary: PriceSummary): string | null {
-  const { p25, median } = summary
-  if (summary.providers < MIN_PROVIDERS_FOR_RANGE || p25 == null || median == null || median - p25 <= 0) return null
-  return `The lower-priced quarter of providers get ${dollars(p25)} or less: ${dollars(median - p25)} less than typical.`
+  const gap = gapOf(summary)
+  if (gap == null || gap <= 0) return null
+  return `The lower-priced quarter of providers get ${dollars(summary.p25!)} or less: ${differenceDollars(gap)} less than typical.`
 }
 
-/** "$124 less per case" ("per unit" for drugs and other per-unit prices); "No less" when there's no gap. */
+/** "$124 less per case" ("per unit" for drugs and other per-unit prices); "Same as typical" when there's no gap. */
 export function lessPerCase(gap: number, perUnit = false): string {
-  return gap > 0 ? `${dollars(gap)} less per ${perUnit ? 'unit' : 'case'}` : 'No less'
+  return gap > 0 ? `${differenceDollars(gap)} less per ${perUnit ? 'unit' : 'case'}` : 'Same as typical'
 }
 
-/** For plans and employers: "$124 less per case at a lower-priced provider." Null without a gap (under 10 providers). */
+/**
+ * For plans and employers: "$124 less per case at a lower-priced provider.", or "The lower-priced quarter of providers
+ * get the typical price." when there's no gap. Null without one (under 10 providers).
+ */
 export function perCaseLine(gap: number | null | undefined, perUnit = false): string | null {
   if (gap == null) return null
-  return gap > 0 ? `${lessPerCase(gap, perUnit)} at a lower-priced provider.` : `No less per ${perUnit ? 'unit' : 'case'} at a lower-priced provider.`
+  return gap > 0 ? `${lessPerCase(gap, perUnit)} at a lower-priced provider.` : 'The lower-priced quarter of providers get the typical price.'
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   dollars,
   feeLabel,
   fewProvidersLine,
+  gapOf,
   lowerFirst,
   MIN_PROVIDERS_FOR_RANGE,
   perCaseLine,
@@ -222,7 +223,7 @@ export interface SpreadLine {
   summary: PriceSummary
   /** High end over low end, leaving out the top and bottom tenth. */
   ratio: number
-  /** How much less the lower-priced quarter get than typical, per case (or per unit). */
+  /** How much less the lower-priced quarter get than typical, per case (or per unit), from the figures as shown (gapOf). */
   gap: number | null
   perUnit: boolean
 }
@@ -239,7 +240,7 @@ export function spreadLines(result: RateSearchResult): SpreadLine[] {
         providers: group.providerCount,
         summary: priceSummary(group),
         ratio: p90 / p10,
-        gap: group.lowerQuartileGap,
+        gap: gapOf(priceSummary(group)),
         perUnit: group.perUnit,
       },
     ]
@@ -267,7 +268,7 @@ export interface CostLine {
   providers: number
   /** The typical price (5+ providers). */
   typical: number
-  /** How much less the lower-priced quarter get than typical (10+ providers): per case, or per unit when perUnit. */
+  /** How much less the lower-priced quarter get than typical (10+ providers), from the figures as shown (gapOf): per case, or per unit when perUnit. */
   gap: number | null
   perUnit: boolean
   /** The gap times the reader's cases a year. Never for per-unit prices: a case can use several units. */
@@ -279,7 +280,7 @@ export function costLines(result: RateSearchResult, cases?: number | null): Cost
     .flatMap((group): CostLine[] => {
       const typical = typicalPrice(priceSummary(group))
       if (typical == null) return []
-      const gap = group.lowerQuartileGap
+      const gap = gapOf(priceSummary(group))
       const yearly = !group.perUnit && gap != null && cases ? gap * cases : null
       return [{ groupKey: group.key, group: groupName(group), providers: group.providerCount, typical, gap, perUnit: group.perUnit, yearly }]
     })
@@ -300,6 +301,21 @@ export function yearlyLead(lines: CostLine[], pickedGroup?: string | null): Cost
 /** "About $149,000 less a year for your 1,200 cases at lower-priced providers." */
 export function yearlyText(line: CostLine, cases: number): string {
   return yearlyLine(line.gap, cases) ?? ''
+}
+
+/**
+ * Why there's no yearly figure when the reader entered cases: no card priced per case has 10 or more providers, or on
+ * those that do the lower-priced quarter of providers get the typical price, so there's nothing less to count.
+ */
+export function noYearlyReason(lines: CostLine[]): string {
+  const perCase = lines.filter((line) => !line.perUnit)
+  const tooFew = perCase.some((line) => line.gap == null)
+  const noGap = perCase.some((line) => line.gap === 0)
+  if (noGap && tooFew) {
+    return "No yearly figure here: cards with fewer than 10 providers can't show one, and on the others the lower-priced quarter of providers get the typical price."
+  }
+  if (noGap) return 'No yearly figure here: the lower-priced quarter of providers get the typical price, so there is nothing less to count.'
+  return 'No yearly figure here: it needs a card with 10 or more providers.'
 }
 
 // What a member pays and how often a service happens are said once per page, in the footer.

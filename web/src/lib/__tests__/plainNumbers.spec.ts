@@ -8,6 +8,7 @@ import {
   feeLabel,
   fewProvidersLine,
   gapLine,
+  gapOf,
   lessPerCase,
   perCaseLine,
   positionLabel,
@@ -15,6 +16,7 @@ import {
   positionParts,
   rangeLine,
   scorecardLine,
+  shownDollars,
   spreadLine,
   typicalLine,
   typicalPrice,
@@ -106,33 +108,54 @@ describe('a provider against the others', () => {
   it('says the difference in dollars, "about the same" within 5%, and times from twice up', () => {
     expect(differenceLine(566.31, 578.31)).toBe('about the same as typical')
     expect(differenceLine(550, 578.31)).toBe('about the same as typical')
-    expect(differenceLine(549, 578.31)).toBe('$29.31 less than typical')
-    expect(differenceLine(143.75, 167.09)).toBe('$23.34 less than typical')
-    expect(differenceLine(707.31, 578.31)).toBe('$129 more than typical')
-    expect(differenceLine(1154.16, 578.31)).toBe('$576 more than typical')
+    // From the figures as shown: the typical $578.31 shows as "$578", so $549.00 is $29 less.
+    expect(differenceLine(549, 578.31)).toBe('$29 less than typical')
+    expect(differenceLine(143.75, 167.09)).toBe('$23.25 less than typical')
+    expect(differenceLine(707.31, 578.31)).toBe('$129.31 more than typical')
+    expect(differenceLine(1154.16, 578.31)).toBe('$576.16 more than typical')
+    expect(differenceLine(80.72, 51.45)).toBe('$29.27 more than typical')
     expect(differenceLine(1405.33, 578.31)).toBe('about 2.4 times the typical price')
     expect(differenceLine(100, null)).toBeNull()
     expect(differenceLine(100, 0)).toBeNull()
   })
 
+  it('shows differences that add up with the figures beside them', () => {
+    // A row at $540.25 under a card whose typical price shows "$578": $37.75 less, as the reader works it out
+    // (not the exact $38.06).
+    expect(differenceLine(540.25, 578.31)).toBe('$37.75 less than typical')
+    expect(shownDollars(578.31)).toBe(578)
+    expect(shownDollars(94.53)).toBe(94.53)
+    expect(shownDollars(99.995)).toBe(100)
+  })
+
   it('puts position and dollars together, without saying "typical" twice', () => {
-    expect(positionLine('low', 143.75, 167.09)).toBe('Lower than most · $23.34 less than typical')
+    expect(positionLine('low', 143.75, 167.09)).toBe('Lower than most · $23.25 less than typical')
     expect(positionLine('typical', 578.31, 578.31)).toBe('About typical')
-    // The middle band, but more than 5% from typical: just the dollars, never "About typical · $31.69 more".
-    expect(positionLine('typical', 610, 578.31)).toBe('$31.69 more than typical')
+    // The middle band, but more than 5% from typical: just the dollars, never "About typical · $32 more".
+    expect(positionLine('typical', 610, 578.31)).toBe('$32 more than typical')
     expect(positionLine('typical', 80.72, 51.45, ', ')).toBe('$29.27 more than typical')
     expect(positionLine('high', 1405.33, 578.31, ', ')).toBe('Higher than most, about 2.4 times the typical price')
-    // Bunched-up prices: lower than most, yet only a little.
-    expect(positionLine('low', 570, 578.31)).toBe('Lower than most · about the same as typical')
+    // Bunched-up prices: lower than most, yet only a little. The dollars say how little.
+    expect(positionLine('low', 570, 578.31)).toBe('Lower than most · $8 less than typical')
     expect(positionLine(null, 300, null)).toBeNull()
   })
 
   it('keeps position and dollars apart for stacked layouts, dropping dollars that only repeat "about typical"', () => {
-    expect(positionParts('low', 143.75, 167.09)).toEqual({ label: 'Lower than most', difference: '$23.34 less than typical' })
+    expect(positionParts('low', 143.75, 167.09)).toEqual({ label: 'Lower than most', difference: '$23.25 less than typical' })
     expect(positionParts('typical', 578.31, 578.31)).toEqual({ label: 'About typical', difference: null })
-    expect(positionParts('typical', 610, 578.31)).toEqual({ label: null, difference: '$31.69 more than typical' })
-    expect(positionParts('low', 570, 578.31)).toEqual({ label: 'Lower than most', difference: 'about the same as typical' })
+    expect(positionParts('typical', 560, 578.31)).toEqual({ label: 'About typical', difference: null })
+    expect(positionParts('typical', 610, 578.31)).toEqual({ label: null, difference: '$32 more than typical' })
     expect(positionParts(null, 300, null)).toEqual({ label: null, difference: null })
+  })
+
+  it('never says "about the same as typical" next to "lower than most" or "higher than most"', () => {
+    // 0324 hospital outpatient: $18.18 is in the lower-priced quarter, $0.91 under a typical $19.09.
+    expect(positionParts('low', 18.18, 19.09)).toEqual({ label: 'Lower than most', difference: '$0.91 less than typical' })
+    // 0420 ER: a typical $115.56 shows as "$116", so $118.62 is $2.62 more.
+    expect(positionParts('high', 118.62, 115.56)).toEqual({ label: 'Higher than most', difference: '$2.62 more than typical' })
+    // Rounding the typical to "$100" leaves a lower price level with it, or above it: the label stands alone.
+    expect(positionParts('low', 100, 100.4)).toEqual({ label: 'Lower than most', difference: null })
+    expect(positionParts('low', 100.3, 100.4)).toEqual({ label: 'Lower than most', difference: null })
   })
 })
 
@@ -145,13 +168,29 @@ describe('the lower-priced quarter', () => {
     expect(gapLine(tiny)).toBeNull()
   })
 
+  it('rounds first, then subtracts, so the figures on a card add up', () => {
+    // 0260 hospital outpatient: typical "$236", lower quarter "$114": $122 less, not the exact $121.05.
+    const ivTherapy = { ...colonoscopy, providers: 20, p25: 114.47, median: 235.52 }
+    expect(gapOf(ivTherapy)).toBe(122)
+    expect(gapLine(ivTherapy)).toBe('The lower-priced quarter of providers get $114 or less: $122 less than typical.')
+    // A typical in whole dollars and a lower quarter in cents: the difference keeps the cents.
+    const mixed = { ...colonoscopy, p25: 94.53, median: 125.08 }
+    expect(gapLine(mixed)).toBe('The lower-priced quarter of providers get $94.53 or less: $30.47 less than typical.')
+    // Shown the same, no gap: nothing to say.
+    expect(gapOf({ ...colonoscopy, p25: 100.1, median: 100.4 })).toBe(0)
+    expect(gapLine({ ...colonoscopy, p25: 100.1, median: 100.4 })).toBeNull()
+    expect(gapOf(small)).toBeNull()
+  })
+
   it('says it per case for plans and employers, per unit for per-unit prices', () => {
-    expect(perCaseLine(123.86)).toBe('$124 less per case at a lower-priced provider.')
+    expect(perCaseLine(gapOf(colonoscopy))).toBe('$124 less per case at a lower-priced provider.')
+    expect(perCaseLine(30.47)).toBe('$30.47 less per case at a lower-priced provider.')
     expect(perCaseLine(0.05, true)).toBe('$0.05 less per unit at a lower-priced provider.')
-    expect(perCaseLine(0)).toBe('No less per case at a lower-priced provider.')
+    // No gap: say what that means rather than "no less at a lower-priced provider".
+    expect(perCaseLine(0)).toBe('The lower-priced quarter of providers get the typical price.')
     expect(perCaseLine(null)).toBeNull()
-    expect(lessPerCase(123.86)).toBe('$124 less per case')
-    expect(lessPerCase(0)).toBe('No less')
+    expect(lessPerCase(124)).toBe('$124 less per case')
+    expect(lessPerCase(0)).toBe('Same as typical')
   })
 
   it('gives a yearly figure only from the reader\'s own case count', () => {

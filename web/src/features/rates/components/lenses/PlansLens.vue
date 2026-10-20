@@ -23,7 +23,9 @@ function showHighest(groupKey: string) {
     <p v-if="!lines.length" class="text-body-medium">
       It takes 10 providers to say how much prices vary, and no card here has that many.
     </p>
-    <p v-else-if="!widest.length" class="text-body-medium">Prices barely vary here: on each card, most providers get about the same price.</p>
+    <p v-else-if="!widest.length" class="text-body-medium">
+      Prices barely vary here: on each card with 10 or more providers, most providers get about the same price.
+    </p>
     <template v-else>
       <p class="text-body-medium">Where prices vary most, first.</p>
       <div v-for="(line, index) in widest" :key="line.groupKey" class="d-flex flex-column ga-1" data-testid="spread-line">

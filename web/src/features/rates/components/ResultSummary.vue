@@ -47,7 +47,7 @@ const qualityChips = computed(() => {
   if (q.providersWithMultipleRates > 0) {
     chips.push({
       text: `${plural(q.providersWithMultipleRates, 'provider')} with more than one rate`,
-      tip: 'Same provider, code and setting but different prices. Shown as a range; comparisons use the middle one.',
+      tip: 'Same provider, code and setting but different prices. Shown as a range; comparisons use the price in the Price column.',
     })
   }
   if (q.maskedTaxIds > 0) {

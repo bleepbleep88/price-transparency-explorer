@@ -12,7 +12,6 @@ import {
   lowerFirst,
   positionLine,
   rangeLine,
-  spreadLine,
   typicalPrice,
   type PriceSummary,
 } from '@/lib/plainNumbers'
@@ -74,21 +73,23 @@ function positionText(position: ProviderPosition): string | null {
 
       <!-- Under 5 providers: just the prices, nothing to compare. -->
       <div v-if="typical == null" data-testid="stats-list">
-        <p class="text-body-medium text-medium-emphasis mb-1">{{ fewProvidersLine(group.providerCount) }} Their prices:</p>
+        <p class="text-body-medium text-medium-emphasis mb-1">
+          {{ fewProvidersLine(group.providerCount) }} {{ group.providerCount === 1 ? 'Its price:' : 'Their prices:' }}
+        </p>
         <div class="d-flex flex-wrap ga-1">
           <v-chip v-for="(rate, index) in group.listedRates" :key="index" variant="tonal">{{ money(rate) }}</v-chip>
         </div>
       </div>
 
-      <!-- 5 or more: the typical price and how far prices run; from 10, the lower-priced quarter and how much prices vary. -->
+      <!-- 5 or more: the typical price and how far prices run; from 10, the lower-priced quarter. "Most providers get
+           between" already says how much prices vary, so the card doesn't say it again as "about N times". -->
       <div v-else :data-testid="group.statsLevel === 'full' ? 'stats-full' : 'stats-basic'" class="d-flex flex-column ga-2">
         <div>
           <div class="text-body-small text-medium-emphasis">Typical price</div>
           <div class="text-title-large stat-figure" data-testid="typical-price">{{ dollars(typical) }}</div>
         </div>
         <p class="text-body-medium" data-testid="range-line">{{ rangeLine(summary) }}</p>
-        <RangeBar :summary="summary" :marker="group.highlights[0]?.rate" />
-        <p v-if="spreadLine(summary)" class="text-body-medium text-medium-emphasis" data-testid="spread-line">{{ spreadLine(summary) }}</p>
+        <RangeBar :summary="summary" :marker="group.highlights[0]?.rate" :marker-label="group.highlights[0]?.displayName" />
         <v-sheet v-if="gapLine(summary)" rounded class="quartile-gap pa-3" data-testid="quartile-gap">
           <p class="text-body-medium">{{ gapLine(summary) }}</p>
         </v-sheet>

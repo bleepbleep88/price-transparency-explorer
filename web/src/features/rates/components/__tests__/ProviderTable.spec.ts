@@ -103,10 +103,11 @@ describe('ProviderTable', () => {
       cell.find('[data-testid="row-difference"]').exists() ? cell.get('[data-testid="row-difference"]').text() : null,
     ])
     expect(compared).toEqual([
-      ['Lower than most', '$124 less than typical'],
+      // Against the "$578" the card shows: $454.44 is $123.56 less, $610 is $32 more.
+      ['Lower than most', '$123.56 less than typical'],
       ['About typical', null],
       // In the API's middle band but over 5% above typical: the dollars, not "About typical".
-      ['$31.69 more than typical', '$31.69 more than typical'],
+      ['$32 more than typical', '$32 more than typical'],
       ['Higher than most', 'About 2.4 times the typical price'],
       ['Too few to compare', null],
     ])

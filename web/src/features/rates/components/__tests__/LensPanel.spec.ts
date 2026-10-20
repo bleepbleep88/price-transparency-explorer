@@ -101,7 +101,7 @@ describe('LensPanel', () => {
     })
     const withNpi = mountPanel(result([office], { npi: '1801474036' }), { lens: 'providers', npi: '1801474036' })
     expect(withNpi.get('[data-testid="your-rate-line"]').text()).toContain(
-      'Your price $80.72: lower than most, $498 less than typical. Typical price: $578.',
+      'Your price $80.72: lower than most, $497.28 less than typical. Typical price: $578.',
     )
 
     const without = mountPanel(result([group()]), { lens: 'providers' })
@@ -149,7 +149,7 @@ describe('LensPanel', () => {
   it('plans: says so when prices barely vary, or when no card has the 10 providers it takes', () => {
     const flat = group({ stats: { min: 7.94, p10: 7.94, p25: 7.94, median: 7.94, p75: 7.94, p90: 7.94, max: 7.94, spreadMultiple: 1, p90ToP10: 1 }, lowerQuartileGap: 0 })
     const wrapper = mountPanel(result([flat]), { lens: 'plans' })
-    expect(wrapper.text()).toContain('Prices barely vary here: on each card, most providers get about the same price.')
+    expect(wrapper.text()).toContain('Prices barely vary here: on each card with 10 or more providers, most providers get about the same price.')
     expect(wrapper.find('[data-testid="spread-line"]').exists()).toBe(false)
 
     const small = group({ providerCount: 8, statsLevel: 'basic', stats: { ...group().stats, p10: null, p90: null }, lowerQuartileGap: null })
@@ -168,7 +168,7 @@ describe('LensPanel', () => {
     expect(wrapper.text()).not.toMatch(BANNED)
 
     // A bigger fee-schedule group with no gap doesn't make the sentence say "$0 a year".
-    const feeSchedule = group({ key: 'fee-schedule', providerCount: 51, lowerQuartileGap: 0 })
+    const feeSchedule = group({ key: 'fee-schedule', providerCount: 51, lowerQuartileGap: 0, stats: { ...group().stats, p25: 578.31 } })
     const mixed = mountPanel(result([feeSchedule, group()]), { lens: 'employers', cases: '1200' })
     expect(mixed.get('[data-testid="yearly-gap"]').text()).toContain('About $149,000 less a year')
 
@@ -181,17 +181,31 @@ describe('LensPanel', () => {
   })
 
   it('employers: the picked group leads the yearly sentence', () => {
-    const essential = group({ key: 'essential-asc', productLabel: 'Essential Plan', providerCount: 27, lowerQuartileGap: 48 })
+    // Shown "$481" and "$433": $48 less per case.
+    const essential = group({ key: 'essential-asc', productLabel: 'Essential Plan', providerCount: 27, lowerQuartileGap: 48, stats: { ...group().stats, p25: 433.31, median: 481.31 } })
     const wrapper = mountPanel(result([group(), essential]), { lens: 'employers', cases: '12', group: 'essential-asc' })
     const yearly = wrapper.get('[data-testid="yearly-gap"]').text()
     expect(yearly).toContain('About $576 less a year for your 12 cases at lower-priced providers.')
     expect(yearly).toContain('Essential Plan')
   })
 
+  it('employers: says why there is no yearly figure, never that there are no lower-priced providers', () => {
+    // Like 0335: one card of 6 providers whose prices run from $44.19 to $1,290. Cheaper providers exist; there are
+    // just too few providers for a lower-priced quarter.
+    const small = group({ providerCount: 6, statsLevel: 'basic', stats: { ...group().stats, p10: null, p90: null }, lowerQuartileGap: null })
+    const wrapper = mountPanel(result([small]), { lens: 'employers', cases: '100' })
+    expect(wrapper.get('[data-testid="cost-line"]').text()).toContain('Needs 10+ providers')
+    expect(wrapper.get('[data-testid="no-yearly"]').text()).toBe('No yearly figure here: it needs a card with 10 or more providers.')
+    expect(wrapper.text()).not.toContain('lower-priced providers to compare with')
+  })
+
   it('employers: per-unit prices say so and get no yearly figure', () => {
-    const anesthesia = group({ key: 'anesthesia', perUnit: true, unit: 'per anesthesia unit', providerCount: 13, lowerQuartileGap: 0.04 })
+    const anesthesia = group({
+      key: 'anesthesia', perUnit: true, unit: 'per anesthesia unit', providerCount: 13, lowerQuartileGap: 0.04,
+      stats: { min: 7.5, p10: 7.6, p25: 7.9, median: 7.94, p75: 8.1, p90: 8.3, max: 9, spreadMultiple: 1.2, p90ToP10: 1.09 },
+    })
     const wrapper = mountPanel(result([anesthesia]), { lens: 'employers', cases: '100' })
-    expect(wrapper.get('[data-testid="cost-line"]').text()).toContain('$578 per unit')
+    expect(wrapper.get('[data-testid="cost-line"]').text()).toContain('$7.94 per unit')
     expect(wrapper.get('[data-testid="cost-line"]').text()).toContain('$0.04 less per unit')
     expect(wrapper.get('[data-testid="per-unit-note"]').text()).toBe('Priced per unit; a case can use several units.')
     expect(wrapper.find('[data-testid="cases-input"]').exists()).toBe(false)

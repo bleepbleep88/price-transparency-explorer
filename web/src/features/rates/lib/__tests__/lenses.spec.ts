@@ -10,6 +10,7 @@ import {
   highlightHeading,
   isDrugCode,
   modifierText,
+  noYearlyReason,
   LENS_OPTIONS,
   qualityLines,
   spreadLines,
@@ -239,12 +240,16 @@ describe('plans lens', () => {
 })
 
 describe('employers lens', () => {
-  const asc = makeGroup({ key: 'asc', settingLabel: 'Ambulatory surgery center', providerCount: 31, lowerQuartileGap: 123.86, stats: { ...makeGroup().stats, median: 578.31 } })
+  // The 45378 Ambetter surgery-center card: typical $578.31 (shown "$578"), lower quarter $454.44 (shown "$454").
+  const ascStats = { ...makeGroup().stats, p10: 371.78, p25: 454.44, median: 578.31, p75: 627.5, p90: 663.64 }
+  const asc = makeGroup({ key: 'asc', settingLabel: 'Ambulatory surgery center', providerCount: 31, lowerQuartileGap: 123.87, stats: ascStats })
+  const feeSchedule = { ...asc, key: 'fee-schedule', providerCount: 51, lowerQuartileGap: 0, stats: { ...ascStats, p25: 167.09, median: 167.09 } }
 
   it('lists the typical price and how much less per case at a lower-priced provider, largest groups first', () => {
     const lines = costLines(makeResult([essentialBasic, asc, singleEr]))
+    // The gap is the card's: "$578" less "$454" as shown, $124.
     expect(lines.map((line) => [line.providers, line.typical, line.gap])).toEqual([
-      [31, 578.31, 123.86],
+      [31, 578.31, 124],
       [8, 3595.92, null],
     ])
     expect(lines.every((line) => line.yearly === null)).toBe(true)
@@ -252,7 +257,7 @@ describe('employers lens', () => {
 
   it("turns the reader's cases a year into a rounded yearly figure only where there is a gap", () => {
     const [first, second] = costLines(makeResult([asc, essentialBasic]), 1200)
-    expect(first!.yearly).toBeCloseTo(123.86 * 1200)
+    expect(first!.yearly).toBe(124 * 1200)
     expect(yearlyText(first!, 1200)).toBe('About $149,000 less a year for your 1,200 cases at lower-priced providers.')
     expect(second!.yearly).toBeNull()
   })
@@ -263,14 +268,23 @@ describe('employers lens', () => {
   })
 
   it('never multiplies a per-unit price by cases: a case can use several units', () => {
-    const contrast = { ...asc, key: 'contrast', perUnit: true, lowerQuartileGap: 0.04 }
+    const contrast = { ...asc, key: 'contrast', perUnit: true, lowerQuartileGap: 0.04, stats: { ...ascStats, p25: 0.13, median: 0.17 } }
     const [line] = costLines(makeResult([contrast]), 100)
     expect(line).toMatchObject({ perUnit: true, gap: 0.04, yearly: null })
   })
 
+  it('says why there is no yearly figure: too few providers, or a lower-priced quarter at the typical price', () => {
+    expect(noYearlyReason(costLines(makeResult([essentialBasic]), 100))).toBe('No yearly figure here: it needs a card with 10 or more providers.')
+    expect(noYearlyReason(costLines(makeResult([feeSchedule]), 100))).toBe(
+      'No yearly figure here: the lower-priced quarter of providers get the typical price, so there is nothing less to count.',
+    )
+    expect(noYearlyReason(costLines(makeResult([feeSchedule, essentialBasic]), 100))).toBe(
+      "No yearly figure here: cards with fewer than 10 providers can't show one, and on the others the lower-priced quarter of providers get the typical price.",
+    )
+  })
+
   it('speaks for the picked group when it has a gap, else the largest group with one', () => {
-    const essential = { ...asc, key: 'essential-asc', providerCount: 27, lowerQuartileGap: 48 }
-    const feeSchedule = { ...asc, key: 'fee-schedule', providerCount: 51, lowerQuartileGap: 0 }
+    const essential = { ...asc, key: 'essential-asc', providerCount: 27, lowerQuartileGap: 48, stats: { ...ascStats, p25: 433, median: 481 } }
     const lines = costLines(makeResult([feeSchedule, asc, essential]), 12)
     expect(yearlyLead(lines)?.groupKey).toBe('asc')
     expect(yearlyLead(lines, 'essential-asc')?.groupKey).toBe('essential-asc')
