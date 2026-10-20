@@ -28,7 +28,7 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
         var (facts, assembled) = await RunAsync(connection, snapshot, search, sort, request.Page, request.PageSize, catalog);
         var rows = await CountRowNpisAsync(connection, assembled.Rows);
 
-        var codeInfo = await DescribeCodeAsync(connection, snapshot, facts, assembled.Groups);
+        var codeInfo = await DescribeCodeAsync(connection, snapshot, facts, assembled.Groups, search.CodeType);
         var hints = await new SearchHints(connection, snapshot, catalog, search).ForAsync(facts, assembled, codeInfo);
         hints = await new HintLinkChecker(connections, snapshot, catalog, logger).KeepLinksThatFindRatesAsync(request, hints, cancellationToken);
 
@@ -99,14 +99,17 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
     }
 
     private async Task<CodeInfo?> DescribeCodeAsync(
-        DuckDBConnection connection, ResolvedSnapshot snapshot, List<RateFactRow> facts, IReadOnlyList<RateGroup> shown)
+        DuckDBConnection connection, ResolvedSnapshot snapshot, List<RateFactRow> facts, IReadOnlyList<RateGroup> shown, string? codeType)
     {
-        // When a short number matched several kinds of code, describe one that's shown under the current filters, then
-        // the one with the most providers.
+        // When a short number matched several kinds of code, describe one that's shown under the current filters. When
+        // nothing is shown, prefer the kind asked for, then one the filtered provider has, then the one with most providers.
         var shownKinds = shown.Select(group => (group.CodeType, group.Code)).ToHashSet();
         var primary = facts
             .GroupBy(fact => (fact.CodeType, fact.Code))
             .OrderByDescending(group => shownKinds.Contains(group.Key))
+            .ThenByDescending(group => group.Key.CodeType == codeType)
+            .ThenByDescending(group => group.Any(fact => fact.FilterMatch))
+            .ThenByDescending(group => group.Any(fact => fact.IdMatch))
             .ThenByDescending(group => group.Select(fact => fact.ProviderKey).Distinct().Count())
             .ThenBy(group => group.Key.CodeType, StringComparer.Ordinal)
             .Select(group => group.Key)

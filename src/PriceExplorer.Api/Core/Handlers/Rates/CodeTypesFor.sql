@@ -4,19 +4,20 @@
 --   are all filed under the procedure code in their notes field is listed too, but isn't searchable.
 --   ForProvider: with provider filters, one of those searchable rates has a provider group matching them all (NPI, EIN
 --   and name in the same group, as in SearchRates.sql); always true without provider filters.
+--   InProduct: one of those searchable rates is in the selected product (always true without one).
 WITH target_files AS (
-    SELECT file_id
+    SELECT file_id, product_key
     FROM source_files
     WHERE snapshot_id = $snapshotId AND kind = 'in_network' AND status IN ('loaded', 'partial')
 ),
 kinds AS (
-    SELECT r.rate_id, r.code_type, r.code, true AS searchable
+    SELECT r.rate_id, r.code_type, r.code, true AS searchable, tf.product_key
     FROM rates r
     JOIN target_files tf ON tf.file_id = r.file_id
     WHERE r.code IN $codes
       AND (r.expiration_date IS NULL OR r.expiration_date >= current_date)
     UNION ALL
-    SELECT r.rate_id, r.billing_code_type, r.billing_code, false
+    SELECT r.rate_id, r.billing_code_type, r.billing_code, false, tf.product_key
     FROM rates r
     JOIN target_files tf ON tf.file_id = r.file_id
     WHERE r.billing_code_type = 'RC'
@@ -38,7 +39,8 @@ SELECT
               WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
                 AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
           AND ($ein::VARCHAR IS NULL OR pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR)
-          AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))))) AS ForProvider
+          AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))))) AS ForProvider,
+    bool_or(k.searchable AND ($product::VARCHAR IS NULL OR k.product_key = $product::VARCHAR)) AS InProduct
 FROM kinds k
 GROUP BY k.code_type, k.code
 ORDER BY CodeType, Code

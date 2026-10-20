@@ -180,14 +180,14 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
 
         own.GetProperty("message").GetString().Should().EndWith("Codes this provider has that start the same way:");
         own.GetProperty("links")[0].GetProperty("query").TryGetProperty("npi", out _).Should().BeFalse("the link keeps the NPI");
-        others.GetProperty("message").GetString().Should().EndWith("The provider you searched for has no codes that start the same way. For all providers:");
+        others.GetProperty("message").GetString().Should().EndWith("Codes that start the same way (none for NPI 1649596081):");
         others.GetProperty("links")[0].GetProperty("query").GetProperty("npi").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
     [Theory(Timeout = 60_000)]
-    [InlineData("490", "MS-DRG", "MS-DRG 490 is an inpatient DRG.")]
-    [InlineData("45378", "MS-DRG", "MS-DRG 45378 is an inpatient DRG.")]
-    [InlineData("45378", "APR-DRG", "APR-DRG 45378 is an inpatient DRG.")]
+    [InlineData("490", "MS-DRG", "No MS-DRG rates for 490. DRGs price inpatient stays")]
+    [InlineData("45378", "MS-DRG", "No MS-DRG rates for 45378. DRGs price inpatient stays")]
+    [InlineData("45378", "APR-DRG", "No APR-DRG rates for 45378. DRGs price inpatient stays")]
     [InlineData("45378", "APC", "No APC rates for 45378. These files list rates by CPT, HCPCS and revenue code only.")]
     public async Task A_code_type_with_its_own_numbering_never_matches_these_files_codes(string code, string codeType, string message)
     {
@@ -198,6 +198,37 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
         var hint = result.GetProperty("hints").EnumerateArray().Should().ContainSingle().Subject;
         hint.GetProperty("kind").GetString().Should().Be("code_not_found");
         hint.GetProperty("message").GetString().Should().StartWith(message);
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_revenue_code_number_typed_as_hcpcs_still_finds_the_providers_procedure_codes()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken,
+            new() { ["code"] = "0490", ["codeType"] = "HCPCS", ["npi"] = YorkvilleNpi });
+
+        Kinds(result).Should().Equal("revenue_code_procedures");
+        Hint(result, "revenue_code_procedures").GetProperty("message").GetString().Should()
+            .StartWith("The only facility rate under revenue code 0490 (Ambulatory surgery) for NPI 1174873780 is filed under the procedure code");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_name_that_matches_the_npis_real_tax_id_is_not_blamed()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken,
+            new() { ["code"] = "0490", ["npi"] = YorkvilleNpi, ["ein"] = "113471596", ["provider"] = "yorkville" });
+
+        var message = Hint(result, "revenue_code_procedures").GetProperty("message").GetString();
+        message.Should().Contain("listed under Yorkville Endoscopy, LLC, EIN 46-0857425, not under EIN 11-3471596")
+            .And.NotContain("but none under a name");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_product_without_rates_for_the_code_is_named_by_its_label()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "29881", ["product"] = "essential-plan" });
+
+        Hint(result, "filters_hide_results").GetProperty("message").GetString().Should()
+            .StartWith("This code has rates, but none match the filters (Essential Plan).");
     }
 
     [Fact(Timeout = 60_000)]

@@ -185,8 +185,19 @@ public sealed class SearchInputTests
     {
         decimal[] market = [45m, 60m, 67.5m, 70m, 80m];   // 67.50 is the provider's own blended value
 
-        RateStatistics.PercentRank(market, 45m, own: 67.5m).Should().Be(0);
+        RateStatistics.PercentRank(market, 45m, own: 67.5m).Should().Be(13, "one of the 4 others is also paid $45 and counts half");
         RateStatistics.PercentRank(market, 90m, own: 67.5m).Should().Be(100, "everyone else is below 90; its own 67.50 isn't counted");
+    }
+
+    [Fact]
+    public void A_provider_paid_the_standard_rate_sits_in_the_middle_not_at_the_bottom()
+    {
+        // A fee schedule: 49 of 51 providers paid $167.09.
+        decimal[] market = [143.75m, .. Enumerable.Repeat(167.09m, 49), 185.40m];
+
+        RateStatistics.PercentRank(market, 167.09m).Should().Be(50, "1 below, 48 others at the same rate count half: (1 + 24) / 50");
+        RateStatistics.PercentRank(market, 143.75m).Should().Be(0);
+        RateStatistics.PercentRank(market, 185.40m).Should().Be(100);
     }
 
     [Fact]

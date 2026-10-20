@@ -137,7 +137,12 @@ internal static class RateSearchAssembler
             full && p90 is { } top ? RateStatistics.Ratio(top, p10) : null);
 
         var category = ServiceCategories.Classify(group.CodeType, group.Code);
-        var unit = group.Setting.Key is "fqhc" or "rhc" ? ServiceCategories.PerVisitAllInclusive : category.Unit;
+        // A drug or unit-priced code named in the notes of a facility rate filed under a revenue code is a facility charge,
+        // not a price per unit (J0585 under revenue code 0490 is a surgery center's charge, not Botox per unit).
+        var perUnit = category.PerUnit && !group.FiledUnderRevenueCode;
+        var unit = group.Setting.Key is "fqhc" or "rhc" ? ServiceCategories.PerVisitAllInclusive
+            : category.PerUnit && !perUnit ? "per facility charge"
+            : category.Unit;
         var modifiers = group.Modifiers.Length == 0
             ? []
             : group.Modifiers.Split(',').Select(code => new ModifierRef(code, catalog.Modifier(code).Label)).ToList();
@@ -181,7 +186,7 @@ internal static class RateSearchAssembler
             Modifiers: modifiers,
             NegotiatedType: group.NegotiatedType,
             Unit: unit,
-            PerUnit: category.PerUnit,
+            PerUnit: perUnit,
             BilledAs: group.BilledAs
                 .Select(billed => new BilledAs(billed.Type, billed.Code, LabelFor(billed.Type, billed.Code, catalog)))
                 .ToList(),
@@ -328,10 +333,11 @@ internal static class RateSearchAssembler
         if (facilityRows.Count > 0)
         {
             var codes = string.Join(", ", facilityRows.Select(b => $"{b.Code} ({catalog.RevenueCodeLabel(b.Code)})"));
-            notes.Add($"The plan files these facility rates under revenue code{(facilityRows.Count == 1 ? "" : "s")} {codes}, naming {group.CodeType} {group.Code} in the notes field.");
+            notes.Add($"The plan files these facility rates under revenue code{(facilityRows.Count == 1 ? "" : "s")} {codes}, naming {group.CodeType} {group.Code} in the notes field" +
+                (category.PerUnit && group.FiledUnderRevenueCode ? $": they are facility charges, not prices {category.Unit}." : "."));
         }
 
-        if (category.PerUnit)
+        if (category.PerUnit && !group.FiledUnderRevenueCode)
         {
             notes.Add($"Priced {category.Unit}, not per visit or procedure.");
         }
@@ -370,6 +376,10 @@ internal static class RateSearchAssembler
         public string NegotiatedType { get; } = first.NegotiatedType;
         public SortedSet<string> Places { get; } = new(StringComparer.Ordinal);
         public SortedSet<(string Type, string Code)> BilledAs { get; } = [];
+
+        /// <summary>Every rate in the group is filed under a revenue code, with this code only in the notes field.</summary>
+        public bool FiledUnderRevenueCode =>
+            CodeType != BillingCodes.RevenueCode && BilledAs.All(billed => billed.Type == BillingCodes.RevenueCode);
         public Dictionary<long, int> RateIds { get; } = [];
         public Dictionary<string, ProviderAccumulator> Providers { get; } = new(StringComparer.Ordinal);
 

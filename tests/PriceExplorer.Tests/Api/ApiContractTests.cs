@@ -22,6 +22,26 @@ public sealed class ApiContractTests(ExplorerApiFactory factory) : IClassFixture
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task Any_provider_key_from_results_filters_a_search()
+    {
+        using var response = await GetAsync("/api/v1/rates?code=45378&ein=npi:1234567890", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, "a tax ID that isn't an EIN is keyed type:value, and results can carry that key");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task Control_characters_in_typeahead_text_get_their_own_message()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        using var providers = await GetAsync("/api/v1/providers?q=%00%00", ct);
+        using var codes = await GetAsync("/api/v1/codes?q=%00", ct);
+
+        (await ErrorsAsync(providers))["q"].Should().Equal("Search text can't contain control characters.");
+        (await ErrorsAsync(codes))["q"].Should().Equal("Search text can't contain control characters.");
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task Too_long_names_get_a_too_long_message()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -46,7 +66,9 @@ public sealed class ApiContractTests(ExplorerApiFactory factory) : IClassFixture
         using var badRoute = await GetAsync("/api/v1/rates/abc/source", ct, accept);
 
         (await ErrorsAsync(invalid)).Should().ContainKey("code");
-        (await ProblemAsync(missingRate, HttpStatusCode.NotFound)).GetProperty("code").GetString().Should().Be("rate_not_found");
+        var notFound = await ProblemAsync(missingRate, HttpStatusCode.NotFound);
+        notFound.GetProperty("code").GetString().Should().Be("rate_not_found");
+        notFound.GetProperty("type").GetString().Should().Be("https://tools.ietf.org/html/rfc9110#section-15.5.5");
         (await ProblemAsync(badRoute, HttpStatusCode.NotFound)).GetProperty("code").GetString().Should().Be("not_found");
     }
 
@@ -60,6 +82,12 @@ public sealed class ApiContractTests(ExplorerApiFactory factory) : IClassFixture
         search.GetProperty("parameters").EnumerateArray().Select(p => p.GetProperty("name").GetString())
             .Should().Contain(["code", "codeType", "npi", "ein", "product", "setting", "feeType", "provider", "group", "page", "pageSize"])
             .And.NotContain(name => char.IsUpper(name![0]));
+        search.GetProperty("parameters").EnumerateArray().Single(p => p.GetProperty("name").GetString() == "code")
+            .GetProperty("required").GetBoolean().Should().BeTrue();
+        search.GetProperty("responses").GetProperty("400").GetProperty("content").EnumerateObject().Select(c => c.Name)
+            .Should().Equal("application/problem+json");
+        search.GetProperty("responses").GetProperty("200").GetProperty("content").EnumerateObject().Select(c => c.Name)
+            .Should().Equal("application/json");
 
         var linkValues = document.GetProperty("components").GetProperty("schemas").GetProperty("HintLink")
             .GetProperty("properties").GetProperty("query").GetProperty("additionalProperties").GetProperty("type");

@@ -67,6 +67,12 @@ internal static class ApiExtensions
                 foreach (var parameter in (operation.Parameters ?? []).OfType<OpenApiParameter>().Where(p => p.In == ParameterLocation.Query))
                 {
                     parameter.Name = JsonNamingPolicy.CamelCase.ConvertName(parameter.Name!);
+
+                    // Validators enforce these; the document should say so too.
+                    if (parameter.Description?.StartsWith("Required.", StringComparison.Ordinal) == true)
+                    {
+                        parameter.Required = true;
+                    }
                 }
 
                 return Task.CompletedTask;

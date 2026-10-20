@@ -11,7 +11,7 @@ SELECT
     pg.npi_count       AS NpiCount,
     pg.ein_level       AS EinLevel,
     pg.network_names   AS NetworkNames,
-    coalesce(pg.provider_key = $provider::VARCHAR, false) AS ProviderMatch
+    coalesce(pg.provider_key = $provider::VARCHAR OR pg.ein = $provider::VARCHAR, false) AS ProviderMatch
 FROM rate_provider_refs rr
 JOIN provider_groups pg ON pg.file_id = rr.file_id AND pg.provider_ref_id = rr.provider_ref_id
 WHERE rr.rate_id = $rateId

@@ -38,9 +38,9 @@ internal sealed record SearchContext(
     public static SearchContext From(SearchRatesQuery request)
     {
         var (code, codeType) = CodeInput.Parse(request.Code, request.CodeType);
-        ProviderKeys.TryNormalizeEinFilter(request.Ein, out var ein);
         return new SearchContext(
-            code, codeType, CodeInput.Candidates(code, codeType), Domain.Npi.Parse(request.Npi), ein, Blank(request.Provider),
+            code, codeType, CodeInput.Candidates(code, codeType), Domain.Npi.Parse(request.Npi), ProviderKeys.NormalizeKey(request.Ein),
+            Blank(request.Provider),
             Blank(request.Product), Blank(request.Setting), Blank(request.FeeType), Blank(request.Group));
     }
 

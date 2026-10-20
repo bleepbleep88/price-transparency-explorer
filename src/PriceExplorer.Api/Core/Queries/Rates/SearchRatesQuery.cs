@@ -70,9 +70,9 @@ public sealed partial class SearchRatesQueryValidator : AbstractValidator<Search
             .WithMessage("An NPI is 10 digits, for example 1396747861.");
 
         RuleFor(query => query.Ein)
-            .Must(ein => ProviderKeys.TryNormalizeEinFilter(ein, out _))
+            .Must(InputRules.IsProviderKey)
             .When(query => !string.IsNullOrWhiteSpace(query.Ein))
-            .WithMessage("An EIN is 9 digits, for example 11-3471596.");
+            .WithMessage("Enter a 9-digit EIN, for example 11-3471596, or a provider key from search results.");
 
         RuleFor(query => query.Setting)
             .Must(setting => catalog.Setting(setting!) is not null)
