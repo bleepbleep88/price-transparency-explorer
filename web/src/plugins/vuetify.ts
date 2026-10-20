@@ -30,7 +30,8 @@ export const vuetify = createVuetify({
           'copper-ink': '#9A4A17',
           low: '#2F7D5B',
           high: '#B4432F',
-          success: '#2F7D5B',
+          // Darker than low: tonal status chips (e.g. "Data ready" on the paper app bar) need 4.5:1 (4.83:1 here).
+          success: '#276B4E',
           warning: '#8F4A12',
           error: '#A8381F',
           info: '#25587F',
