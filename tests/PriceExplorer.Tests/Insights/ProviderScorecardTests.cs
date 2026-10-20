@@ -128,7 +128,8 @@ public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassF
         Groups(scorecard).Should().ContainSingle().Which.Should().Be(("CPT", "99214", Ambetter, 170m, null, null, null));
     }
 
-    [Fact(Timeout = 60_000)]
+    // One search per scorecard row, one after another: under the full parallel suite that can pass a minute.
+    [Fact(Timeout = 120_000)]
     public async Task Every_group_reads_exactly_as_the_search_its_link_opens()
     {
         using var client = factory.CreateClient();
