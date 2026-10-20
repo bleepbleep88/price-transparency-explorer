@@ -19,7 +19,9 @@ public sealed class ReportingStructure
 {
     public List<ReportingPlan?>? ReportingPlans { get; set; }
     public List<FileLocation?>? InNetworkFiles { get; set; }
-    public FileLocation? AllowedAmountFile { get; set; }
+
+    /// <summary>One file object in the schema. Read by <c>TableOfContentsReader</c>, which also accepts an array of them.</summary>
+    public System.Text.Json.JsonElement? AllowedAmountFile { get; set; }
 }
 
 public sealed class ReportingPlan

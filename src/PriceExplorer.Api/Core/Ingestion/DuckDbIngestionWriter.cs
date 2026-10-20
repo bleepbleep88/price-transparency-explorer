@@ -11,10 +11,10 @@ namespace PriceExplorer.Api.Core.Ingestion;
 internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections, TimeProvider time, ILogger<DuckDbIngestionWriter> logger)
 {
     /// <summary>Bump when Schema.sql changes: all tables are rebuilt from the download cache.</summary>
-    public const int SchemaVersion = 4;
+    public const int SchemaVersion = 5;
 
     /// <summary>The meta key holding the per-install secret behind masked provider keys (see <see cref="ProviderKeys"/>).</summary>
-    private const string ProviderKeySecret = "provider_key_secret";
+    internal const string ProviderKeySecret = "provider_key_secret";
 
     /// <summary>Bump when normalization rules change: every file is re-parsed even if its bytes didn't change.</summary>
     public const int ParserVersion = 1;
@@ -24,7 +24,7 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
 
     private static readonly string[] Tables =
     [
-        "stats_builds", "provider_values", "group_stats",
+        "stats_builds", "provider_values", "group_stats", "oon_providers", "oon_payments", "oon_items",
         "ingestion_rejects", "code_descriptions", "rate_provider_refs", "rate_places", "rates",
         "group_npis", "provider_groups", "source_files", "structure_files", "plans", "snapshots", "meta",
     ];
@@ -76,7 +76,7 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
     {
         await using var connection = await connections.OpenAsync(cancellationToken);
         return await connection.ExecuteScalarAsync<long>(
-            "SELECT count(*) FROM source_files WHERE status IN ('loaded', 'partial')") > 0;
+            "SELECT count(*) FROM source_files WHERE kind = 'in_network' AND status IN ('loaded', 'partial')") > 0;
     }
 
     public async Task<int> UpsertSnapshotAsync(string indexUrl, SnapshotHeader header, CancellationToken cancellationToken)

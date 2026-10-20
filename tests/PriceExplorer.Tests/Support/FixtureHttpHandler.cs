@@ -13,6 +13,8 @@ public sealed class FixtureHttpHandler : HttpMessageHandler
     public const string IndexUrl = BaseUrl + "2026-08-31_fidelis_index.json";
     public const string AmbetterUrl = BaseUrl + "2026-08-31_fidelis-ex_in-network.json";
     public const string EssentialUrl = BaseUrl + "2026-08-31_fidelis-es_in-network.json";
+    public const string AmbetterAllowedUrl = BaseUrl + "2026-08-31_fidelis-ex_allowed-amounts.json";
+    public const string EssentialAllowedUrl = BaseUrl + "2026-08-31_fidelis-es_allowed-amounts.json";
 
     private readonly ConcurrentDictionary<string, Func<HttpRequestMessage, HttpResponseMessage>> _routes = new(StringComparer.OrdinalIgnoreCase);
 
@@ -21,6 +23,8 @@ public sealed class FixtureHttpHandler : HttpMessageHandler
         ServeFixture(IndexUrl, "2026-08-31_fidelis_index.json");
         ServeFixture(AmbetterUrl, "2026-08-31_fidelis-ex_in-network.json");
         ServeFixture(EssentialUrl, "2026-08-31_fidelis-es_in-network.json");
+        ServeFixture(AmbetterAllowedUrl, "2026-08-31_fidelis-ex_allowed-amounts.json");
+        ServeFixture(EssentialAllowedUrl, "2026-08-31_fidelis-es_allowed-amounts.json");
     }
 
     /// <summary>Every request seen: URL and whether it was a conditional (If-None-Match) re-check.</summary>
