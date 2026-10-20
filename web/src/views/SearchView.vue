@@ -199,6 +199,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
               :sort="params.sort"
               :loading="search.isFetching.value"
               :yours="Boolean(result.query.npi || result.query.ein || result.query.provider)"
+              :directory="reference.data.value?.directory"
               @update-options="onTableOptions"
               @open-source="openSource"
               @open-npis="openNpis"
