@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using PriceExplorer.Api.Configuration;
 using PriceExplorer.Api.Core.Data;
 using PriceExplorer.Api.Core.Ingestion;
+using PriceExplorer.Api.Core.Reference;
 
 namespace PriceExplorer.Api.Hosting;
 
@@ -28,6 +29,13 @@ internal static class IngestionExtensions
         services.AddSingleton<AllowedAmountLoader>();
         services.AddSingleton<IngestionCoordinator>();
         services.AddHostedService<IngestionService>();
+
+        services.AddOptions<ReferenceOptions>()
+            .BindConfiguration(ReferenceOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<ProviderDirectoryInfo>();
+        services.AddSingleton<ReferenceDataLoader>();
 
         // Large bodies are streamed with our own stall watchdog, so the client-wide timeout is off.
         // No compressed transfers: the payer's CDN then always sends Content-Length (checked after download), a strong

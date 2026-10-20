@@ -89,3 +89,10 @@ public sealed record ProviderSuggestion(
 public sealed record ReferenceLists(IReadOnlyList<SettingOption> Settings, IReadOnlyList<string> Sorts);
 
 public sealed record SettingOption(string Key, string Label, string? Note);
+
+/// <summary>Where the loaded provider directory came from (reference/provider_directory.source.json).</summary>
+/// <param name="Release">The NPPES monthly release it was built from, e.g. "October 2026"; null when unknown.</param>
+/// <param name="BuiltAt">When the builder tool made the bundled file.</param>
+/// <param name="NpisLoaded">NPIs in the loaded directory.</param>
+/// <param name="Source">The NPPES download it was built from.</param>
+public sealed record DirectorySource(string? Release, DateTimeOffset? BuiltAt, long NpisLoaded, string? Source);

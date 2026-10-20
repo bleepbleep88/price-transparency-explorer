@@ -1,0 +1,8 @@
+{
+  "generatedAt": "2026-10-19T21:10:45.8593842+00:00",
+  "nppes": "https://download.cms.gov/nppes/NPPES_Data_Dissemination_October_2026_V2.zip",
+  "nucc": "https://www.nucc.org/images/stories/CSV/nucc_taxonomy_261.csv",
+  "census": "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt",
+  "npisRequested": 58690,
+  "npisFound": 58688
+}
