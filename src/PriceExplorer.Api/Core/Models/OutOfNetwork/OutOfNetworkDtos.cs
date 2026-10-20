@@ -27,13 +27,14 @@ public sealed record OutOfNetworkFile(int FileId, string ProductKey, string Prod
 /// are separate bills, so they're never mixed. Places of service aren't split: one payment often lists several.
 /// </summary>
 /// <param name="PerUnitCode">In-network rates for this code are per unit (anesthesia, drugs, supplies); these amounts are for the whole service.</param>
-/// <param name="Payments">Unique payments (distinct allowed amounts per tax ID and place), after duplicates collapse.</param>
+/// <param name="Payments">Different amounts listed: unique payments (distinct allowed amounts per tax ID and place), after
+/// duplicates collapse. Not a claim count; the files have none.</param>
 /// <param name="Providers">Tax IDs paid.</param>
 /// <param name="Billed">What the providers billed, one charge per provider on a payment; null when none was published.</param>
 /// <param name="BilledToAllowed">
 /// The median of billed ÷ allowed over each provider on a payment (4.81 = providers usually billed about 4.8 times what
-/// the plan allowed), with 5 or more such pairs; null under 5. It holds even where a listed amount is a total of several
-/// claims, since the charge covers the same claims.
+/// the plan allowed), when 5 or more providers published a billed charge; null otherwise. It holds whatever an amount
+/// covers, since the charge covers the same thing.
 /// </param>
 public sealed record OutOfNetworkGroup(
     string Key,
@@ -53,7 +54,7 @@ public sealed record OutOfNetworkGroup(
     AmountSummary? Billed,
     decimal? BilledToAllowed);
 
-/// <summary>A set of dollar amounts. Under 5 amounts they're listed instead of summarized, so no midpoint reads as a price.</summary>
-/// <param name="Median">With 5 or more amounts: linear interpolation, rounded to cents. Null under 5.</param>
-/// <param name="Listed">Every amount, lowest first, when there are fewer than 5; empty otherwise.</param>
+/// <summary>A set of dollar amounts. From fewer than 5 providers they're listed instead of summarized, so no midpoint reads as a price.</summary>
+/// <param name="Median">From 5 or more providers: linear interpolation, rounded to cents. Null with fewer.</param>
+/// <param name="Listed">Every amount, lowest first, from fewer than 5 providers; empty otherwise.</param>
 public sealed record AmountSummary(int Count, decimal Min, decimal? Median, decimal Max, IReadOnlyList<decimal> Listed);

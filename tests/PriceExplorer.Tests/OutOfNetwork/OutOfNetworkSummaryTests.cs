@@ -8,9 +8,9 @@ public sealed class OutOfNetworkSummaryTests
     private static readonly ReferenceCatalog Catalog = new();
 
     [Fact]
-    public void Under_five_amounts_are_listed_lowest_first_with_no_median()
+    public void Amounts_from_under_five_providers_are_listed_lowest_first_with_no_median()
     {
-        var summary = OutOfNetworkSummary.Amounts([544.80m, 217.92m, 8373.66m, 762.72m]);
+        var summary = OutOfNetworkSummary.Amounts([544.80m, 217.92m, 8373.66m, 762.72m], providers: 4);
 
         summary.Count.Should().Be(4);
         summary.Median.Should().BeNull();
@@ -19,13 +19,27 @@ public sealed class OutOfNetworkSummaryTests
     }
 
     [Fact]
-    public void From_five_amounts_the_median_interpolates_and_rounds_half_cents_up_like_the_rate_statistics()
+    public void From_five_providers_the_median_interpolates_and_rounds_half_cents_up_like_the_rate_statistics()
     {
-        var summary = OutOfNetworkSummary.Amounts([30m, 1m, 10.01m, 2m, 20m, 10m]);
+        var summary = OutOfNetworkSummary.Amounts([30m, 1m, 10.01m, 2m, 20m, 10m], providers: 5);
 
         summary.Median.Should().Be(10.01m, "(10.00 + 10.01) / 2 = 10.005 rounds away from zero");
         summary.Listed.Should().BeEmpty();
         (summary.Min, summary.Max).Should().Be((1m, 30m));
+    }
+
+    [Fact]
+    public void The_five_rule_counts_providers_not_amounts()
+    {
+        // Ten amounts from one provider: still no midpoint, and no billed-to-allowed figure.
+        var group = OutOfNetworkSummary.Summarize(
+            [.. Enumerable.Range(1, 10).Select(id => Fact(id, allowed: 100m * id, billed: 300m * id))], Catalog).Single();
+
+        group.Providers.Should().Be(1);
+        group.Allowed.Median.Should().BeNull();
+        group.Allowed.Listed.Should().HaveCount(10);
+        group.Billed!.Median.Should().BeNull();
+        group.BilledToAllowed.Should().BeNull("ten pairs from one provider say nothing about what providers bill");
     }
 
     [Fact]
@@ -66,23 +80,27 @@ public sealed class OutOfNetworkSummaryTests
     }
 
     [Fact]
-    public void Billed_to_allowed_is_the_median_over_each_provider_on_a_payment_from_five_pairs()
+    public void Billed_to_allowed_is_the_median_over_each_provider_on_a_payment_from_five_providers()
     {
-        // Billed ÷ allowed: 1, 2, 3.25, 3.26, 5, 6; the payment without a billed charge has none.
+        // Billed ÷ allowed: 1, 2, 3.25, 3.26, 5, 6 from five providers; the payment without a billed charge has none.
         var six = OutOfNetworkSummary.Summarize(
         [
-            Fact(1, allowed: 100m, billed: 100m),
-            Fact(2, allowed: 100m, billed: 200m),
-            Fact(3, allowed: 100m, billed: 325m),
-            Fact(4, allowed: 100m, billed: 326m),
-            Fact(5, allowed: 100m, providerIndex: 0, billed: 500m, npi: 1407814825),
-            Fact(5, allowed: 100m, providerIndex: 1, billed: 600m, npi: 1538690458),
-            Fact(6, allowed: 70m, providerIndex: null, billed: null, npi: null),
+            Fact(1, allowed: 100m, billed: 100m, providerKey: "p1"),
+            Fact(2, allowed: 100m, billed: 200m, providerKey: "p2"),
+            Fact(3, allowed: 100m, billed: 325m, providerKey: "p3"),
+            Fact(4, allowed: 100m, billed: 326m, providerKey: "p4"),
+            Fact(5, allowed: 100m, providerIndex: 0, billed: 500m, npi: 1407814825, providerKey: "p5"),
+            Fact(5, allowed: 100m, providerIndex: 1, billed: 600m, npi: 1538690458, providerKey: "p5"),
+            Fact(6, allowed: 70m, providerIndex: null, billed: null, npi: null, providerKey: "p6"),
         ], Catalog).Single();
-        var four = OutOfNetworkSummary.Summarize([Fact(1), Fact(2), Fact(3), Fact(4)], Catalog).Single();
+        var fourProviders = OutOfNetworkSummary.Summarize(
+            [Fact(1, providerKey: "p1"), Fact(2, providerKey: "p2"), Fact(3, providerKey: "p3"), Fact(4, providerKey: "p4"), Fact(5, providerKey: "p4")],
+            Catalog).Single();
 
         six.BilledToAllowed.Should().Be(3.26m, "(3.25 + 3.26) / 2 = 3.255 rounds half away from zero");
-        four.BilledToAllowed.Should().BeNull();
+        six.Allowed.Median.Should().Be(100m);
+        fourProviders.BilledToAllowed.Should().BeNull("five pairs, but from four providers");
+        fourProviders.Allowed.Median.Should().BeNull();
     }
 
     [Fact]

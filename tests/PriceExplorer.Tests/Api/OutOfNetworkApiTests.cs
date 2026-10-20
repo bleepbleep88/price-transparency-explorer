@@ -31,9 +31,10 @@ public sealed class OutOfNetworkApiTests(ExplorerApiFactory factory) : IClassFix
         ambetter.GetProperty("places").EnumerateArray().Select(p => p.GetProperty("name").GetString()).Should().Equal("Emergency room (hospital)");
         (ambetter.GetProperty("payments").GetInt32(), ambetter.GetProperty("providers").GetInt32(), ambetter.GetProperty("npis").GetInt32())
             .Should().Be((12, 3, 4), "the 24 published payments are the same 12 under two item names");
-        Amounts(ambetter.GetProperty("allowed")).Should().Be((12, 23.38m, 1185.02m, 18803.47m, 0), "1,185.015 rounds half away from zero");
-        Amounts(ambetter.GetProperty("billed")).Should().Be((13, 434.92m, 2233m, 217627m, 0), "one payment lists two providers");
-        ambetter.GetProperty("billedToAllowed").GetDecimal().Should().Be(3.28m);
+        // Three providers: under the 5 rule (which counts providers, not amounts), so the amounts are listed, unsummarized.
+        Amounts(ambetter.GetProperty("allowed")).Should().Be((12, 23.38m, null, 18803.47m, 12));
+        Amounts(ambetter.GetProperty("billed")).Should().Be((13, 434.92m, null, 217627m, 13), "one payment lists two providers");
+        ambetter.GetProperty("billedToAllowed").ValueKind.Should().Be(JsonValueKind.Null, "13 pairs, but from 3 providers");
 
         var essential = groups[1];
         (essential.GetProperty("payments").GetInt32(), essential.GetProperty("providers").GetInt32(), essential.GetProperty("npis").GetInt32())
@@ -44,7 +45,7 @@ public sealed class OutOfNetworkApiTests(ExplorerApiFactory factory) : IClassFix
     }
 
     [Fact(Timeout = 60_000)]
-    public async Task Under_five_amounts_they_are_listed_instead_of_summarized()
+    public async Task Under_five_providers_the_amounts_are_listed_instead_of_summarized()
     {
         var groups = (await GetAsync("/api/v1/out-of-network?code=74177", TestContext.Current.CancellationToken)).GetProperty("groups").EnumerateArray().ToList();
 

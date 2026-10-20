@@ -27,8 +27,12 @@ internal static class OutOfNetworkSummary
             .Select(group => ToGroup(group.Key, [.. group], catalog))
             .ToList();
 
-    /// <summary>Lists the amounts under 5 (no midpoint reads as a price, as with rates); min, median and max from 5 on.</summary>
-    public static AmountSummary Amounts(IEnumerable<decimal> amounts)
+    /// <summary>
+    /// The amounts from fewer than 5 providers are listed, with no median, as with rates: a midpoint of one provider's
+    /// amounts isn't what providers typically get. From 5 providers on: min, median and max.
+    /// </summary>
+    /// <param name="providers">Distinct providers (tax IDs) behind the amounts.</param>
+    public static AmountSummary Amounts(IEnumerable<decimal> amounts, int providers)
     {
         var sorted = amounts.Order().ToList();
         if (sorted.Count == 0)
@@ -36,7 +40,7 @@ internal static class OutOfNetworkSummary
             throw new ArgumentException("No amounts to summarize.", nameof(amounts));
         }
 
-        var listed = sorted.Count < RateStatistics.MinimumForBasicStats;
+        var listed = providers < RateStatistics.MinimumForBasicStats;
         return new AmountSummary(sorted.Count, sorted[0], listed ? null : RateStatistics.Median(sorted), sorted[^1], listed ? sorted : []);
     }
 
@@ -57,6 +61,10 @@ internal static class OutOfNetworkSummary
         var billed = providerEntries.Select(fact => fact.BilledCharge!.Value).ToList();
         var multiples = providerEntries.Select(fact => fact.BilledCharge!.Value / fact.AllowedAmount).Order().ToList();
 
+        // The 5 rule counts providers, not amounts: one provider's ten amounts say nothing about what providers get.
+        var providers = payments.Select(payment => payment.ProviderKey).Distinct(StringComparer.Ordinal).Count();
+        var billedProviders = providerEntries.Select(fact => fact.ProviderKey).Distinct(StringComparer.Ordinal).Count();
+
         return new OutOfNetworkGroup(
             Key: string.Join('|', key.ProductKey, key.CodeType, key.Code, key.FeeType, key.Modifiers),
             key.ProductKey,
@@ -76,11 +84,11 @@ internal static class OutOfNetworkSummary
                 .ToList(),
             PerUnitCode: ServiceCategories.Classify(key.CodeType, key.Code).PerUnit,
             Payments: payments.Count,
-            Providers: payments.Select(payment => payment.ProviderKey).Distinct(StringComparer.Ordinal).Count(),
+            Providers: providers,
             Npis: facts.Where(fact => fact.Npi is not null).Select(fact => fact.Npi).Distinct().Count(),
-            Allowed: Amounts(payments.Select(payment => payment.AllowedAmount)),
-            Billed: billed.Count == 0 ? null : Amounts(billed),
-            BilledToAllowed: multiples.Count < RateStatistics.MinimumForBasicStats ? null : RateStatistics.Median(multiples));
+            Allowed: Amounts(payments.Select(payment => payment.AllowedAmount), providers),
+            Billed: billed.Count == 0 ? null : Amounts(billed, billedProviders),
+            BilledToAllowed: billedProviders < RateStatistics.MinimumForBasicStats ? null : RateStatistics.Median(multiples));
     }
 
     private sealed record GroupKey(
