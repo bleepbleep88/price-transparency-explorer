@@ -3,7 +3,9 @@ import type { CodeInfo, RateGroup, RateSearchResult } from '../../api/types'
 import {
   apiSearchUrl,
   costLines,
+  filedUnderRevenueCode,
   groupName,
+  hasFacilityCharges,
   hasProviderFilter,
   isDrugCode,
   LENS_OPTIONS,
@@ -209,36 +211,73 @@ describe('life sciences lens', () => {
     levelFamily: null,
     foundVia: [],
   }
+  const unit = "per HCPCS unit (see the code's description)"
+  const billedDirectly = [{ billingCodeType: 'HCPCS', billingCode: 'J0585', label: 'HCPCS J0585' }]
+  const office = makeGroup({
+    key: 'office-jw',
+    codeType: 'HCPCS',
+    code: 'J0585',
+    productLabel: 'Essential Plan',
+    feeTypeLabel: 'Professional (clinician) fee',
+    settingLabel: "Doctor's office",
+    modifiers: [{ code: 'JW', label: 'Drug amount discarded' }],
+    unit,
+    perUnit: true,
+    billedAs: billedDirectly,
+    providerCount: 7,
+    statsLevel: 'basic',
+    stats: { min: 5.1, p10: null, p25: null, median: 6.97, p75: null, p90: null, max: 8.2, spreadMultiple: 1.61, p90ToP10: null },
+    lowerQuartileGap: null,
+  })
+  const small = {
+    ...singleEr,
+    key: 'small',
+    codeType: 'HCPCS',
+    code: 'J0585',
+    feeTypeLabel: 'Professional (clinician) fee',
+    settingLabel: "Doctor's office",
+    unit,
+    perUnit: true,
+    billedAs: billedDirectly,
+    providerCount: 4,
+    listedRates: [7.16, 9.77, 8.46, 7.16],
+  }
+  // The surgery center's $551.29 is a facility charge filed under revenue code 0490, with J0585 only in the notes.
+  const ascCharge = {
+    ...singleEr,
+    key: 'asc',
+    codeType: 'HCPCS',
+    code: 'J0585',
+    productLabel: 'Essential Plan',
+    settingLabel: 'Ambulatory surgery center',
+    unit,
+    perUnit: true,
+    billedAs: [{ billingCodeType: 'RC', billingCode: '0490', label: 'Revenue code 0490 (Ambulatory surgery)' }],
+    listedRates: [551.29],
+  }
 
-  it('recognizes drug codes by category or HCPCS J/Q prefix', () => {
+  it("goes by the API's category, not the code's letters", () => {
     expect(isDrugCode(drug)).toBe(true)
-    expect(isDrugCode({ ...drug, code: 'Q5101', category: { ...drug.category, key: 'other' } })).toBe(true)
-    expect(isDrugCode({ ...drug, codeType: 'CPT', code: '45378', category: { ...drug.category, key: 'surgery' } })).toBe(false)
+    expect(isDrugCode({ ...drug, code: 'Q0091', category: { ...drug.category, key: 'other' } })).toBe(false)
+    expect(isDrugCode({ ...drug, codeType: 'CPT', code: '90715', category: { ...drug.category, key: 'drugs' } })).toBe(true)
     expect(isDrugCode(null)).toBe(false)
   })
 
   it('prices each site of care per unit: median, a single rate, or the listed range', () => {
-    const unit = "per HCPCS unit (see the code's description)"
-    const office = makeGroup({
-      key: 'office-jw',
-      productLabel: 'Essential Plan',
-      feeTypeLabel: 'Professional (clinician) fee',
-      settingLabel: "Doctor's office",
-      modifiers: [{ code: 'JW', label: 'Drug amount discarded' }],
-      unit,
-      providerCount: 7,
-      statsLevel: 'basic',
-      stats: { min: 5.1, p10: null, p25: null, median: 6.97, p75: null, p90: null, max: 8.2, spreadMultiple: 1.61, p90ToP10: null },
-      lowerQuartileGap: null,
-    })
-    const asc = { ...singleEr, key: 'asc', productLabel: 'Essential Plan', settingLabel: 'Ambulatory surgery center', unit, listedRates: [551.29] }
-    const small = { ...singleEr, key: 'small', feeTypeLabel: 'Professional (clinician) fee', settingLabel: "Doctor's office", unit, providerCount: 4, listedRates: [7.16, 9.77, 8.46, 7.16] }
-    const lines = unitPriceLines(makeResult([office, asc, small]))
+    const lines = unitPriceLines(makeResult([office, small]))
     expect(lines.map((line) => [line.site, unitPriceText(line)])).toEqual([
-      ['Ambulatory surgery center · Facility fee', '$551.29, one rate'],
       ["Doctor's office · Professional (clinician) fee", '$7.16 to $9.77'],
       ["Doctor's office · Professional (clinician) fee (JW)", '$6.97 median'],
     ])
-    expect(lines.every((line) => line.unit === unit)).toBe(true)
+  })
+
+  it('leaves revenue-code facility charges and non-unit prices out of the per-unit table', () => {
+    const notPerUnit = { ...office, key: 'fqhc', settingLabel: 'Federally qualified health center', perUnit: false, unit: 'per visit (all-inclusive)' }
+    const result = makeResult([office, ascCharge, notPerUnit])
+    expect(unitPriceLines(result).map((line) => line.groupKey)).toEqual(['office-jw'])
+    expect(filedUnderRevenueCode(ascCharge)).toBe(true)
+    expect(filedUnderRevenueCode(office)).toBe(false)
+    expect(hasFacilityCharges(result)).toBe(true)
+    expect(hasFacilityCharges(makeResult([office]))).toBe(false)
   })
 })

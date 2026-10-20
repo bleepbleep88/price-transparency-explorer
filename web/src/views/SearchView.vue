@@ -124,7 +124,9 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
         <div :style="{ opacity: search.isPlaceholderData.value ? 0.6 : 1 }" class="d-flex flex-column ga-4">
           <ResultSummary :result="result" :params="params" :products="products" :settings="settings" @update="update" />
 
+          <!-- No groups, no reading: the hint or the empty state already says why and what to try. -->
           <LensPanel
+            v-if="result.groups.length"
             :result="result"
             :params="params"
             @update="update"

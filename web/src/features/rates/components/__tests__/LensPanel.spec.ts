@@ -130,12 +130,12 @@ describe('LensPanel', () => {
     expect(hrefs).toEqual(expect.arrayContaining(['/scalar/v1', '/openapi/v1.json']))
   })
 
-  it('life sciences: unit prices by site for a drug, examples for anything else', async () => {
+  it('life sciences: unit prices by site for a drug, the facility-charge note, examples for anything else', async () => {
     const drug: CodeInfo = {
       codeType: 'HCPCS',
       code: 'J1100',
       name: 'INJ DEXMETH SODM PHOSHA 1MG',
-      description: null,
+      description: 'Injection, dexamethasone sodium phosphate, 1 mg',
       descriptionSource: 'payer_file',
       category: { key: 'drugs', label: 'Drugs & biologicals', unit: 'per HCPCS unit', perUnit: true },
       levelFamily: null,
@@ -143,17 +143,35 @@ describe('LensPanel', () => {
     }
     const office = group({
       key: 'j1100-office',
+      codeType: 'HCPCS',
+      code: 'J1100',
       feeTypeLabel: 'Professional (clinician) fee',
       settingLabel: "Doctor's office",
       modifiers: [{ code: 'JA', label: 'Administered intravenously' }],
+      perUnit: true,
+      unit: "per HCPCS unit (see the code's description)",
+      billedAs: [{ billingCodeType: 'HCPCS', billingCode: 'J1100', label: 'HCPCS J1100' }],
       providerCount: 50,
       stats: { min: 0.11, p10: 0.11, p25: 0.11, median: 0.11, p75: 0.11, p90: 0.11, max: 0.11, spreadMultiple: 1, p90ToP10: 1 },
       lowerQuartileGap: 0,
     })
-    const wrapper = mountPanel(result([office], { code: 'J1100' }, drug), { lens: 'life-sciences' })
-    expect(wrapper.get('[data-testid="unit-price-line"]').text()).toContain('$0.11 median')
+    const facilityCharge = group({
+      key: 'j1100-asc',
+      codeType: 'HCPCS',
+      code: 'J1100',
+      perUnit: true,
+      billedAs: [{ billingCodeType: 'RC', billingCode: '0490', label: 'Revenue code 0490 (Ambulatory surgery)' }],
+    })
+    const wrapper = mountPanel(result([office, facilityCharge], { code: 'J1100' }, drug), { lens: 'life-sciences' })
+    const rows = wrapper.findAll('[data-testid="unit-price-line"]')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.text()).toContain('$0.11 median')
+    expect(wrapper.text()).toContain('One unit, as the code defines it: Injection, dexamethasone sodium phosphate, 1 mg.')
+    expect(wrapper.get('[data-testid="facility-charges-note"]').text()).toContain("aren't per-unit prices")
 
-    const other = mountPanel(result([group()]), { lens: 'life-sciences' })
+    const colonoscopy: CodeInfo = { ...drug, codeType: 'CPT', code: '45378', category: { key: 'surgery', label: 'Surgery & procedures', unit: 'per procedure', perUnit: false } }
+    const other = mountPanel(result([group()], {}, colonoscopy), { lens: 'life-sciences' })
+    expect(other.text()).toContain("This isn't a drug code.")
     await other.get('[data-testid="drug-example-J0585"]').trigger('click')
     expect(other.emitted('search')).toEqual([['J0585']])
   })

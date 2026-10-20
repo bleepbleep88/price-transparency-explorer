@@ -226,9 +226,18 @@ export function apiSearchUrl(params: SearchParams, origin: string): string {
 
 // ---- Life sciences ----
 
+/** The API's category decides; the code's letters don't (Q0091 is a procedure, 90715 a vaccine). */
 export function isDrugCode(code: CodeInfo | null | undefined): boolean {
-  if (!code) return false
-  return code.category.key === 'drugs' || (code.codeType === 'HCPCS' && /^[JQ]/i.test(code.code))
+  return code?.category.key === 'drugs'
+}
+
+/** Rates the plan files under a revenue code (the drug named only in a notes field): a facility charge, not a unit price. */
+export function filedUnderRevenueCode(group: RateGroup): boolean {
+  return group.codeType !== 'RC' && group.billedAs.some((billed) => billed.billingCodeType === 'RC')
+}
+
+export function hasFacilityCharges(result: RateSearchResult): boolean {
+  return result.groups.some(filedUnderRevenueCode)
 }
 
 export interface UnitPriceLine {
@@ -241,12 +250,15 @@ export interface UnitPriceLine {
   price: number | null
   low: number | null
   high: number | null
-  unit: string
 }
 
-/** One line per site of care, ordered by setting then fee type, so the same drug reads side by side. */
+/**
+ * Per-unit prices by site of care, ordered by setting then fee type so the same drug reads side by side.
+ * Only groups priced per unit and billed under the code itself: revenue-code facility charges aren't unit prices.
+ */
 export function unitPriceLines(result: RateSearchResult): UnitPriceLine[] {
   return result.groups
+    .filter((group) => group.perUnit && !filedUnderRevenueCode(group))
     .flatMap((group): UnitPriceLine[] => {
       const modifiers = group.modifiers.length ? ` (${group.modifiers.map((modifier) => modifier.code).join(', ')})` : ''
       const base = {
@@ -254,7 +266,6 @@ export function unitPriceLines(result: RateSearchResult): UnitPriceLine[] {
         product: group.productLabel,
         site: `${group.settingLabel} · ${group.feeTypeLabel}${modifiers}`,
         providers: group.providerCount,
-        unit: group.unit,
       }
       if (group.stats.median != null) {
         return [{ ...base, kind: 'median', price: group.stats.median, low: group.stats.min, high: group.stats.max }]
