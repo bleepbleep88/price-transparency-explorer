@@ -188,7 +188,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
           <section v-if="result.groups.length" ref="tableSection" aria-labelledby="providers-heading">
             <div class="d-flex flex-wrap align-center ga-2 mb-2">
               <h2 id="providers-heading" class="text-title-large">Providers</h2>
-              <span class="text-body-medium text-medium-emphasis">
+              <span class="text-body-medium text-medium-emphasis" data-testid="row-total">
                 {{ plural(result.rows.total, 'row') }}<template v-if="params.group"> for {{ pickedGroup ?? 'one card' }}</template>
               </span>
               <v-btn v-if="params.group" variant="text" size="small" @click="update({ group: null })">Show all cards</v-btn>
