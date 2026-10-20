@@ -11,6 +11,8 @@ const routes = [
   '/?code=45378&lens=employers&cases=1200',
   '/?code=29881&lens=innovators',
   '/?code=J0585&lens=life-sciences',
+  // Has the out-of-network panel too.
+  '/?code=97530',
 ]
 
 test('the home page uses no statistics words', async ({ page }) => {
@@ -31,3 +33,16 @@ for (const route of routes) {
     await expect(page.getByTestId('like-for-like')).toHaveText('Each card compares like with like: same service, same setting, same plan.')
   })
 }
+
+test('the sources page uses no statistics words, and out-of-network amounts are never "typical" or "payments"', async ({ page }) => {
+  await page.goto('/sources')
+  await expect(page.getByTestId('source-file').first()).toBeVisible()
+  const text = await page.locator('body').innerText()
+  expect(text).not.toMatch(BANNED)
+  expect(text).not.toMatch(/typical|payment|npi \[0\]/i)
+
+  await page.goto('/?code=97530')
+  const panel = page.getByTestId('oon-panel')
+  await expect(panel.getByTestId('oon-row').first()).toBeVisible()
+  expect(await panel.innerText()).not.toMatch(/typical|payment/i)
+})
