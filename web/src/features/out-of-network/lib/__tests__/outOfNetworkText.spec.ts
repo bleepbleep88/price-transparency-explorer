@@ -3,13 +3,11 @@ import type { OutOfNetworkFile } from '../../api/types'
 import {
   OUT_OF_NETWORK_NOTES,
   PER_UNIT_NOTE,
-  aboutTimes,
   amountsListed,
   amountsSentence,
   amountsText,
   billedLine,
   billedVersusAllowed,
-  dollars,
   fileNotes,
   groupLabel,
   leadGroup,
@@ -31,14 +29,6 @@ function file(productKey: string, productLabel: string, status: string): OutOfNe
 }
 
 describe('out-of-network readings', () => {
-  it('writes dollars the way the rest of the app does: whole dollars from $100, cents below', () => {
-    expect(dollars(1375.18)).toBe('$1,375')
-    expect(dollars(60.12)).toBe('$60.12')
-    expect(dollars(48)).toBe('$48')
-    expect(aboutTimes(4.81)).toBe('about 4.8 times')
-    expect(aboutTimes(33.33)).toBe('about 33 times')
-  })
-
   it('shows the amounts, never a typical one: their range from 5 providers, every amount under 5', () => {
     expect(amountsText(LISTED_CT_READ.allowed)).toBe('$218, $545, $763 and $8,374')
     expect(amountsText(oonGroup().allowed)).toBe('ran from $60.12 to $187,539')

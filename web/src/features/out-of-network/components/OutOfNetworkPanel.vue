@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useDisplay } from 'vuetify'
 import { mdiOpenInNew } from '@mdi/js'
 import { plural } from '@/lib/format'
+import { capitalize } from '@/lib/plainNumbers'
 import type { SearchParams } from '@/features/rates/lib/searchParams'
 import type { OutOfNetworkResult } from '../api/types'
 import {
@@ -31,8 +32,6 @@ const notes = computed(() => (groups.value.some((group) => group.perUnitCode) ? 
 const problems = computed(() => fileNotes(props.result, props.params))
 // The allowed-amount files behind the rows shown, for tracing.
 const files = computed(() => props.result.files.filter((file) => groups.value.some((group) => group.productKey === file.productKey)))
-
-const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 </script>
 
 <template>

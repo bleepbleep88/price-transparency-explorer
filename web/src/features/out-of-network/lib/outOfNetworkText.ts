@@ -1,4 +1,5 @@
-import { money, plural, wholeDollars } from '@/lib/format'
+import { plural } from '@/lib/format'
+import { ABOUT_THE_SAME, MIN_PROVIDERS_FOR_TYPICAL, TIMES_FROM, aboutTimes, dollars, feeLabel, fewProvidersLine } from '@/lib/plainNumbers'
 import { modifierText } from '@/features/rates/lib/lenses'
 import type { SearchParams } from '@/features/rates/lib/searchParams'
 import type { AmountSummary, OutOfNetworkFile, OutOfNetworkGroup, OutOfNetworkResult } from '../api/types'
@@ -7,7 +8,7 @@ import type { AmountSummary, OutOfNetworkFile, OutOfNetworkGroup, OutOfNetworkRe
 // - billed against allowed leads, because it holds whatever an amount covers;
 // - the amounts themselves get no "typical" figure: the files don't say whether one covers a visit or several;
 // - the 5 rule counts providers, not amounts: under 5 providers the amounts are listed and nothing is compared.
-// dollars, aboutTimes and feeLabel follow the rules of lib/plainNumbers.ts on feat/plain-numbers, which replaces them.
+// Dollars, "times", fee names and the 5 and 5% rules come from lib/plainNumbers.ts, like the rest of the app.
 
 export const OUT_OF_NETWORK_NOTES: readonly string[] = [
   'Plans list a provider and service only with 20 or more claims in a 90-day window. Most codes here have none.',
@@ -15,34 +16,6 @@ export const OUT_OF_NETWORK_NOTES: readonly string[] = [
 ]
 
 export const PER_UNIT_NOTE = "In-network rates for this code are per unit; the files don't say how many units an out-of-network amount covers."
-
-/** Fewer providers than this: amounts are listed, nothing is compared. */
-export const MIN_PROVIDERS = 5
-/** Within 5% reads "about the same as". */
-const ABOUT_THE_SAME = 0.05
-/** From exactly twice up, say "times"; below that, a percentage (1.97 is "about 97% more", never "about 2 times"). */
-const TIMES_FROM = 2
-
-/** A dollar amount in a sentence: whole dollars from $100 up ("$1,375"), cents below ("$60.12", but "$48"). */
-export function dollars(value: number): string {
-  const amount = Math.abs(value)
-  return amount >= 100 || Math.round(amount * 100) % 100 === 0 ? wholeDollars(amount) : money(amount)
-}
-
-/** "about 4.8 times", "about 33 times": one decimal under 10, whole numbers from 10. */
-export function aboutTimes(ratio: number): string {
-  return `about ${ratio < 10 ? Math.round(ratio * 10) / 10 : Math.round(ratio)} times`
-}
-
-/** The two bills people know: "Doctor's fee" (professional) and "Facility fee". */
-export function feeLabel(feeType: string): string {
-  return feeType === 'professional' ? "Doctor's fee" : feeType === 'facility' ? 'Facility fee' : 'Fee'
-}
-
-/** "Only 3 providers: too few to compare." */
-export function fewProvidersLine(providers: number): string {
-  return `Only ${plural(providers, 'provider')}: too few to compare.`
-}
 
 /** "20 different amounts listed" (never "payments": the files have no claim counts). */
 export function amountsListed(count: number): string {
@@ -111,7 +84,7 @@ export function amountsSentence(summary: AmountSummary, noun: 'Allowed amounts' 
  */
 export function billedVersusAllowed(group: OutOfNetworkGroup): string | null {
   const ratio = group.billedToAllowed
-  if (ratio == null || group.providers < MIN_PROVIDERS) return null
+  if (ratio == null || group.providers < MIN_PROVIDERS_FOR_TYPICAL) return null
   if (Math.abs(ratio - 1) < ABOUT_THE_SAME) return 'about the same as'
   if (ratio >= TIMES_FROM) return aboutTimes(ratio)
   return `about ${Math.round(Math.abs(ratio - 1) * 100)}% ${ratio < 1 ? 'less' : 'more'} than`
@@ -125,7 +98,7 @@ export function billedLine(group: OutOfNetworkGroup): string | null {
 
 /** Why there's no billed-against-allowed figure, for the table cell. */
 export function noBilledLine(group: OutOfNetworkGroup): string {
-  return group.providers < MIN_PROVIDERS ? fewProvidersLine(group.providers) : 'Too few billed charges published to compare.'
+  return group.providers < MIN_PROVIDERS_FOR_TYPICAL ? fewProvidersLine(group.providers) : 'Too few billed charges published to compare.'
 }
 
 /** The group a one-line reading speaks for: the most providers, then the most amounts. */

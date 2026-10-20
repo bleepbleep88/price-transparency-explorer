@@ -43,7 +43,7 @@ const fieldErrors = computed(() => ({
   ...(apiError.value?.status === 400 ? apiError.value.fieldErrors : {}),
 }))
 const result = computed(() => (search.isError.value ? undefined : search.data.value))
-// The searched code's out-of-network payments under the same product and fee type filters; none, no panel.
+// The searched code's out-of-network amounts under the same product and fee type filters; none, no panel.
 const outOfNetworkResult = computed(() => outOfNetwork.data.value ?? null)
 const showOutOfNetwork = computed(() => visibleGroups(outOfNetworkResult.value, params.value).length > 0)
 
