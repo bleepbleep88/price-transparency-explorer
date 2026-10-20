@@ -192,6 +192,11 @@ const comparisons = computed(() => {
           <p v-if="data.providerGroupCount > data.providerGroups.length" class="text-body-small text-medium-emphasis mb-1">
             Showing the first {{ data.providerGroups.length }}.
           </p>
+          <!-- Above the list, which can run to 200 groups; the row's own group is listed first, right below. -->
+          <div v-if="wholeTaxIdRateId != null && !showingWholeTaxId" class="mb-1" data-testid="whole-tax-id-contract">
+            <p class="text-body-medium">This row also includes a whole-tax-ID contract (no NPIs listed).</p>
+            <v-btn variant="text" size="small" class="px-0" @click="showRate(wholeTaxIdRateId)">Show that contract</v-btn>
+          </div>
           <v-list density="compact" class="py-0">
             <v-list-item
               v-for="group in data.providerGroups"
@@ -204,10 +209,6 @@ const comparisons = computed(() => {
               </template>
             </v-list-item>
           </v-list>
-          <div v-if="wholeTaxIdRateId != null && !showingWholeTaxId" class="mt-2" data-testid="whole-tax-id-contract">
-            <p class="text-body-medium">This row also includes a whole-tax-ID contract (no NPIs listed).</p>
-            <v-btn variant="text" size="small" class="px-0" @click="showRate(wholeTaxIdRateId)">Show that contract</v-btn>
-          </div>
         </section>
       </template>
     </div>
