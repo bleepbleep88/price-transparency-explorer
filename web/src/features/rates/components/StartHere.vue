@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { mdiOpenInNew } from '@mdi/js'
+import { useRoute } from 'vue-router'
 import { START_HERE } from '../lib/lenses'
+
+// Examples stay on the snapshot picked in the app bar.
+const route = useRoute()
 </script>
 
 <template>
@@ -17,7 +21,7 @@ import { START_HERE } from '../lib/lenses'
             <!-- Each example is a link (it is just a URL); the wrapper keeps the list's items valid for screen readers. -->
             <div v-for="example in card.examples" :key="`${example.code}-${example.npi ?? ''}`" role="listitem">
               <v-list-item
-                :to="{ name: 'search', query: { code: example.code, lens: card.key, npi: example.npi } }"
+                :to="{ name: 'search', query: { code: example.code, lens: card.key, npi: example.npi, snapshot: route.query.snapshot } }"
                 exact
                 :data-testid="`start-${card.key}-${example.code}`"
               >

@@ -4,6 +4,7 @@ const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD',
 const usdWhole = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 const whole = new Intl.NumberFormat('en-US')
 const calendar = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+const calendarDay = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 
 export function money(value: number | null | undefined): string {
   return value == null || Number.isNaN(value) ? '—' : usd.format(value)
@@ -28,6 +29,26 @@ export function shortDate(value: string | null | undefined): string {
   const datePart = value.slice(0, 10)
   const parsed = new Date(`${datePart}T00:00:00Z`)
   return Number.isNaN(parsed.getTime()) ? value : calendar.format(parsed)
+}
+
+/** "2026-08-31" → "Aug 31": for lists of dates in one year. */
+export function monthDay(value: string | null | undefined): string {
+  if (!value) return '—'
+  const parsed = new Date(`${value.slice(0, 10)}T00:00:00Z`)
+  return Number.isNaN(parsed.getTime()) ? value : calendarDay.format(parsed)
+}
+
+/** +10.0% or −4.5%: one decimal, with a real minus sign. */
+export function signedPercent(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '—'
+  const text = Math.abs(value).toFixed(1)
+  return value > 0 ? `+${text}%` : value < 0 ? `−${text}%` : `${text}%`
+}
+
+/** +$60.00 or −$50.00. */
+export function signedMoney(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return '—'
+  return value > 0 ? `+${usd.format(value)}` : value < 0 ? `−${usd.format(-value)}` : usd.format(0)
 }
 
 export function megabytes(bytes: number | null | undefined): string {
