@@ -5,7 +5,6 @@ import { ApiError } from '@/lib/apiClient'
 import { plural } from '@/lib/format'
 import LoadingPanel from '@/features/status/components/LoadingPanel.vue'
 import DatasetSnapshot from '@/features/rates/components/DatasetSnapshot.vue'
-import ExampleSearches from '@/features/rates/components/ExampleSearches.vue'
 import GroupCard from '@/features/rates/components/GroupCard.vue'
 import LensPanel from '@/features/rates/components/LensPanel.vue'
 import NpiDialog from '@/features/rates/components/NpiDialog.vue'
@@ -13,6 +12,7 @@ import ProviderTable from '@/features/rates/components/ProviderTable.vue'
 import ResultSummary from '@/features/rates/components/ResultSummary.vue'
 import SearchForm from '@/features/rates/components/SearchForm.vue'
 import SourceDrawer from '@/features/rates/components/SourceDrawer.vue'
+import StartHere from '@/features/rates/components/StartHere.vue'
 import type { RateRow } from '@/features/rates/api/types'
 import { useRateSearch, useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import { useSearchRoute } from '@/features/rates/composables/useSearchRoute'
@@ -92,16 +92,12 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
 
     <div class="d-sr-only" aria-live="polite">{{ announcement }}</div>
 
-    <v-row v-if="!hasCode" class="mt-4">
-      <v-col cols="12" md="5">
-        <ExampleSearches @search="(code) => startOver(code)" />
-      </v-col>
-      <v-col cols="12" md="7">
-        <DatasetSnapshot v-if="currentSnapshot" :snapshot="currentSnapshot" />
-        <v-skeleton-loader v-else-if="snapshots.isPending.value" type="card" />
-        <LoadingPanel v-else />
-      </v-col>
-    </v-row>
+    <div v-if="!hasCode" class="mt-6 d-flex flex-column ga-6">
+      <StartHere @start="(lens, example) => startOver(example.code, { lens, npi: example.npi ?? null })" />
+      <DatasetSnapshot v-if="currentSnapshot" :snapshot="currentSnapshot" />
+      <v-skeleton-loader v-else-if="snapshots.isPending.value" type="card" />
+      <LoadingPanel v-else />
+    </div>
 
     <div v-else class="mt-4 d-flex flex-column ga-4">
       <v-alert v-if="!canSearch" type="warning" variant="tonal">Fix the highlighted fields to search.</v-alert>
