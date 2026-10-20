@@ -66,9 +66,11 @@ internal sealed class GetRateTrendHandler(DuckDbConnectionFactory connections, R
             group.ProviderCount,
             group.StatsLevel,
             group.Stats.Min,
+            group.Stats.P10,
             group.Stats.P25,
             group.Stats.Median,
             group.Stats.P75,
+            group.Stats.P90,
             group.Stats.Max,
             group.Highlights.FirstOrDefault() is { } marked ? new TrendProvider(marked.ProviderKey, marked.DisplayName, marked.Rate) : null);
 

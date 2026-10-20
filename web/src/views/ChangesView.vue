@@ -72,9 +72,10 @@ function chooseTo(id: unknown) {
 const kinds = computed(() => {
   const counts = result.value?.counts
   return [
-    { value: 'changed', label: 'Changed', count: counts?.changed },
+    { value: 'increased', label: 'Went up', count: counts?.increased },
+    { value: 'decreased', label: 'Went down', count: counts?.decreased },
     { value: 'new', label: 'New', count: counts?.new },
-    { value: 'dropped', label: 'Dropped', count: counts?.dropped },
+    { value: 'dropped', label: 'Gone', count: counts?.dropped },
   ]
 })
 
@@ -104,8 +105,8 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
   <v-container class="py-6" max-width="1280">
     <h1 class="text-headline-medium mb-1">Rate changes between files</h1>
     <p class="text-body-medium text-medium-emphasis mb-4">
-      Negotiated rates that differ between two of the plan's monthly files, for the same provider in the same comparison group. A
-      change means the file lists a different rate. It isn't a claim, and the files don't say how often a service is used.
+      Negotiated rates that differ between two of the plan's monthly files, for the same provider, service, setting and plan. A
+      change means the file lists a different rate, not that anyone paid it. The files don't say how often a service happens.
     </p>
 
     <v-skeleton-loader v-if="snapshotsPending" type="card" />
@@ -183,7 +184,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
               <v-col cols="12" sm="6" md="6">
                 <v-switch
                   :model-value="params.hideListedElsewhere"
-                  label="Hide new and dropped rates that are only listed differently"
+                  label="Hide new and gone rates that are only listed differently"
                   color="primary"
                   density="compact"
                   hide-details
@@ -210,13 +211,13 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
       <v-skeleton-loader v-else-if="changes.isPending.value" type="paragraph, table" />
 
       <v-alert v-else-if="result && notBuilt.length" type="info" variant="tonal" data-testid="changes-not-built">
-        Changes show once the statistics for {{ notBuilt.join(' and ') }} are saved, when loading finishes.
+        Changes show once the numbers for {{ notBuilt.join(' and ') }} are saved, when loading finishes.
       </v-alert>
 
       <template v-else-if="result">
         <v-alert v-if="outOfDate.length" type="warning" variant="tonal" data-testid="changes-out-of-date">
-          The saved statistics for {{ outOfDate.join(' and ') }} are being updated, so these changes may be out of date. They
-          refresh when loading finishes.
+          The numbers for {{ outOfDate.join(' and ') }} are being updated, so these changes may be out of date. They refresh
+          when loading finishes.
         </v-alert>
         <v-alert
           v-for="product in notCompared"

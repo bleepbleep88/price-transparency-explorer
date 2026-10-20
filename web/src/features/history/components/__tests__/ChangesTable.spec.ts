@@ -22,7 +22,7 @@ afterEach(() => {
 })
 
 describe('ChangesTable', () => {
-  it('shows each change with both files, in dollars and percent, under the files dates', async () => {
+  it("shows each change with both files' rates, in dollars and percent, under the files' dates", async () => {
     await mountTable([change(), change({ providerKey: 'u1a2b3c4d5e6f', ein: null, einDisplay: '••-•••4567', einMasked: true, change: -50, changePct: -10, from: 500, to: 450 })])
 
     const headers = wrapper!.findAll('th').map((th) => th.text())
@@ -31,8 +31,9 @@ describe('ChangesTable', () => {
     expect(rows[0]!.text()).toContain('CPT 45378')
     expect(rows[0]!.text()).toContain('DIAGNOSTIC COLONOSCOPY')
     expect(rows[0]!.text()).toContain('Facility fee · Ambulatory surgery center')
+    expect(headers).toContain('Fee, setting and plan')
     expect(rows[0]!.text()).toContain('EIN 22-1111111')
-    expect(rows[0]!.get('[data-testid="change-text"]').text()).toBe('+$60.00 (+10.0%)')
+    expect(rows[0]!.get('[data-testid="change-text"]').text()).toBe('Up $60 (10%)')
     expect(rows[0]!.get('[data-testid="change-text"]').classes()).toContain('text-high')
     expect(rows[1]!.get('[data-testid="change-text"]').classes()).toContain('text-low')
     expect(rows[1]!.text()).toContain('Unverified tax ID')
@@ -45,10 +46,10 @@ describe('ChangesTable', () => {
     ])
 
     const rows = wrapper!.findAll('tbody tr')
-    expect(rows[0]!.get('[data-testid="change-text"]').text()).toBe('Dropped')
+    expect(rows[0]!.get('[data-testid="change-text"]').text()).toBe('Gone')
     expect(rows[0]!.find('[data-testid="listed-elsewhere"]').exists()).toBe(true)
-    expect(rows[1]!.text()).toContain('of 2 rates')
-    expect(rows[1]!.text()).toContain('of 3 rates')
+    expect(rows[1]!.text()).toContain('(2 rates)')
+    expect(rows[1]!.text()).toContain('(3 rates)')
     expect(rows[1]!.text()).toContain('Several rates')
   })
 

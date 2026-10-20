@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useDisplay } from 'vuetify'
 import { mdiMagnify } from '@mdi/js'
 import { money, shortDate } from '@/lib/format'
+import { feeLabel } from '@/lib/plainNumbers'
 import { modifierText } from '@/features/rates/lib/lenses'
 import type { HistorySnapshot, RateChange, RateChangesPage } from '../api/types'
 import { changeText } from '../lib/changesText'
@@ -22,7 +23,7 @@ const { smAndDown } = useDisplay()
 // The two rate columns are named by their files' dates.
 const headers = computed(() => [
   { title: 'Code', key: 'code', sortable: true },
-  { title: 'Comparison group', key: 'group', sortable: false },
+  { title: 'Fee, setting and plan', key: 'group', sortable: false },
   { title: 'Provider', key: 'provider', sortable: true },
   { title: shortDate(props.from.indexDate), key: 'from', sortable: false, align: 'end' as const },
   { title: shortDate(props.to.indexDate), key: 'to', sortable: false, align: 'end' as const },
@@ -98,7 +99,7 @@ function direction(row: RateChange): string | undefined {
     <template #[`item.group`]="{ item }">
       <div class="py-1">
         <div class="text-body-medium">
-          {{ item.feeTypeLabel }} · {{ item.settingLabel }}<template v-if="item.modifiers.length"> · {{ modifierText(item.modifiers) }}</template>
+          {{ feeLabel(item.feeType) }} · {{ item.settingLabel }}<template v-if="item.modifiers.length"> · {{ modifierText(item.modifiers) }}</template>
         </div>
         <div class="text-body-small text-medium-emphasis">{{ item.productLabel }}</div>
       </div>
@@ -116,12 +117,12 @@ function direction(row: RateChange): string | undefined {
 
     <template #[`item.from`]="{ item }">
       <span class="text-no-wrap">{{ money(item.from) }}</span>
-      <div v-if="(item.fromRates ?? 0) > 1" class="text-body-small text-medium-emphasis text-no-wrap">of {{ item.fromRates }} rates</div>
+      <div v-if="(item.fromRates ?? 0) > 1" class="text-body-small text-medium-emphasis text-no-wrap">({{ item.fromRates }} rates)</div>
     </template>
 
     <template #[`item.to`]="{ item }">
       <span class="text-no-wrap font-weight-medium">{{ money(item.to) }}</span>
-      <div v-if="(item.toRates ?? 0) > 1" class="text-body-small text-medium-emphasis text-no-wrap">of {{ item.toRates }} rates</div>
+      <div v-if="(item.toRates ?? 0) > 1" class="text-body-small text-medium-emphasis text-no-wrap">({{ item.toRates }} rates)</div>
     </template>
 
     <template #[`item.changePct`]="{ item }">
@@ -129,7 +130,7 @@ function direction(row: RateChange): string | undefined {
         <span class="text-no-wrap font-weight-medium" :class="direction(item)" data-testid="change-text">{{ changeText(item) }}</span>
         <v-tooltip
           v-if="item.listedElsewhere"
-          :text="`The ${otherFile(item)} file lists this provider for the same code under other modifiers or another setting.`"
+          :text="`The ${otherFile(item)} file lists this provider for the same service with other modifiers or in another setting.`"
           max-width="320"
           location="top"
         >
@@ -139,7 +140,7 @@ function direction(row: RateChange): string | undefined {
         </v-tooltip>
         <v-tooltip
           v-else-if="item.kind === 'changed' && ((item.fromRates ?? 0) > 1 || (item.toRates ?? 0) > 1)"
-          text="The provider has several rates in this group. Its rate here is their NPI-weighted median, which also moves when a rate is added or removed."
+          text="The provider has several rates here. The one shown is the middle of its clinicians' rates, so it can also move when a rate is added or removed, not only when a price changes."
           max-width="340"
           location="top"
         >

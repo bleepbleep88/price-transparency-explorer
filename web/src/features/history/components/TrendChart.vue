@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useTheme } from 'vuetify'
 import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent } from 'echarts/components'
+import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { SVGRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
 import { money, plural, shortDate } from '@/lib/format'
@@ -12,10 +12,14 @@ import { trendSeries } from '../lib/trend'
 
 // Loaded on demand (defineAsyncComponent in TrendLine), so ECharts only downloads once a trend shows. The text next to
 // the chart says the same numbers, and that is what screen readers get.
-use([LineChart, GridComponent, TooltipComponent, SVGRenderer])
+use([LineChart, GridComponent, LegendComponent, TooltipComponent, SVGRenderer])
 
 const props = defineProps<{ trend: GroupTrend; selectedId: number | null; showProvider: boolean }>()
 const theme = useTheme()
+
+const TYPICAL = 'Typical price'
+const YOURS = 'Your rate'
+const MOST = 'Most providers'
 
 function rgba(hex: string, alpha: number): string {
   const value = Number.parseInt(hex.replace('#', '').slice(0, 6), 16)
@@ -32,11 +36,11 @@ function tooltip(index: number): string {
   const point = props.trend.points[index]
   if (!point) return ''
   const lines = [`<strong>${shortDate(point.indexDate)}</strong>`]
-  if (point.partial) lines.push('This file looks partial')
-  lines.push(point.median != null ? `Median ${money(point.median)}` : 'Too few providers for a median')
-  if (point.p25 != null && point.p75 != null) lines.push(`Middle half ${money(point.p25)} to ${money(point.p75)}`)
+  if (point.partial) lines.push('This file looks incomplete')
+  lines.push(point.median != null ? `${TYPICAL}: ${money(point.median)}` : 'Too few providers for a typical price')
+  if (point.p10 != null && point.p90 != null) lines.push(`${MOST} get ${money(point.p10)} to ${money(point.p90)}`)
   lines.push(plural(point.providerCount, 'provider'))
-  if (props.showProvider && point.provider) lines.push(`Your provider ${money(point.provider.rate)}`)
+  if (props.showProvider && point.provider) lines.push(`${YOURS}: ${money(point.provider.rate)}`)
   return lines.join('<br>')
 }
 
@@ -45,12 +49,22 @@ const option = computed(() => {
   const primary = hex('primary', '#0E6B4E')
   const copper = hex('copper', '#C0662B')
   const series = trendSeries(props.trend, props.selectedId, props.showProvider)
+  const hasBand = series.band.some((value) => value != null)
   // The snapshot on screen gets the bigger dot.
   const symbolSize = (_: unknown, params: { dataIndex: number }) => (params.dataIndex === series.selected ? 9 : 5)
   return {
     animation: false,
     textStyle: { fontFamily: "'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, sans-serif", color: ink },
-    grid: { left: 4, right: 4, top: 8, bottom: 4, containLabel: true },
+    legend: {
+      top: 0,
+      left: 0,
+      itemWidth: 14,
+      itemHeight: 8,
+      textStyle: { color: rgba(ink, 0.8), fontSize: 11 },
+      data: [TYPICAL, ...(props.showProvider ? [YOURS] : []), ...(hasBand ? [MOST] : [])],
+      selectedMode: false,
+    },
+    grid: { left: 4, right: 4, top: 26, bottom: 4, containLabel: true },
     tooltip: {
       trigger: 'axis',
       confine: true,
@@ -67,19 +81,30 @@ const option = computed(() => {
     // From zero, so a 2% move looks like 2%: the text gives the exact figures.
     yAxis: { type: 'value', min: 0, show: false },
     series: [
-      { type: 'line', data: series.p25, stack: 'middle-half', symbol: 'none', lineStyle: { opacity: 0 }, silent: true },
+      { type: 'line', data: series.low, stack: 'most', symbol: 'none', lineStyle: { opacity: 0 }, silent: true },
       {
+        name: MOST,
         type: 'line',
         data: series.band,
-        stack: 'middle-half',
+        stack: 'most',
         symbol: 'none',
         lineStyle: { opacity: 0 },
+        itemStyle: { color: rgba(primary, 0.2) },
         areaStyle: { color: rgba(primary, 0.16) },
         silent: true,
       },
-      { type: 'line', data: series.median, symbolSize, lineStyle: { color: primary, width: 2 }, itemStyle: { color: primary } },
+      { name: TYPICAL, type: 'line', data: series.typical, symbolSize, lineStyle: { color: primary, width: 2 }, itemStyle: { color: primary } },
       ...(props.showProvider
-        ? [{ type: 'line', data: series.provider, symbolSize, lineStyle: { color: copper, width: 2, type: 'dashed' }, itemStyle: { color: copper } }]
+        ? [
+            {
+              name: YOURS,
+              type: 'line',
+              data: series.provider,
+              symbolSize,
+              lineStyle: { color: copper, width: 2, type: 'dashed' },
+              itemStyle: { color: copper },
+            },
+          ]
         : []),
     ],
   }
@@ -94,6 +119,6 @@ const option = computed(() => {
 
 <style scoped>
 .trend-chart {
-  height: 84px;
+  height: 104px;
 }
 </style>

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { monthDay } from '@/lib/format'
 import type { RateSearchResult } from '@/features/rates/api/types'
+import { lowerFirst } from '@/lib/plainNumbers'
 import { costLines, pinsProvider } from '@/features/rates/lib/lenses'
 import type { Lens, SearchParams } from '@/features/rates/lib/searchParams'
 import type { RateTrendResult } from '../api/types'
@@ -10,10 +11,10 @@ import { useSnapshotChoice } from '../composables/useSnapshotChoice'
 import { DEFAULT_CHANGE_SORT } from '../lib/changesParams'
 import { previousSnapshot } from '../lib/snapshots'
 import { changesSinceText } from '../lib/changesText'
-import { hasHistory, medianTrendText, providerTrendText, trendFor } from '../lib/trend'
+import { hasHistory, providerTrendText, trendFor, typicalTrendText } from '../lib/trend'
 
 // One line of history per lens: providers follow their own rate, plans see what changed since the last file, employers
-// follow the typical (median) rate. Shown only when more than one snapshot is loaded.
+// follow the typical price. Shown only when more than one snapshot is loaded.
 const props = defineProps<{ lens: Lens; result: RateSearchResult; params: SearchParams; trend: RateTrendResult | null }>()
 const emit = defineEmits<{ showTrend: [groupKey: string] }>()
 
@@ -26,19 +27,19 @@ const yours = computed(() => {
   for (const group of props.result.groups) {
     const trend = trendFor(props.trend, group.key)
     if (!group.highlights.length || !hasHistory(trend)) continue
-    const text = providerTrendText(trend, 'Your rate over time:')
+    const text = providerTrendText(trend)
     if (text) return { groupKey: group.key, text }
   }
   return null
 })
 
-/** Employers: the largest group with a median, as the cost table above lists first. */
+/** Employers: the largest group with a typical price, as the cost table above lists first. */
 const typical = computed(() => {
   if (props.lens !== 'employers') return null
   for (const line of costLines(props.result)) {
     const trend = trendFor(props.trend, line.groupKey)
-    const text = hasHistory(trend) ? medianTrendText(trend) : null
-    if (text) return { groupKey: line.groupKey, text: text.replace(/^Median/, 'Median over time, largest group:') }
+    const text = hasHistory(trend) ? typicalTrendText(trend) : null
+    if (text) return { groupKey: line.groupKey, text: `For the setting and plan with the most providers, ${lowerFirst(text)}` }
   }
   return null
 })

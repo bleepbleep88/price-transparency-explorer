@@ -17,7 +17,7 @@ describe('changes URL state', () => {
       page: 2,
       pageSize: 50,
     })
-    expect(parseChangesQuery({ snapshot: '-1', kind: 'increased', minChangePct: '0', sort: 'rate', page: 'x', pageSize: '500' })).toEqual({
+    expect(parseChangesQuery({ snapshot: '-1', kind: 'raised', minChangePct: '0', sort: 'rate', page: 'x', pageSize: '500' })).toEqual({
       snapshot: undefined,
       from: undefined,
       product: undefined,
@@ -29,6 +29,11 @@ describe('changes URL state', () => {
       page: 1,
       pageSize: 25,
     })
+  })
+
+  it('takes the went-up and went-down filters', () => {
+    expect(parseChangesQuery({ kind: 'increased' }).kind).toBe('increased')
+    expect(parseChangesQuery({ kind: 'decreased' }).kind).toBe('decreased')
   })
 
   it('keeps URLs short: defaults and cleared filters drop out', () => {

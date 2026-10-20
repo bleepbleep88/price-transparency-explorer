@@ -109,7 +109,7 @@ describe('LensHistoryLine', () => {
     await mountLine('providers', result([group(ASC, 200), group(OFFICE, 114, [PM])], '061036715'), { ein: '061036715' })
 
     expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain(
-      'Your rate over time: $100.36 (Jul 27) → $100.36 (Aug 31) → $117.77 (Sep 28), +17.3% since Jul 27.',
+      'Your rate went from $100.36 (Jul 27) to $117.77 (Sep 28): up $17.41 (17%).',
     )
     await wrapper!.get('[data-testid="show-trend"]').trigger('click')
     expect(wrapper!.emitted('showTrend')).toEqual([[OFFICE]])
@@ -121,10 +121,12 @@ describe('LensHistoryLine', () => {
     expect(wrapper!.find('[data-testid="lens-history"]').exists()).toBe(false)
   })
 
-  it("gives employers the largest group's median over time", async () => {
+  it("gives employers the typical price over time where the most providers are", async () => {
     await mountLine('employers', result([group(OFFICE, 114), group(ASC, 200)]))
 
-    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('Median over time, largest group: $70.00 (Jul 27) → $77.00 (Sep 28), +10.0% since Jul 27.')
+    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain(
+      'For the setting and plan with the most providers, the typical price went from $70 (Jul 27) to $77 (Sep 28): up $7 (10%).',
+    )
     await wrapper!.get('[data-testid="show-trend"]').trigger('click')
     expect(wrapper!.emitted('showTrend')).toEqual([[ASC]])
   })
@@ -139,7 +141,7 @@ describe('LensHistoryLine', () => {
 
     expect(changes).toHaveBeenCalledWith(expect.objectContaining({ code: '99213', snapshot: undefined, pageSize: 1 }), expect.anything())
     const line = wrapper!.get('[data-testid="lens-history"]')
-    expect(line.text()).toContain('Since the Aug 31 file, for 99213: 113 rates changed (56 up, 57 down), 683 new and 618 dropped.')
+    expect(line.text()).toContain('Since the Aug 31 file, for 99213: 56 rates went up, 57 went down, 683 are new and 618 are gone.')
     expect(line.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?code=99213')
   })
 
@@ -152,7 +154,7 @@ describe('LensHistoryLine', () => {
     await mountLine('plans', result([group(OFFICE, 114)]))
 
     expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('The changes since the Aug 31 file are being updated.')
-    expect(wrapper!.text()).not.toContain('5 rates changed')
+    expect(wrapper!.text()).not.toContain('went up')
   })
 
   it('compares an older snapshot with the file before it, and the oldest with nothing', async () => {

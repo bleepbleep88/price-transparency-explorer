@@ -1,34 +1,46 @@
 import { describe, expect, it } from 'vitest'
-import { drawableSeries, hasHistory, medianTrendText, movementText, partialNote, providerTrendText, trendSeries } from '../trend'
+import { drawableSeries, hasHistory, movementText, partialNote, providerTrendText, trendSeries, typicalTrendText } from '../trend'
 import { point, trend } from './fixtures'
 
 const yours = (rate: number) => ({ providerKey: '061036715', displayName: 'PM Pediatrics', rate })
 
 describe('trend readings', () => {
-  it('follows the median through each file and says how far it moved since the first', () => {
-    const text = medianTrendText(
+  it('says how the typical price moved from the first file to the last, in dollars and percent', () => {
+    const text = typicalTrendText(
       trend([point(3, '2026-07-27', { median: 51.45 }), point(2, '2026-08-31', { median: 51.45 }), point(1, '2026-09-28', { median: 113.59 })]),
     )
-    expect(text).toBe('Median $51.45 (Jul 27) → $51.45 (Aug 31) → $113.59 (Sep 28), +120.8% since Jul 27.')
+    expect(text).toBe('The typical price went from $51.45 (Jul 27) to $113.59 (Sep 28): up $62.14 (about 2.2 times as much).')
   })
 
-  it('names the files when the amount never moves, and only the ends past three files', () => {
-    expect(movementText('Median', [{ date: '2026-08-31', value: 80.72 }, { date: '2026-09-28', value: 80.72 }])).toBe(
-      'Median $80.72 in the Aug 31 and Sep 28 files.',
+  it('names the files when the price never moves, and keeps whole dollars whole', () => {
+    expect(movementText('Your rate', [{ date: '2026-08-31', value: 80.72 }, { date: '2026-09-28', value: 80.72 }])).toBe(
+      'Your rate was $80.72 in the Aug 31 and Sep 28 files.',
     )
-    const months = ['2026-06-29', '2026-07-27', '2026-08-31', '2026-09-28'].map((date, index) => ({ date, value: 100 + index }))
-    expect(movementText('Median', months)).toBe('Median $100.00 (Jun 29) → $103.00 (Sep 28), +3.0% since Jun 29.')
-    expect(movementText('Median', [{ date: '2026-09-28', value: 1 }])).toBeNull()
+    expect(movementText('Your rate', [{ date: '2026-08-31', value: 600 }, { date: '2026-09-28', value: 660 }])).toBe(
+      'Your rate went from $600 (Aug 31) to $660 (Sep 28): up $60 (10%).',
+    )
+    const months = ['2026-06-29', '2026-07-27', '2026-08-31', '2026-09-28'].map((date) => ({ date, value: 100 }))
+    expect(movementText('The typical price', months)).toBe('The typical price was $100 in all 4 files.')
+    expect(movementText('The typical price', [{ date: '2026-09-28', value: 1 }])).toBeNull()
   })
 
-  it('leaves out partial files and files too small for a median', () => {
+  it('says small moves plainly', () => {
+    expect(movementText('The typical price', [{ date: '2026-07-27', value: 113.01 }, { date: '2026-09-28', value: 113.59 }])).toBe(
+      'The typical price went from $113.01 (Jul 27) to $113.59 (Sep 28): up $0.58 (under 1%).',
+    )
+    expect(movementText('The typical price', [{ date: '2026-07-27', value: 573.48 }, { date: '2026-09-28', value: 568.65 }])).toBe(
+      'The typical price went from $573.48 (Jul 27) to $568.65 (Sep 28): down $4.83 (under 1%).',
+    )
+  })
+
+  it('leaves out incomplete files and files too small for a typical price', () => {
     const groupTrend = trend([
       point(3, '2026-07-27', { median: 610, partial: true }),
       point(2, '2026-08-31', { median: null, statsLevel: 'list' }),
       point(1, '2026-09-28', { median: 620 }),
     ])
-    expect(medianTrendText(groupTrend)).toBeNull()
-    expect(partialNote(groupTrend)).toBe("The Jul 27 file looks partial, so it's left out.")
+    expect(typicalTrendText(groupTrend)).toBeNull()
+    expect(partialNote(groupTrend)).toBe("The Jul 27 file looks incomplete, so it's left out.")
     expect(drawableSeries(groupTrend, false)).toBe(false)
   })
 
@@ -38,13 +50,20 @@ describe('trend readings', () => {
       point(2, '2026-08-31', { provider: yours(100.36) }),
       point(1, '2026-09-28', { provider: yours(117.77) }),
     ])
-    expect(providerTrendText(groupTrend)).toBe(
-      'Your rate $100.36 (Aug 31) → $117.77 (Sep 28), +17.3% since Aug 31. No rate in the Jul 27 file.',
-    )
-    expect(providerTrendText(trend([point(3, '2026-07-27'), point(1, '2026-09-28', { provider: yours(80.72) })]), 'Your rate over time:')).toBe(
-      'Your rate over time: $80.72 (Sep 28). No rate in the Jul 27 file.',
+    expect(providerTrendText(groupTrend)).toBe('Your rate went from $100.36 (Aug 31) to $117.77 (Sep 28): up $17.41 (17%). No rate in the Jul 27 file.')
+    expect(providerTrendText(trend([point(3, '2026-07-27'), point(1, '2026-09-28', { provider: yours(80.72) })]))).toBe(
+      'Your rate: $80.72 (Sep 28). No rate in the Jul 27 file.',
     )
     expect(providerTrendText(trend([point(3, '2026-07-27'), point(1, '2026-09-28')]))).toBeNull()
+  })
+
+  it('never says median, percentile or quartile', () => {
+    const texts = [
+      typicalTrendText(trend([point(2, '2026-08-31', { median: 100 }), point(1, '2026-09-28', { median: 120 })])),
+      providerTrendText(trend([point(2, '2026-08-31', { provider: yours(90) }), point(1, '2026-09-28', { provider: yours(95) })])),
+      partialNote(trend([point(2, '2026-08-31', { partial: true }), point(1, '2026-09-28')])),
+    ].join(' ')
+    expect(texts.toLowerCase()).not.toMatch(/median|percentile|quartile/)
   })
 
   it('needs two snapshots for a history, and a line to draw for a chart', () => {
@@ -58,21 +77,21 @@ describe('trend readings', () => {
     expect(drawableSeries(small, true)).toBe(true)
   })
 
-  it('gives the chart a band from the 25th to the 75th percentile, gaps for partial files, and the snapshot on screen', () => {
+  it('draws the band most providers fall in (10+ providers), with gaps for incomplete files', () => {
     const series = trendSeries(
       trend([
         point(3, '2026-07-27', { partial: true }),
-        point(2, '2026-08-31', { p25: 400, median: 500, p75: 650, provider: yours(480) }),
-        point(1, '2026-09-28', { p25: null, median: null, p75: null }),
+        point(2, '2026-08-31', { p10: 400, median: 500, p90: 650, provider: yours(480) }),
+        point(1, '2026-09-28', { p10: null, median: 520, p90: null, statsLevel: 'basic' }),
       ]),
       2,
       true,
     )
     expect(series).toEqual({
       labels: ['Jul 27', 'Aug 31', 'Sep 28'],
-      p25: [null, 400, null],
+      low: [null, 400, null],
       band: [null, 250, null],
-      median: [null, 500, null],
+      typical: [null, 500, 520],
       provider: [null, 480, null],
       selected: 1,
     })

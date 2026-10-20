@@ -142,7 +142,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
             product => product.GetProperty("productKey").GetString()!, product => product);
         products[Essential].GetProperty("compared").GetBoolean().Should().BeFalse();
         products[Essential].GetProperty("notComparedBecause").GetString().Should()
-            .Be("Left out: the 2026-07-27 file looks partial. Its unique rates are 14% of what nearby snapshots have.");
+            .Be("Left out: the 2026-07-27 file looks incomplete. It has 14% of the rates that nearby months have.");
         products[Ambetter].GetProperty("compared").GetBoolean().Should().BeTrue();
         products[Ambetter].GetProperty("notComparedBecause").ValueKind.Should().Be(JsonValueKind.Null);
         Counts(result).Should().Equal([0, 0, 0, 0, 0, 0, 0, 8], "July's Ambetter file equals August's");
@@ -159,6 +159,8 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     [InlineData("sort=changePct&kind=changed", 5, "masked|22-1111111|44-3333333|22-1111111|88-7777777")]
     [InlineData("sort=-changePct&kind=changed&minChangePct=2", 4, "88-7777777|22-1111111|44-3333333|masked")]
     [InlineData("sort=provider&kind=dropped", 2, "55-4444444|77-6666666")]
+    [InlineData("kind=increased", 4, "88-7777777|22-1111111|44-3333333|22-1111111")]
+    [InlineData("kind=decreased", 1, "masked")]
     public async Task Filters_and_sorts_narrow_the_rows_and_counts(string filters, int total, string providers)
     {
         var result = await GetAsync($"/api/v1/changes?{filters}", TestContext.Current.CancellationToken);
@@ -209,7 +211,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     }
 
     [Theory(Timeout = 60_000)]
-    [InlineData("kind=increased", "kind")]
+    [InlineData("kind=raised", "kind")]
     [InlineData("sort=rate", "sort")]
     [InlineData("minChangePct=-1", "minChangePct")]
     [InlineData("minChangePct=1001", "minChangePct")]
@@ -277,7 +279,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
                 var stats = card.GetProperty("stats");
                 point.GetProperty("providerCount").GetInt32().Should().Be(card.GetProperty("providerCount").GetInt32());
                 point.GetProperty("statsLevel").GetString().Should().Be(card.GetProperty("statsLevel").GetString());
-                foreach (var name in new[] { "min", "p25", "median", "p75", "max" })
+                foreach (var name in new[] { "min", "p10", "p25", "median", "p75", "p90", "max" })
                 {
                     point.GetProperty(name).GetRawText().Should().Be(stats.GetProperty(name).GetRawText(), $"{date} {name}");
                 }

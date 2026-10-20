@@ -6,7 +6,8 @@ import { expect, test } from '@playwright/test'
 test("the app bar's snapshot picker moves search to the brief's file and back, and each card shows its trend", async ({ page }) => {
   await page.goto('/?code=45378')
   const card = page.getByTestId('group-card').filter({ has: page.getByTestId('trend-line') }).first()
-  await expect(card.getByTestId('trend-median')).toContainText(/^Median \$[\d,.]+ \(Jul 27\) → .+ \(Sep 28\)/)
+  await expect(card.getByTestId('trend-typical')).toContainText(/^The typical price (went from \$[\d,.]+ \(Jul 27\) to \$[\d,.]+ \(Sep 28\)|was \$)/)
+  await expect(card.getByTestId('trend-line')).not.toContainText(/median|percentile|quartile/i)
   await expect(page.getByText('Snapshot Sep 28, 2026')).toBeVisible()
 
   await page.getByTestId('snapshot-picker').click()
@@ -31,21 +32,21 @@ test("the app bar's snapshot picker moves search to the brief's file and back, a
   await expect(page.getByText('Snapshot Sep 28, 2026')).toBeVisible()
 })
 
-test("the changes page compares the newest file with the one before, narrows by kind and code, and leads to the provider's trend", async ({
+test("the changes page compares the newest file with the one before, narrows to rates that went up and a code, and leads to the provider's trend", async ({
   page,
 }) => {
   await page.goto('/changes')
-  await expect(page.getByTestId('changes-summary')).toContainText(/^Between Aug 31, 2026 and Sep 28, 2026: [\d,]+ rates changed/)
+  await expect(page.getByTestId('changes-summary')).toContainText(/^Between Aug 31, 2026 and Sep 28, 2026: [\d,]+ rates went up/)
   await expect(page.getByTestId('change-row').first()).toBeVisible()
 
-  await page.getByTestId('changes-kind-changed').click()
-  await expect(page).toHaveURL(/[?&]kind=changed(&|$)/)
+  await page.getByTestId('changes-kind-increased').click()
+  await expect(page).toHaveURL(/[?&]kind=increased(&|$)/)
   await page.getByTestId('changes-code').locator('input').fill('99213')
   await page.getByTestId('changes-apply').click()
   await expect(page).toHaveURL(/[?&]code=99213(&|$)/)
   // Previous results stay on screen while the new ones load, so wait for the table to settle.
   await expect.poll(async () => [...new Set(await page.getByTestId('change-row').locator('span').first().allInnerTexts())]).toEqual(['CPT 99213'])
-  await expect(page.getByTestId('change-text').first()).toContainText(/[+−]\$[\d,.]+ \([+−][\d.]+%\)/)
+  await expect(page.getByTestId('change-text').first()).toHaveText(/^Up \$[\d,.]+ \((under 1%|\d+%|about [\d.]+ times as much)\)$/)
 
   // Leaving out rates only listed differently keeps the changed ones.
   await page.getByTestId('changes-hide-listed').locator('input').check()
@@ -57,5 +58,5 @@ test("the changes page compares the newest file with the one before, narrows by 
   await expect(page).toHaveURL(/[?&]ein=[^&]+/)
   await expect(page).toHaveURL(/[?&]group=[^&]+/)
   await expect(page.getByTestId('provider-row').first()).toBeVisible()
-  await expect(page.getByTestId('trend-provider').first()).toContainText(/^Your rate \$[\d,.]+ \(/)
+  await expect(page.getByTestId('trend-provider').first()).toContainText(/^Your rate( went from|:| was) \$[\d,.]+/)
 })

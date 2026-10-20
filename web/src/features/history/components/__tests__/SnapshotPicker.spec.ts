@@ -84,7 +84,7 @@ describe('SnapshotPicker', () => {
     expect(router.currentRoute.value.query).toEqual({ code: '45378' })
   })
 
-  it('says which files look partial', async () => {
+  it('says which files look incomplete', async () => {
     const partial = snapshot(3, '2026-07-27', {
       products: [product({ productLabel: 'Essential Plan', completeness: { score: 0.14, rates: 0.14, eins: 0.2, codes: 0.5, comparedWith: [1, 2], partial: true } })],
     })
@@ -92,7 +92,7 @@ describe('SnapshotPicker', () => {
 
     await open()
 
-    expect(option('2026-07-27').textContent).toContain('Essential Plan looks partial')
+    expect(option('2026-07-27').textContent).toContain('Essential Plan looks incomplete')
   })
 
   it('stays out of the way with a single snapshot', async () => {

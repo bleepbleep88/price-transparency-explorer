@@ -3,6 +3,8 @@
 import type { ModifierRef, StatsLevel } from '@/features/rates/api/types'
 
 export type ChangeKind = 'changed' | 'new' | 'dropped'
+/** What the kind filter takes: a kind, or changed rates by direction. */
+export type ChangeFilter = ChangeKind | 'increased' | 'decreased'
 
 export interface SnapshotRef {
   snapshotId: number
@@ -22,7 +24,7 @@ export interface ChangesEcho {
   product: string | null
   code: string | null
   codeType: string | null
-  kind: ChangeKind | null
+  kind: ChangeFilter | null
   minChangePct: number | null
   listedElsewhere: boolean | null
   sort: string
@@ -113,14 +115,18 @@ export interface TrendProvider {
 export interface TrendPoint {
   snapshotId: number
   indexDate: string | null
-  /** The product's file in this snapshot looks partial. */
+  /** The product's file in this snapshot looks incomplete next to nearby months. */
   partial: boolean
   providerCount: number
   statsLevel: StatsLevel
   min: number
+  /** 10+ providers only: the band "most providers" get (10th to 90th percentile). */
+  p10: number | null
   p25: number | null
+  /** The typical price (the middle provider's), from 5 providers. */
   median: number | null
   p75: number | null
+  p90: number | null
   max: number
   /** The searched provider's rate here, as the card marks it; null without a provider filter or when it has none here. */
   provider: TrendProvider | null

@@ -30,13 +30,13 @@ describe('snapshots', () => {
     expect(snapshotLabel(SNAPSHOTS[1]!, [...SNAPSHOTS, snapshot(9, '2025-12-29')])).toBe('Aug 31, 2026')
   })
 
-  it('says which snapshot is the default and which products look partial', () => {
+  it('says which snapshot is the default and which products look incomplete', () => {
     const partial = snapshot(5, '2025-12-29', {
       products: [product({ completeness: { score: 0.1, rates: 0.1, eins: 0.4, codes: 0.6, comparedWith: [6, 7], partial: true } }), product({ productLabel: 'Essential Plan' })],
     })
     expect(snapshotNote(SNAPSHOTS[0]!)).toBe('Newest, shown by default')
     expect(partialProducts(partial)).toEqual(['Ambetter from Fidelis Care'])
-    expect(snapshotNote(partial)).toBe('Ambetter from Fidelis Care looks partial')
+    expect(snapshotNote(partial)).toBe('Ambetter from Fidelis Care looks incomplete')
     expect(snapshotNote(snapshot(4, '2026-10-26', { status: 'loading' }))).toBe('Still loading')
   })
 })

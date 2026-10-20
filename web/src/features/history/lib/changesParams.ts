@@ -1,11 +1,11 @@
 import type { LocationQuery, LocationQueryRaw } from 'vue-router'
 import type { QueryValue } from '@/lib/apiClient'
-import type { ChangeKind } from '../api/types'
+import type { ChangeFilter } from '../api/types'
 
 // The changes page lives in the URL like search does. `snapshot` is the newer file (the app bar's snapshot, shared with
 // search); `from` is the older one, which the API defaults to the snapshot just before.
 
-export const CHANGE_KINDS = ['changed', 'new', 'dropped'] as const satisfies readonly ChangeKind[]
+export const CHANGE_KINDS = ['changed', 'increased', 'decreased', 'new', 'dropped'] as const satisfies readonly ChangeFilter[]
 export const CHANGE_SORTS = ['largest', '-changePct', 'changePct', 'code', '-code', 'provider', '-provider'] as const
 export type ChangeSort = (typeof CHANGE_SORTS)[number]
 export const DEFAULT_CHANGE_SORT: ChangeSort = 'largest'
@@ -17,7 +17,7 @@ export interface ChangesParams {
   from?: number
   product?: string
   code?: string
-  kind?: ChangeKind
+  kind?: ChangeFilter
   minChangePct?: number
   /** Leave out new and dropped rates the other file lists under other modifiers or another setting. */
   hideListedElsewhere: boolean

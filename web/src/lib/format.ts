@@ -38,19 +38,6 @@ export function monthDay(value: string | null | undefined): string {
   return Number.isNaN(parsed.getTime()) ? value : calendarDay.format(parsed)
 }
 
-/** +10.0% or −4.5%: one decimal, with a real minus sign. */
-export function signedPercent(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return '—'
-  const text = Math.abs(value).toFixed(1)
-  return value > 0 ? `+${text}%` : value < 0 ? `−${text}%` : `${text}%`
-}
-
-/** +$60.00 or −$50.00. */
-export function signedMoney(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return '—'
-  return value > 0 ? `+${usd.format(value)}` : value < 0 ? `−${usd.format(-value)}` : usd.format(0)
-}
-
 export function megabytes(bytes: number | null | undefined): string {
   return bytes == null ? '—' : `${whole.format(Math.round(bytes / 1_048_576))} MB`
 }

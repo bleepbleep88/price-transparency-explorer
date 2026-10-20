@@ -80,6 +80,8 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
         var total = request.Kind switch
         {
             "changed" => counts.Changed,
+            "increased" => counts.Increased,
+            "decreased" => counts.Decreased,
             "new" => counts.New,
             "dropped" => counts.Dropped,
             _ => counts.Changed + counts.New + counts.Dropped,
@@ -159,12 +161,12 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
 
         if (completeness.Score is not { } score || score >= SnapshotCompleteness.PartialBelow)
         {
-            return $"Left out: the {Name(snapshot)} file was only partly read.";
+            return $"Left out: the {Name(snapshot)} file was only partly read, so it looks incomplete.";
         }
 
-        var measure = score == completeness.Rates ? "unique rates" : score == completeness.Eins ? "EINs" : "codes";
+        var measure = score == completeness.Rates ? "rates" : score == completeness.Eins ? "tax IDs" : "billing codes";
         return string.Create(CultureInfo.InvariantCulture,
-            $"Left out: the {Name(snapshot)} file looks partial. Its {measure} are {score * 100:0}% of what nearby snapshots have.");
+            $"Left out: the {Name(snapshot)} file looks incomplete. It has {score * 100:0}% of the {measure} that nearby months have.");
     }
 
     private static async Task<Dictionary<(string CodeType, string Code), string?>> CodeNamesAsync(

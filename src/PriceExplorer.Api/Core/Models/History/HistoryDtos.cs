@@ -113,7 +113,7 @@ public sealed record GroupTrend(string Key, string ProductKey, IReadOnlyList<Tre
 
 /// <summary>A comparison group in one snapshot, as that snapshot's search card shows it.</summary>
 /// <param name="Partial">The product's file in this snapshot looks partial next to nearby snapshots (see /api/v1/snapshots).</param>
-/// <param name="StatsLevel">list (fewer than 5 providers: no median), basic (5–9) or full (10+).</param>
+/// <param name="StatsLevel">list (fewer than 5 providers: no median), basic (5–9) or full (10+: p10 and p90 too).</param>
 /// <param name="Provider">The searched provider's rate here, as the card marks it (the first highlighted provider); null
 /// without an NPI, EIN or name filter, or when the provider has no rate in the group in this snapshot.</param>
 public sealed record TrendPoint(
@@ -123,9 +123,11 @@ public sealed record TrendPoint(
     int ProviderCount,
     string StatsLevel,
     decimal Min,
+    decimal? P10,
     decimal? P25,
     decimal? Median,
     decimal? P75,
+    decimal? P90,
     decimal Max,
     TrendProvider? Provider);
 

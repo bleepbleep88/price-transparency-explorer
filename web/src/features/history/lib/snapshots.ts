@@ -40,17 +40,17 @@ export function snapshotLabel(snapshot: SnapshotSummary | null, all: readonly Sn
   return years.size <= 1 ? monthDay(snapshot.indexDate) : shortDate(snapshot.indexDate)
 }
 
-/** Product names whose file in this snapshot looks partial next to nearby snapshots. */
+/** Product names whose file in this snapshot looks incomplete next to nearby snapshots. */
 export function partialProducts(snapshot: SnapshotSummary): string[] {
   return snapshot.products.filter((product) => product.completeness?.partial).map((product) => product.productLabel)
 }
 
-/** One line under a snapshot in the picker: "Newest", "Essential Plan looks partial", "Still loading". */
+/** One line under a snapshot in the picker: "Newest, shown by default", "Essential Plan looks incomplete", "Still loading". */
 export function snapshotNote(snapshot: SnapshotSummary): string {
   const notes: string[] = []
   if (snapshot.isLatest) notes.push('Newest, shown by default')
   const partial = partialProducts(snapshot)
-  if (partial.length) notes.push(`${partial.join(' and ')} ${partial.length === 1 ? 'looks' : 'look'} partial`)
+  if (partial.length) notes.push(`${partial.join(' and ')} ${partial.length === 1 ? 'looks' : 'look'} incomplete`)
   if (snapshot.status === 'loading') notes.push('Still loading')
   return notes.join(' · ')
 }

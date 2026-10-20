@@ -17,7 +17,8 @@ namespace PriceExplorer.Api.Core.Queries.History;
 /// <param name="To">Newer snapshot id. Defaults to the snapshot searches default to (the newest).</param>
 /// <param name="Product">Optional product key, e.g. "essential-plan".</param>
 /// <param name="Code">Optional billing code, as search takes it ("45378", "490", "RC 0490").</param>
-/// <param name="Kind">changed | new | dropped. Omit for all three.</param>
+/// <param name="Kind">changed | increased | decreased (changed, by direction) | new | dropped. Omit for changed, new and
+/// dropped.</param>
 /// <param name="MinChangePct">Only changes of at least this many percent, up or down (changed rates only).</param>
 /// <param name="ListedElsewhere">false leaves out new and dropped rates whose provider the other file lists for the same
 /// code under other modifiers or another setting; true keeps only those.</param>
@@ -36,7 +37,7 @@ public sealed record GetChangesQuery(
 
 public sealed class GetChangesQueryValidator : AbstractValidator<GetChangesQuery>
 {
-    public static readonly string[] Kinds = ["changed", "new", "dropped"];
+    public static readonly string[] Kinds = ["changed", "increased", "decreased", "new", "dropped"];
     public static readonly string[] Sorts = ["largest", "-changePct", "changePct", "code", "-code", "provider", "-provider"];
     public const decimal MaxChangePct = 1_000;
 
