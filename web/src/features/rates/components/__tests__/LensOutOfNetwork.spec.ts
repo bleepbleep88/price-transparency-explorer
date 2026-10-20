@@ -59,6 +59,10 @@ async function mountLens(lens: string, outOfNetwork: OutOfNetworkResult | null, 
     routes: [
       { path: '/', name: 'search', component: { template: '<div />' } },
       { path: '/sources', name: 'sources', component: { template: '<div />' } },
+      // The lenses also link to the insights pages.
+      { path: '/insights/gaps', name: 'gaps', component: { template: '<div />' } },
+      { path: '/insights/compare', name: 'compare', component: { template: '<div />' } },
+      { path: '/providers/:key', name: 'scorecard', component: { template: '<div />' } },
     ],
   })
   await router.push('/')
