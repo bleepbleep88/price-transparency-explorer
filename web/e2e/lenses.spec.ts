@@ -56,3 +56,11 @@ test('the dark theme turns the whole ledger dark', async ({ page }) => {
   await expect(page.getByTestId('group-card').first()).toHaveCSS('background-color', 'rgb(26, 31, 28)')
   await expect(page.getByRole('button', { name: 'Switch to light theme' })).toBeVisible()
 })
+
+// Vuetify's stylesheet declares its CSS layer order. If a component's CSS loads first, the order flips and the reset's
+// `button { font: inherit }` gives every button the body text's weight (400).
+test("buttons keep Vuetify's button type", async ({ page }) => {
+  await page.goto('/?code=45378')
+  await expect(page.getByTestId('group-card').first()).toBeVisible()
+  await expect(page.getByTestId('search-submit')).toHaveCSS('font-weight', '500')
+})
