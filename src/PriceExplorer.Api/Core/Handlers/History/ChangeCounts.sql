@@ -9,5 +9,5 @@ SELECT
     CAST(count(*) FILTER (WHERE included AND kind = 'dropped') AS INTEGER)                           AS Dropped,
     CAST(count(*) FILTER (WHERE included AND kind = 'dropped' AND listed_elsewhere) AS INTEGER)      AS DroppedListedElsewhere,
     CAST(count(*) FILTER (WHERE included AND kind = 'unchanged') AS INTEGER)                         AS Unchanged,
-    CAST(count(*) FILTER (WHERE code_type = 'RC' AND kind <> 'unchanged' AND of_kind) AS INTEGER)    AS RevenueCodeOnly
+    CAST(count(*) FILTER (WHERE code_type = 'RC' AND kind <> 'unchanged' AND of_kind) AS INTEGER)    AS FacilityCharges
 FROM shown

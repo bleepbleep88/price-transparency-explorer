@@ -16,7 +16,8 @@ import {
   type ChangeSort,
   type ChangesPatch,
 } from '@/features/history/lib/changesParams'
-import { countsSummary, listedElsewhereSummary, revenueCodeSwitchLabel, waitingText } from '@/features/history/lib/changesText'
+import { countsSummary, listedElsewhereSummary, waitingText } from '@/features/history/lib/changesText'
+import FacilityChargesSwitch from '@/features/insights/components/FacilityChargesSwitch.vue'
 import { olderSnapshots } from '@/features/history/lib/snapshots'
 
 const route = useRoute()
@@ -182,16 +183,11 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
                 />
               </v-col>
               <v-col cols="12" sm="6" md="6">
-                <!-- Decision 89: they state no unit, so they're left out of the order and counts unless asked for. -->
-                <v-switch
-                  :model-value="params.includeRevenueCodeOnly"
-                  :label="revenueCodeSwitchLabel(counts?.revenueCodeOnly)"
-                  hint="They state no unit, so they aren't ranked with the rest."
-                  persistent-hint
-                  color="primary"
-                  density="compact"
-                  data-testid="changes-include-rc"
-                  @update:model-value="(include) => update({ includeRevenueCodeOnly: Boolean(include) })"
+                <!-- Decision 89, the insights pages' switch: left out of the order and counts unless asked for. -->
+                <FacilityChargesSwitch
+                  :model-value="params.includeFacilityCharges"
+                  :count="counts?.facilityCharges ?? 0"
+                  @update:model-value="(include) => update({ includeFacilityCharges: include })"
                 />
               </v-col>
               <v-col cols="12" md="6" class="d-flex justify-md-end align-center">
@@ -256,11 +252,11 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
         </section>
 
         <p
-          v-if="params.sort === DEFAULT_CHANGE_SORT && params.includeRevenueCodeOnly"
+          v-if="params.sort === DEFAULT_CHANGE_SORT && params.includeFacilityCharges"
           class="text-body-small text-medium-emphasis"
           data-testid="changes-order"
         >
-          Biggest moves first. Facility charges filed only under a revenue code come after the rest.
+          Biggest moves first. Facility charges with no procedure named come after the rest.
         </p>
         <div :style="{ opacity: changes.isPlaceholderData.value ? 0.6 : 1 }">
           <ChangesTable

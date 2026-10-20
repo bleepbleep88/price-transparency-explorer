@@ -32,8 +32,8 @@ LEFT JOIN group_stats g
     ON g.snapshot_id = CASE WHEN s.kind = 'dropped' THEN $from ELSE $to END AND g.group_key = s.group_key
 WHERE s.kind <> 'unchanged' AND s.of_kind AND s.included
 ORDER BY
-    -- largest: the biggest moves first, then new and dropped rates, highest first. Revenue-code-only facility charges,
-    -- when included, come after the rest: they state no unit, so they aren't ranked with them.
+    -- largest: the biggest moves first, then new and dropped rates, highest first. Facility charges with no procedure
+    -- named, when included, come after the rest: they don't compare like for like, so they aren't ranked with them.
     CASE WHEN $sort = 'largest' THEN s.code_type = 'RC' END ASC,
     CASE WHEN $sort = 'largest' THEN abs(s.change_pct) END DESC NULLS LAST,
     CASE WHEN $sort = 'largest' THEN coalesce(s.to_value, s.from_value) END DESC,

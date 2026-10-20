@@ -12,7 +12,7 @@ describe('changes URL state', () => {
         kind: 'changed',
         minChangePct: '5',
         listedElsewhere: 'false',
-        includeRevenueCodeOnly: 'true',
+        includeFacilityCharges: 'true',
         sort: '-changePct',
         page: '2',
         pageSize: '50',
@@ -25,7 +25,7 @@ describe('changes URL state', () => {
       kind: 'changed',
       minChangePct: 5,
       hideListedElsewhere: true,
-      includeRevenueCodeOnly: true,
+      includeFacilityCharges: true,
       sort: '-changePct',
       page: 2,
       pageSize: 50,
@@ -38,7 +38,7 @@ describe('changes URL state', () => {
       kind: undefined,
       minChangePct: undefined,
       hideListedElsewhere: false,
-      includeRevenueCodeOnly: false,
+      includeFacilityCharges: false,
       sort: 'largest',
       page: 1,
       pageSize: 25,
@@ -58,8 +58,8 @@ describe('changes URL state', () => {
     expect(mergeChangesQuery({ listedElsewhere: 'false', kind: 'new' }, { hideListedElsewhere: false, kind: undefined, pageSize: 25 })).toEqual({
       kind: 'new',
     })
-    expect(mergeChangesQuery({ code: '0450' }, { includeRevenueCodeOnly: true })).toEqual({ code: '0450', includeRevenueCodeOnly: 'true' })
-    expect(mergeChangesQuery({ includeRevenueCodeOnly: 'true' }, { includeRevenueCodeOnly: false })).toEqual({})
+    expect(mergeChangesQuery({ code: '0450' }, { includeFacilityCharges: true })).toEqual({ code: '0450', includeFacilityCharges: 'true' })
+    expect(mergeChangesQuery({ includeFacilityCharges: 'true' }, { includeFacilityCharges: false })).toEqual({})
   })
 
   it("sends the page's snapshot as the newer file and only what the API takes", () => {
@@ -72,7 +72,7 @@ describe('changes URL state', () => {
       kind: undefined,
       minChangePct: undefined,
       listedElsewhere: false,
-      includeRevenueCodeOnly: undefined,
+      includeFacilityCharges: undefined,
       sort: undefined,
       page: 1,
       pageSize: 25,

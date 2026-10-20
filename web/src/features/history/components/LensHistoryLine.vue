@@ -54,7 +54,7 @@ const changes = useChanges(
     product: props.params.product,
     hideListedElsewhere: false,
     // The searched code's own changes: a revenue code's facility charges are what it was searched for, and nothing is ranked.
-    includeRevenueCodeOnly: true,
+    includeFacilityCharges: true,
     sort: DEFAULT_CHANGE_SORT,
     page: 1,
     pageSize: 1,
@@ -77,7 +77,7 @@ const changesLink = computed(() => ({
   query: {
     ...carried.value,
     code: code.value,
-    includeRevenueCodeOnly: 'true',
+    includeFacilityCharges: 'true',
     ...(props.params.product ? { product: props.params.product } : {}),
   },
 }))

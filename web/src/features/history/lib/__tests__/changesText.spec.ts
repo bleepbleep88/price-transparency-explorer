@@ -6,7 +6,6 @@ import {
   changeText,
   countsSummary,
   listedElsewhereSummary,
-  revenueCodeSwitchLabel,
   waitingText,
 } from '../changesText'
 import { change } from './fixtures'
@@ -21,9 +20,9 @@ const counts: ChangeCounts = {
   dropped: 16776,
   droppedListedElsewhere: 5856,
   unchanged: 41163,
-  revenueCodeOnly: 2210,
+  facilityCharges: 2210,
 }
-const none: ChangeCounts = { changed: 0, increased: 0, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 12, revenueCodeOnly: 0 }
+const none: ChangeCounts = { changed: 0, increased: 0, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 12, facilityCharges: 0 }
 
 describe('changes in words', () => {
   it('says why there are no changes yet, naming the files', () => {
@@ -42,10 +41,6 @@ describe('changes in words', () => {
     ).toBe('Changes show once loading finishes: the numbers for Aug 31, 2026 and Sep 28, 2026 are being updated.')
   })
 
-  it('counts the revenue-code facility charges the switch would add', () => {
-    expect(revenueCodeSwitchLabel(2210)).toBe('Include facility charges filed only under a revenue code (2,210)')
-    expect(revenueCodeSwitchLabel(0)).toBe('Include facility charges filed only under a revenue code')
-  })
 
   it('sums up what the filters cover: up, down, new and gone', () => {
     expect(countsSummary(counts, 'Aug 31, 2026', 'Sep 28, 2026')).toBe(

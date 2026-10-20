@@ -160,8 +160,8 @@ describe('LensHistoryLine', () => {
     const line = wrapper!.get('[data-testid="lens-history"]')
     expect(line.text()).toContain('Since the Aug 31 file, for 99213: 56 rates went up, 57 went down, 683 are new and 618 are gone.')
     // The searched code's own changes, revenue-code facility charges included, as the line counts them.
-    expect(line.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?code=99213&includeRevenueCodeOnly=true')
-    expect(changes).toHaveBeenCalledWith(expect.objectContaining({ includeRevenueCodeOnly: true }), expect.anything())
+    expect(line.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?code=99213&includeFacilityCharges=true')
+    expect(changes).toHaveBeenCalledWith(expect.objectContaining({ includeFacilityCharges: true }), expect.anything())
   })
 
   it('shows no counts until both files\' numbers are saved and current, as the changes page does', async () => {
@@ -182,7 +182,7 @@ describe('LensHistoryLine', () => {
     await mountLine('plans', result([group(OFFICE, 114)]), { snapshot: '2' })
     expect(changes).toHaveBeenCalledWith(expect.objectContaining({ snapshot: 2 }), expect.anything())
     expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('No rate for 99213 changed since the Jul 27 file.')
-    expect(wrapper!.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?snapshot=2&code=99213&includeRevenueCodeOnly=true')
+    expect(wrapper!.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?snapshot=2&code=99213&includeFacilityCharges=true')
     wrapper!.unmount()
 
     changes.mockClear()

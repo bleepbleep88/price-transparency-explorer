@@ -90,11 +90,6 @@ export function waitingText(result: Pick<ChangesResult, 'from' | 'to'>): string 
   return `Changes show once loading finishes: the numbers for ${outOfDate.join(' and ')} are being updated.`
 }
 
-/** The switch that adds facility charges filed only under a revenue code, with how many the other filters match. */
-export function revenueCodeSwitchLabel(count: number | undefined): string {
-  return `Include facility charges filed only under a revenue code${count ? ` (${wholeNumber(count)})` : ''}`
-}
-
 /** The changes page's summary of everything the filters cover. */
 export function countsSummary(counts: ChangeCounts, from: string, to: string): string {
   const text = countsText(counts)

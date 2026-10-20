@@ -21,8 +21,8 @@ export interface ChangesParams {
   minChangePct?: number
   /** Leave out new and dropped rates the other file lists under other modifiers or another setting. */
   hideListedElsewhere: boolean
-  /** Add facility charges filed only under a revenue code, which are left out by default (decision 89). */
-  includeRevenueCodeOnly: boolean
+  /** Add facility charges with no procedure named, which are left out by default as on the insights pages (decision 89). */
+  includeFacilityCharges: boolean
   sort: ChangeSort
   page: number
   pageSize: number
@@ -56,7 +56,7 @@ export function parseChangesQuery(query: LocationQuery): ChangesParams {
     kind: oneOf(CHANGE_KINDS, first(query.kind)),
     minChangePct: first(query.minChangePct) && minChangePct > 0 && minChangePct <= MAX_CHANGE_PCT ? minChangePct : undefined,
     hideListedElsewhere: first(query.listedElsewhere) === 'false',
-    includeRevenueCodeOnly: first(query.includeRevenueCodeOnly) === 'true',
+    includeFacilityCharges: first(query.includeFacilityCharges) === 'true',
     sort: oneOf(CHANGE_SORTS, first(query.sort)) ?? DEFAULT_CHANGE_SORT,
     page: positiveInteger(first(query.page)) ?? 1,
     pageSize: positiveInteger(first(query.pageSize), 100) ?? DEFAULT_CHANGES_PAGE_SIZE,
@@ -88,7 +88,7 @@ export function toChangesApiQuery(params: ChangesParams): Record<string, QueryVa
     kind: params.kind,
     minChangePct: params.minChangePct,
     listedElsewhere: params.hideListedElsewhere ? false : undefined,
-    includeRevenueCodeOnly: params.includeRevenueCodeOnly ? true : undefined,
+    includeFacilityCharges: params.includeFacilityCharges ? true : undefined,
     sort: params.sort === DEFAULT_CHANGE_SORT ? undefined : params.sort,
     page: params.page,
     pageSize: params.pageSize,

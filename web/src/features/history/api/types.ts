@@ -30,7 +30,7 @@ export interface ChangesEcho {
   sort: string
   page: number
   pageSize: number
-  includeRevenueCodeOnly: boolean
+  includeFacilityCharges: boolean
 }
 
 export interface ChangesProduct {
@@ -51,10 +51,10 @@ export interface ChangeCounts {
   droppedListedElsewhere: number
   unchanged: number
   /**
-   * Facility charges filed only under a revenue code that match every other filter, kind included: what
-   * includeRevenueCodeOnly adds. They state no unit, so they're left out by default (decision 89).
+   * Facility charges with no procedure named (filed under a revenue code alone) that match every other filter, kind included: what
+   * includeFacilityCharges adds. They don't compare like for like, so they're left out by default (decision 89).
    */
-  revenueCodeOnly: number
+  facilityCharges: number
 }
 
 export interface RateChange {

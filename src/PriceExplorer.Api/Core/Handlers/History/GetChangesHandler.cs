@@ -49,7 +49,7 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
         var toState = (await SavedStatistics.StateAsync(connection, to.SnapshotId, transaction)).SingleOrDefault();
         var products = await ProductsAsync(connection, from, to, transaction);
         var echo = new ChangesEcho(from.SnapshotId, to.SnapshotId, product, code.Length == 0 ? null : code, codeType, request.Kind,
-            request.MinChangePct, request.ListedElsewhere, sort, request.Page, request.PageSize, request.IncludeRevenueCodeOnly);
+            request.MinChangePct, request.ListedElsewhere, sort, request.Page, request.PageSize, request.IncludeFacilityCharges);
         var notCurrent = NotCurrentMessage((from, fromState), (to, toState));
         if (notCurrent is not null)
         {
@@ -72,7 +72,7 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
             kind = request.Kind,
             minChangePct = (double?)request.MinChangePct,
             listedElsewhere = request.ListedElsewhere,
-            includeRevenueCodeOnly = request.IncludeRevenueCodeOnly,
+            includeFacilityCharges = request.IncludeFacilityCharges,
             sort,
             limit = request.PageSize,
             offset = (request.Page - 1) * request.PageSize,

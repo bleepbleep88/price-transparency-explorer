@@ -67,7 +67,7 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
 
         result.Counts.Should().Be(new ChangeCounts(
             Changed: 1, Increased: 1, Decreased: 0, New: 1, NewListedElsewhere: 0, Dropped: 1, DroppedListedElsewhere: 0, Unchanged: 1,
-            RevenueCodeOnly: 0));
+            FacilityCharges: 0));
         result.Rows.Items.Select(row => (row.Kind, row.ProviderKey, row.From, row.To, row.Change, row.ChangePct)).Should().Equal(
             ("changed", "111111111", 600m, 660m, 60m, 10m),
             ("new", "444444444", null, 750m, null, null),
@@ -113,7 +113,7 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
         await PairAsync("ambetter|RC|0490|facility|asc||negotiated", "111111111", 900m, 990m);
         await PairAsync("ambetter|CPT|00490|professional|asc||negotiated", "111111111", 9m, 10m);
 
-        var result = await ChangesAsync(new GetChangesQuery(Code: code, IncludeRevenueCodeOnly: true));
+        var result = await ChangesAsync(new GetChangesQuery(Code: code, IncludeFacilityCharges: true));
 
         result.Rows.Items.Select(row => row.Code).Should().BeEquivalentTo(matched);
     }
@@ -208,28 +208,28 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Facility_charges_filed_only_under_a_revenue_code_are_left_out_unless_asked_for_and_their_count_follows_the_filters()
+    public async Task Facility_charges_with_no_procedure_named_are_left_out_unless_asked_for_and_their_count_follows_the_filters()
     {
-        // A facility charge filed under a revenue code alone states no unit, so it isn't ranked with the rest (decision 89).
+        // A facility charge with no procedure named doesn't compare like for like, so it isn't ranked with the rest (decision 89).
         await PairAsync("ambetter|RC|0301|facility|hospital-outpatient||negotiated", "rc-up", 20m, 1667m, name: "RC up");
         await PairAsync("ambetter|RC|0450|facility|hospital-outpatient||negotiated", "rc-down", 500m, 490m, name: "RC down");
         await PairAsync("ambetter|CPT|45378|facility|asc||negotiated", "cpt-small", 100m, 101m, name: "CPT small");
         await PairAsync("ambetter|CPT|99213|professional|office||negotiated", "cpt-big", 100m, 150m, name: "CPT big");
 
         var largest = await ChangesAsync(new GetChangesQuery());
-        var included = await ChangesAsync(new GetChangesQuery(IncludeRevenueCodeOnly: true));
-        var byPercent = await ChangesAsync(new GetChangesQuery(Sort: "-changePct", IncludeRevenueCodeOnly: true));
+        var included = await ChangesAsync(new GetChangesQuery(IncludeFacilityCharges: true));
+        var byPercent = await ChangesAsync(new GetChangesQuery(Sort: "-changePct", IncludeFacilityCharges: true));
         var down = await ChangesAsync(new GetChangesQuery(Kind: "decreased"));
         var big = await ChangesAsync(new GetChangesQuery(MinChangePct: 10));
 
         largest.Rows.Items.Select(row => row.ProviderKey).Should().Equal("cpt-big", "cpt-small");
-        largest.Counts.Should().Match<ChangeCounts>(counts => counts.Changed == 2 && counts.Increased == 2 && counts.RevenueCodeOnly == 2);
+        largest.Counts.Should().Match<ChangeCounts>(counts => counts.Changed == 2 && counts.Increased == 2 && counts.FacilityCharges == 2);
         included.Rows.Items.Select(row => row.ProviderKey).Should().Equal(["cpt-big", "cpt-small", "rc-up", "rc-down"], "they follow the rest");
-        included.Counts.Should().Match<ChangeCounts>(counts => counts.Changed == 4 && counts.Decreased == 1 && counts.RevenueCodeOnly == 2);
+        included.Counts.Should().Match<ChangeCounts>(counts => counts.Changed == 4 && counts.Decreased == 1 && counts.FacilityCharges == 2);
         byPercent.Rows.Items.Select(row => row.ProviderKey).Should().Equal(["rc-up", "cpt-big", "cpt-small", "rc-down"], "only the default order sets them apart");
-        down.Counts!.RevenueCodeOnly.Should().Be(1, "the switch's count follows the kind asked for");
+        down.Counts!.FacilityCharges.Should().Be(1, "the switch's count follows the kind asked for");
         down.Rows.Items.Should().BeEmpty();
-        big.Counts!.RevenueCodeOnly.Should().Be(1, "and the minimum change");
+        big.Counts!.FacilityCharges.Should().Be(1, "and the minimum change");
     }
 
     [Fact]

@@ -34,7 +34,7 @@ public sealed record ChangesResult(
 /// <summary>The request as the server ran it, with the snapshots it picked.</summary>
 public sealed record ChangesEcho(
     int From, int To, string? Product, string? Code, string? CodeType, string? Kind, decimal? MinChangePct, bool? ListedElsewhere,
-    string Sort, int Page, int PageSize, bool IncludeRevenueCodeOnly);
+    string Sort, int Page, int PageSize, bool IncludeFacilityCharges);
 
 /// <param name="Compared">Both snapshots have the product, and neither file looks partial: its rates are in the counts and rows.</param>
 /// <param name="NotComparedBecause">Why it wasn't compared, in plain words; null when it was.</param>
@@ -52,11 +52,11 @@ public sealed record ChangesProduct(string ProductKey, string ProductLabel, bool
 /// <param name="DroppedListedElsewhere">Of the dropped ones, providers the newer file lists for the same code under other
 /// modifiers or another setting.</param>
 /// <param name="Unchanged">In both files with the same value, or with the same rates.</param>
-/// <param name="RevenueCodeOnly">Facility charges filed only under a revenue code that match every other filter, kind
-/// included: what <c>includeRevenueCodeOnly</c> adds to the rows. The other counts include them only when it's set.</param>
+/// <param name="FacilityCharges">Facility charges with no procedure named (filed under a revenue code alone) that match every other filter, kind
+/// included: what <c>includeFacilityCharges</c> adds to the rows. The other counts include them only when it's set.</param>
 public sealed record ChangeCounts(
     int Changed, int Increased, int Decreased, int New, int NewListedElsewhere, int Dropped, int DroppedListedElsewhere, int Unchanged,
-    int RevenueCodeOnly);
+    int FacilityCharges);
 
 public sealed record RateChangesPage(int Total, int Page, int PageSize, IReadOnlyList<RateChange> Items);
 

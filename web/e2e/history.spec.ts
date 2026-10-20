@@ -74,15 +74,15 @@ test('a card whose typical price moved only because different providers are list
   await expect(line).not.toContainText(/went up|times as much/)
 })
 
-test('the changes page leaves out revenue-code-only facility charges until the switch adds them', async ({ page }) => {
+test('the changes page leaves out facility charges with no procedure named until the switch adds them', async ({ page }) => {
   await page.goto('/changes')
-  const toggle = page.getByTestId('changes-include-rc')
-  await expect(toggle).toContainText(/^Include facility charges filed only under a revenue code \([\d,]+\)/)
+  const toggle = page.getByTestId('facility-charges')
+  await expect(toggle).toContainText(/Include facility charges with no procedure named \([\d,]+\)/)
   const before = await page.getByTestId('changes-summary').innerText()
 
   await toggle.locator('input').check()
-  await expect(page).toHaveURL(/[?&]includeRevenueCodeOnly=true(&|$)/)
-  await expect(page.getByTestId('changes-order')).toContainText('Facility charges filed only under a revenue code come after the rest.')
+  await expect(page).toHaveURL(/[?&]includeFacilityCharges=true(&|$)/)
+  await expect(page.getByTestId('changes-order')).toContainText('Facility charges with no procedure named come after the rest.')
   await expect(page.getByTestId('changes-summary')).not.toHaveText(before)
 })
 

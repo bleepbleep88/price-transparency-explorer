@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { ALWAYS_TRUE } from '@/lib/plainNumbers'
 import { mdiAccountSearchOutline, mdiChartBar, mdiCompareHorizontal, mdiDatabaseOutline, mdiHistory, mdiMagnify, mdiMenu, mdiThemeLightDark } from '@mdi/js'
 import { useRoute } from 'vue-router'
-import { useTheme } from 'vuetify'
+import { useDisplay, useTheme } from 'vuetify'
 import DataStatusChip from '@/features/status/components/DataStatusChip.vue'
 import { useDataStatus } from '@/features/status/useDataStatus'
 import SnapshotPicker from '@/features/history/components/SnapshotPicker.vue'
@@ -11,6 +11,9 @@ import { useSnapshotChoice } from '@/features/history/composables/useSnapshotCho
 
 const theme = useTheme()
 const route = useRoute()
+// Six pages, the snapshot picker and the status chip: below the extra-large breakpoint the page buttons drop their icons
+// and some padding, so the brand isn't cut off.
+const { xlAndUp } = useDisplay()
 
 // Start the live status stream once for the whole app.
 useDataStatus()
@@ -41,7 +44,8 @@ const isCurrent = (item: { names: string[] }) => item.names.includes(String(rout
           v-for="item in navItems"
           :key="item.title"
           :to="item.to"
-          :prepend-icon="item.icon"
+          :prepend-icon="xlAndUp ? item.icon : undefined"
+          :class="{ 'px-2': !xlAndUp }"
           :active="isCurrent(item)"
           :aria-current="isCurrent(item) ? 'page' : undefined"
           variant="text"

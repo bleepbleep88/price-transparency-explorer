@@ -11,8 +11,9 @@
 -- telehealth modifiers such as GQ and GT from month to month). A provider that simply has another group in the other file,
 -- one it is still in, doesn't count. $listedElsewhere keeps only those (true) or leaves them out (false).
 -- of_kind: the pair is of $kind (changed, increased or decreased for changed ones by direction, new or dropped; NULL for
--- all). included: false for facility charges filed only under a revenue code (code_type RC: they state no unit, so
--- they aren't ranked with the rest, decision 89) unless $includeRevenueCodeOnly.
+-- all). included: false for facility charges with no procedure named (code_type RC, as InsightSupport.IsFacilityChargeOnly:
+-- hospitals bundle different services under them, so they don't compare like for like, decision 89) unless
+-- $includeFacilityCharges.
 -- ChangeCounts.sql and ChangeRows.sql each end this query with their own SELECT from shown.
 WITH older AS (
     SELECT *
@@ -77,7 +78,7 @@ shown AS (
             OR kind = $kind::VARCHAR
             OR ($kind::VARCHAR = 'increased' AND kind = 'changed' AND to_value > from_value)
             OR ($kind::VARCHAR = 'decreased' AND kind = 'changed' AND to_value < from_value)) AS of_kind,
-           (code_type <> 'RC' OR $includeRevenueCodeOnly::BOOLEAN)                            AS included
+           (code_type <> 'RC' OR $includeFacilityCharges::BOOLEAN)                            AS included
     FROM flagged
     -- A change from $0 has no percentage, so a minimum leaves it out.
     WHERE (kind <> 'changed' OR $minChangePct::DOUBLE IS NULL OR abs(change_pct) >= $minChangePct::DOUBLE)
