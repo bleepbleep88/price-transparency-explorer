@@ -27,6 +27,11 @@ export function isValidNpi(input: string | null | undefined): boolean {
 }
 
 /** "11-3471596", "113471596" or "11 3471596" → "113471596"; anything else → null. */
+/** The API sends NPIs as numbers, which drops a leading zero (124507857); NPIs are always 10 digits. */
+export function formatNpi(npi: number | string): string {
+  return String(npi).padStart(10, '0')
+}
+
 export function normalizeEin(input: string | null | undefined): string | null {
   const compact = (input ?? '').replace(/[\s-]/g, '')
   return /^\d{9}$/.test(compact) ? compact : null

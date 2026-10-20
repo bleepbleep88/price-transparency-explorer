@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatEin, isEinOrProviderKey, isValidNpi, normalizeEin, npiDigits } from '../providerIds'
+import { formatEin, formatNpi, isEinOrProviderKey, isValidNpi, normalizeEin, npiDigits } from '../providerIds'
 
 describe('isValidNpi', () => {
   it.each([
@@ -30,5 +30,12 @@ describe('EIN helpers', () => {
 
   it('strips everything but digits from NPI input', () => {
     expect(npiDigits(' 1396-747-861 ')).toBe('1396747861')
+  })
+})
+
+describe('formatNpi', () => {
+  it('puts back the leading zero a number drops, so a copied NPI searches', () => {
+    expect(formatNpi(124507857)).toBe('0124507857')
+    expect(formatNpi(1801474036)).toBe('1801474036')
   })
 })

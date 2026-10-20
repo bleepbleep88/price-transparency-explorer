@@ -5,6 +5,7 @@ import { money, plural } from '@/lib/format'
 import { ApiError } from '@/lib/apiClient'
 import type { RateRow } from '../api/types'
 import { useRateNpis } from '../composables/useRateQueries'
+import { formatNpi } from '../lib/providerIds'
 
 const open = defineModel<boolean>({ required: true })
 const props = defineProps<{ row: RateRow | null }>()
@@ -53,7 +54,7 @@ function rateText(rate: number, rateHigh: number): string {
             <v-list-item
               v-for="item in npis.data.value.items"
               :key="item.npi"
-              :title="String(item.npi)"
+              :title="formatNpi(item.npi)"
               :subtitle="showRates ? rateText(item.rate, item.rateHigh) : undefined"
             >
               <template v-if="!item.valid" #append>
