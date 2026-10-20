@@ -9,7 +9,8 @@ namespace PriceExplorer.Api.Core.Queries.Statistics;
 /// <summary>
 /// A snapshot's saved statistics: each comparison group's numbers (group_stats) with its providers' values
 /// (provider_values), the same numbers GET /api/v1/rates shows without provider filters. Internal: the history and
-/// insights features read these instead of searching code by code. Rows from one call always come from one build.
+/// insights features read these instead of searching code by code. Rows from one call always come from one build, and
+/// <see cref="GroupStatsResult.Current"/> says whether that build still matches what search shows.
 /// </summary>
 /// <param name="Snapshot">Snapshot id; defaults to the snapshot searches default to.</param>
 /// <param name="Codes">Only these codes, in stored form (45378, 00812, 0490, J0585). Null for every code.</param>

@@ -4,7 +4,15 @@ namespace PriceExplorer.Api.Core.Models.Statistics;
 
 /// <summary>A snapshot's saved comparison groups (group_stats), each with its providers' values (provider_values).</summary>
 /// <param name="BuiltAt">When the snapshot's statistics were built; null until its first build finishes.</param>
-internal sealed record GroupStatsResult(SnapshotRef Snapshot, DateTimeOffset? BuiltAt, IReadOnlyList<GroupStats> Groups);
+/// <param name="Current">
+/// The saved numbers are what search shows now. False while they're out of date: a rate file was saved again or the
+/// index renamed a product since the build (reloads rebuild them once every file is loaded), the app's code changed, a
+/// rate in them has expired, or no build has finished. Don't present them as current then: say they're being updated,
+/// or use search.
+/// </param>
+/// <param name="ExpiresOn">The earliest expiration date among the rates the statistics include; null if none ends.</param>
+internal sealed record GroupStatsResult(
+    SnapshotRef Snapshot, DateTimeOffset? BuiltAt, bool Current, DateOnly? ExpiresOn, IReadOnlyList<GroupStats> Groups);
 
 /// <summary>
 /// One comparison group's statistics over one value per provider: the numbers its search card shows
@@ -40,9 +48,11 @@ internal sealed record GroupStats(
 /// <param name="BusinessName">The name on the provider group(s) behind <paramref name="FirstRateId"/>.</param>
 /// <param name="Value">The NPI-weighted (lower) median of its rates in the group: always a rate it is really paid.</param>
 /// <param name="NpiWeight">The total weight behind <paramref name="Value"/>: each rate's NPI count (at least 1), summed.</param>
-/// <param name="FirstRateId">The rate carrying <paramref name="Value"/> that lists the most NPIs (the row's source).</param>
+/// <param name="FirstRateId">The rate carrying <paramref name="Value"/> that lists the most NPIs (the row's source). Rate
+/// ids are renumbered when a file is saved again, so it points at the rate it describes only while the result is
+/// <see cref="GroupStatsResult.Current"/>.</param>
 /// <param name="WholeTaxIdRateId">When <paramref name="EinLevel"/> comes from a whole-tax-ID contract other than
-/// <paramref name="FirstRateId"/>, that rate; null otherwise.</param>
+/// <paramref name="FirstRateId"/>, that rate; null otherwise. Like <paramref name="FirstRateId"/>, only while current.</param>
 internal sealed record ProviderValue(
     string ProviderKey,
     string? Ein,

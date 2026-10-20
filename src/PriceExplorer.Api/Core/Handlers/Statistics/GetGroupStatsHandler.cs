@@ -22,10 +22,10 @@ internal sealed class GetGroupStatsHandler(DuckDbConnectionFactory connections) 
             provider = ProviderKeys.NormalizeKey(request.ProviderKey),
         };
 
-        // One transaction, so the groups and the values come from the same build even when a rebuild commits meanwhile.
+        // One transaction, so the groups, the values and whether they're current all come from the same moment, even when
+        // a rebuild or a file reload commits meanwhile.
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        var builtAt = await connection.ExecuteScalarAsync<DateTime?>(
-            "SELECT built_at FROM stats_builds WHERE snapshot_id = $snapshotId", new { snapshotId = snapshot.SnapshotId }, transaction);
+        var state = (await SavedStatistics.StateAsync(connection, snapshot.SnapshotId, transaction)).SingleOrDefault();
         var groups = await connection.QueryAsync<GroupRow>(SqlFile.For<GetGroupStatsHandler>("GroupStats.sql"), filters, transaction);
         var values = request.IncludeProviders
             ? (await connection.QueryAsync<ValueRow>(SqlFile.For<GetGroupStatsHandler>("ProviderValues.sql"), filters, transaction))
@@ -34,7 +34,9 @@ internal sealed class GetGroupStatsHandler(DuckDbConnectionFactory connections) 
 
         return new GroupStatsResult(
             new SnapshotRef(snapshot.SnapshotId, snapshot.IndexDate, snapshot.IsLatest),
-            UtcTimestamps.From(builtAt),
+            UtcTimestamps.From(state?.BuiltAt),
+            state?.Current ?? false,
+            state?.ExpiresOn,
             groups.Select(group => new GroupStats(
                 group.GroupKey, group.ProductKey, group.ProductLabel, group.CodeType, group.Code, group.FeeType, group.SettingKey,
                 group.Modifiers, group.NegotiatedType, group.Unit, group.PerUnit, group.ProviderCount, group.RateCount, group.StatsLevel,

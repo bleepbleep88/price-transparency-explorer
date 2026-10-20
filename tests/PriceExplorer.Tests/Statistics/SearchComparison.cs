@@ -22,6 +22,7 @@ internal static class SearchComparison
 
         groups.Should().NotBeEmpty();
         saved.BuiltAt.Should().NotBeNull();
+        saved.Current.Should().BeTrue();
         saved.Groups.Select(GroupFacts.Of).Should().BeEquivalentTo(groups.Select(GroupFacts.Of));
         saved.Groups.SelectMany(group => group.Providers.Select(value => RowFacts.Of(group.Key, value)))
             .Should().BeEquivalentTo(rows.Select(RowFacts.Of), "every row on every page, and nothing else");

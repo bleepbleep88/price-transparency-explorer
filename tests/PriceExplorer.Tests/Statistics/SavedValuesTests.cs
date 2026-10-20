@@ -72,26 +72,23 @@ public sealed class SavedValuesTests
 
         saved.Groups.Single().Providers.Select(value => value.Value).Should().BeEquivalentTo([41.50m, 55.00m],
             "the rate that ended in 2020 is in neither search nor the saved statistics");
-        (await ExpiresOnAsync(factory, ct)).Should().Be("2098-06-30", "the earliest end date among the rates still shown");
+        saved.ExpiresOn.Should().Be(new DateOnly(2098, 6, 30), "the earliest end date among the rates still shown");
 
-        // When that day passes, search stops showing the rate, so the next check rebuilds the statistics.
+        // When that day passes, search stops showing the rate: readers are told at once, and the next check rebuilds.
         await using (var connection = await factory.Services.GetRequiredService<DuckDbConnectionFactory>().OpenAsync(ct))
         {
             await connection.ExecuteAsync("UPDATE stats_builds SET expires_on = DATE '2020-01-02'");
         }
 
+        var expired = await factory.SendAsync(new GetGroupStatsQuery(Codes: ["88305"]), ct);
         await factory.Services.GetRequiredService<IngestionCoordinator>().BuildStatisticsAsync(ct);
+        var rebuilt = await factory.SendAsync(new GetGroupStatsQuery(Codes: ["88305"]), ct);
 
-        (await factory.SendAsync(new GetGroupStatsQuery(Codes: ["88305"]), ct)).BuiltAt.Should().BeAfter(saved.BuiltAt!.Value);
-        (await ExpiresOnAsync(factory, ct)).Should().Be("2098-06-30");
+        (expired.Current, expired.ExpiresOn).Should().Be((false, new DateOnly(2020, 1, 2)));
+        (rebuilt.Current, rebuilt.ExpiresOn).Should().Be((true, new DateOnly(2098, 6, 30)));
+        rebuilt.BuiltAt.Should().BeAfter(saved.BuiltAt!.Value);
     }
 
     private static ExplorerApiFactory ServingEssential(string json) =>
         ExplorerApiFactory.With(http => http.ServeJson(FixtureHttpHandler.EssentialUrl, json));
-
-    private static async Task<string?> ExpiresOnAsync(ExplorerApiFactory factory, CancellationToken ct)
-    {
-        await using var connection = await factory.Services.GetRequiredService<DuckDbConnectionFactory>().OpenAsync(ct);
-        return await connection.ExecuteScalarAsync<string?>("SELECT CAST(expires_on AS VARCHAR) FROM stats_builds");
-    }
 }

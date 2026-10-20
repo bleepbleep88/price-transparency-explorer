@@ -1,13 +1,14 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using PriceExplorer.Api.Configuration;
+using PriceExplorer.Api.Core.Data;
 
 namespace PriceExplorer.Api.Core.Ingestion;
 
 /// <summary>
 /// Runs the whole load: read each configured index, then download → parse → save every in-network file it lists, then
-/// build each changed snapshot's statistics. One file failing never stops the others, and data from earlier runs stays
-/// queryable throughout.
+/// rebuild the statistics of each snapshot whose saved statistics aren't current. One file failing never stops the
+/// others, and data from earlier runs stays queryable throughout.
 /// </summary>
 internal sealed class IngestionCoordinator(
     IOptions<IngestionOptions> options,
@@ -92,13 +93,14 @@ internal sealed class IngestionCoordinator(
     }
 
     /// <summary>
-    /// Builds the saved statistics of every settled snapshot whose rate files (or this app's code) changed since its last
-    /// build; the others keep theirs. Runs after loading, and also repairs a build an earlier run didn't finish. Search
-    /// never reads these tables, so it keeps answering meanwhile, and a failed build is reported without stopping the rest.
+    /// Rebuilds the saved statistics of every snapshot search can serve whose statistics aren't current (see
+    /// <see cref="SavedStatistics"/>); the others keep theirs. Runs after loading, and also repairs a build an earlier run
+    /// didn't finish. Search never reads these tables, so it keeps answering meanwhile, and a failed build is reported
+    /// without stopping the rest.
     /// </summary>
     public async Task BuildStatisticsAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<StaleSnapshot> stale;
+        IReadOnlyList<StatisticsState> stale;
         try
         {
             stale = await statistics.FindStaleAsync(cancellationToken);
