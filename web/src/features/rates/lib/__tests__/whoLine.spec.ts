@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ProviderProfile } from '../../api/types'
-import { directorySourceNote, moreCount, moreLines, registryNote, whoLine } from '../whoLine'
+import { directorySourceNote, moreCount, moreLines, moreText, registryNote, whoLine } from '../whoLine'
 
 // Shaped like a real 45378 row: Gastrointestinal Care of Long Island PLLC (35 NPIs in 11 places; the API lists 3).
 function makeProfile(overrides: Partial<ProviderProfile> = {}): ProviderProfile {
@@ -14,7 +14,7 @@ function makeProfile(overrides: Partial<ProviderProfile> = {}): ProviderProfile 
       { specialty: 'Family Nurse Practitioner', group: 'Physician Assistants & Advanced Practice Nursing Providers', npis: 3 },
       { specialty: 'Internal Medicine Physician', group: 'Allopathic & Osteopathic Physicians', npis: 1 },
     ],
-    locations: ['Brooklyn, NY', 'Bronx, NY', 'New City, NY · Rockland County'],
+    locations: ['Brooklyn, NY', 'Bronx, NY', 'New City, NY (Rockland County)'],
     locationCount: 11,
     ...overrides,
   }
@@ -26,17 +26,19 @@ describe('whoLine', () => {
     expect(who.specialty).toBe('Gastroenterology Physician')
     expect(who.location).toBe('Brooklyn, NY')
     expect(who.otherSpecialties).toEqual(['Family Nurse Practitioner (3 NPIs)', 'Internal Medicine Physician (1 NPI)'])
-    expect(who.otherLocations).toEqual(['Bronx, NY', 'New City, NY · Rockland County'])
+    expect(who.otherLocations).toEqual(['Bronx, NY', 'New City, NY (Rockland County)'])
     expect(who.unlistedPlaces).toBe(8)
     expect(moreCount(who)).toBe(12)
+    expect(moreText(who)).toBe('+2 specialties, +10 places')
     expect(who.registryNote).toBeNull()
   })
 
   it('shows the place the API puts first for a location filter, with its county outside New York City', () => {
-    const who = whoLine(makeProfile({ locations: ['Rome, NY · Oneida County', 'Utica, NY · Oneida County'], locationCount: 2 }))!
-    expect(who.location).toBe('Rome, NY · Oneida County')
-    expect(who.otherLocations).toEqual(['Utica, NY · Oneida County'])
+    const who = whoLine(makeProfile({ locations: ['Rome, NY (Oneida County)', 'Utica, NY (Oneida County)'], locationCount: 2 }))!
+    expect(who.location).toBe('Rome, NY (Oneida County)')
+    expect(who.otherLocations).toEqual(['Utica, NY (Oneida County)'])
     expect(who.unlistedPlaces).toBe(0)
+    expect(moreText(who)).toBe('+2 specialties, +1 place')
   })
 
   it('copes with an empty profile and with no profile at all', () => {
@@ -45,6 +47,15 @@ describe('whoLine', () => {
     expect(who.specialty).toBeNull()
     expect(who.location).toBeNull()
     expect(moreCount(who)).toBe(0)
+    expect(moreText(who)).toBe('')
+  })
+
+  it('says what "+N more" holds by kind, for a big department', () => {
+    // Teladoc Physicians PC on 99213 in Monroe: 30 specialties and 215 places, 3 of them listed.
+    const specialties = Array.from({ length: 30 }, (_, i) => ({ specialty: `Specialty ${i + 1}`, group: null, npis: 30 - i }))
+    const who = whoLine(makeProfile({ specialties, locations: ['Rochester, NY (Monroe County)', 'Manhattan, NY', 'Bronx, NY'], locationCount: 215 }))!
+    expect(moreText(who)).toBe('+29 specialties, +214 places')
+    expect(moreText(whoLine(makeProfile({ locations: ['Brooklyn, NY'], locationCount: 1 }))!)).toBe('+2 specialties')
   })
 })
 
@@ -63,7 +74,7 @@ describe('moreLines', () => {
   it('lists other specialties and places in plain words, counting places the API left out', () => {
     expect(moreLines(whoLine(makeProfile())!)).toEqual([
       'Also: Family Nurse Practitioner (3 NPIs); Internal Medicine Physician (1 NPI)',
-      'Other places: Bronx, NY; New City, NY · Rockland County; and 8 more places',
+      'Other places: Bronx, NY; New City, NY (Rockland County); and 8 more places',
     ])
   })
 

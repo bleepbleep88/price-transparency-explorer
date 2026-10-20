@@ -11,7 +11,7 @@ export function directorySourceNote(source: DirectorySource | null | undefined):
 export interface WhoLine {
   /** The API lists a specialty matching the specialty filter first, else the one with the most NPIs. */
   specialty: string | null
-  /** The API lists a place in the filtered location first ("Rome, NY · Oneida County"), else the one with the most NPIs. */
+  /** The API lists a place in the filtered location first ("Rome, NY (Oneida County)"), else the one with the most NPIs. */
   location: string | null
   /** Everything else, for the "+N more" tooltip. */
   otherSpecialties: string[]
@@ -44,6 +44,17 @@ export function registryNote(profile: ProviderProfile): string | null {
 
 export function moreCount(who: WhoLine): number {
   return who.otherSpecialties.length + who.otherLocations.length + who.unlistedPlaces
+}
+
+/** What "+N more" holds, by kind: "+29 specialties, +214 places". */
+export function moreText(who: WhoLine): string {
+  const places = who.otherLocations.length + who.unlistedPlaces
+  return [
+    who.otherSpecialties.length ? `+${plural(who.otherSpecialties.length, 'specialty', 'specialties')}` : '',
+    places ? `+${plural(places, 'place')}` : '',
+  ]
+    .filter(Boolean)
+    .join(', ')
 }
 
 /** Lines for the "+N more" tooltip, capped so a 750-NPI department doesn't fill the screen. */

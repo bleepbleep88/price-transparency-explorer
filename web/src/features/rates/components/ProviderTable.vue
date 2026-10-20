@@ -7,7 +7,7 @@ import { capitalize, feeLabel, positionParts, typicalPrice } from '@/lib/plainNu
 import type { DirectorySource, ModifierRef, RateGroup, RateRow, RateRowsPage } from '../api/types'
 import { modifierText } from '../lib/lenses'
 import type { SortKey } from '../lib/searchParams'
-import { directorySourceNote, moreCount, moreLines, whoLine } from '../lib/whoLine'
+import { directorySourceNote, moreCount, moreLines, moreText, whoLine } from '../lib/whoLine'
 
 const props = defineProps<{
   rows: RateRowsPage
@@ -169,7 +169,7 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
           {{ [item.who.specialty, item.who.location].filter(Boolean).join(' · ') || 'No specialty or place in the registry' }}
           <v-tooltip v-if="moreCount(item.who) > 0" location="top" max-width="420">
             <template #activator="{ props: tip }">
-              · <span v-bind="tip" class="has-tooltip" tabindex="0">+{{ moreCount(item.who) }} more</span>
+              · <span v-bind="tip" class="has-tooltip" tabindex="0">{{ moreText(item.who) }}</span>
             </template>
             <p v-for="line in moreLines(item.who)" :key="line">{{ line }}</p>
           </v-tooltip>
