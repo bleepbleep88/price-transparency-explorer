@@ -1,3 +1,4 @@
+using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -56,6 +57,13 @@ public class ExplorerApiFactory : WebApplicationFactory<Program>
         }
 
         throw new InvalidOperationException("The status stream ended before loading finished.");
+    }
+
+    /// <summary>Sends a request through MediatR in its own scope, as a controller would (for internal queries with no endpoint).</summary>
+    public async Task<TResponse> SendAsync<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken)
+    {
+        using var scope = Services.CreateScope();
+        return await scope.ServiceProvider.GetRequiredService<ISender>().Send(request, cancellationToken);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
