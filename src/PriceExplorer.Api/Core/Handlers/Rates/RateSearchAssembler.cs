@@ -2,6 +2,7 @@ using System.Globalization;
 using PriceExplorer.Api.Core.Domain;
 using PriceExplorer.Api.Core.Ingestion;
 using PriceExplorer.Api.Core.Models.Rates;
+using PriceExplorer.Api.Core.Models.Statistics;
 using PriceExplorer.Api.Core.Reference;
 
 namespace PriceExplorer.Api.Core.Handlers.Rates;
@@ -55,26 +56,18 @@ internal sealed record AssembledSearch(
 /// <summary>
 /// Pure grouping and statistics for a search: builds fair comparison groups (one value per provider), applies the
 /// UI filters, ranks providers within their group, and pages the rows. No database access, so it's unit-tested directly.
+/// <see cref="Summarize"/> gives the same groups and values whole, for the saved statistics tables.
 /// </summary>
 internal static class RateSearchAssembler
 {
     public static AssembledSearch Assemble(IReadOnlyList<RateFactRow> facts, AssemblyOptions options, ReferenceCatalog catalog)
     {
-        var accumulators = new Dictionary<string, GroupAccumulator>(StringComparer.Ordinal);
-        foreach (var fact in facts)
-        {
-            var key = GroupKeyOf(fact, catalog);
-            if (!accumulators.TryGetValue(key, out var accumulator))
+        var built = Accumulate(facts, catalog)
+            .Select(accumulator =>
             {
-                accumulator = new GroupAccumulator(key, fact, FeeTypeOf(fact.BillingClass), catalog.SettingForPlace(fact.Pos));
-                accumulators[key] = accumulator;
-            }
-
-            accumulator.Add(fact);
-        }
-
-        var built = accumulators.Values
-            .Select(accumulator => (Accumulator: accumulator, Group: Build(accumulator, catalog, options.ProviderFilterActive)))
+                var distribution = Distribution.Of(accumulator);
+                return (Accumulator: accumulator, Distribution: distribution, Group: Build(accumulator, distribution, catalog, options.ProviderFilterActive));
+            })
             .OrderBy(pair => pair.Group.ProductLabel, StringComparer.Ordinal)
             .ThenByDescending(pair => pair.Group.ProviderCount)
             .ThenBy(pair => pair.Accumulator.Setting.SortOrder)
@@ -91,7 +84,7 @@ internal static class RateSearchAssembler
 
         var rows = visible
             .Where(pair => options.Group is null || pair.Group.Key == options.Group)
-            .SelectMany(pair => RowsFor(pair.Accumulator, pair.Group, options.ProviderFilterActive))
+            .SelectMany(pair => RowsFor(pair.Accumulator, pair.Distribution, pair.Group, options.ProviderFilterActive))
             .ToList();
 
         var skip = (long)(options.Page - 1) * options.PageSize;
@@ -106,6 +99,24 @@ internal static class RateSearchAssembler
             built.Select(pair => pair.Group).ToList());
     }
 
+    /// <summary>
+    /// Every group's statistics and every provider's value in it, exactly as a search with no provider filter shows them,
+    /// with no filters or paging: what the statistics tables save. Groups come in key order, providers in key order.
+    /// </summary>
+    public static IReadOnlyList<GroupStats> Summarize(IReadOnlyList<RateFactRow> facts, ReferenceCatalog catalog) =>
+        Accumulate(facts, catalog)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group =>
+            {
+                var distribution = Distribution.Of(group);
+                return new GroupStats(
+                    group.Key, group.ProductKey, group.ProductLabel, group.CodeType, group.Code, group.FeeType, group.Setting.Key,
+                    group.Modifiers, group.NegotiatedType, distribution.Values.Count, group.RateIds.Count, distribution.Level,
+                    distribution.Stats, distribution.LowerQuartileGap,
+                    group.Providers.Values.OrderBy(provider => provider.Key, StringComparer.Ordinal).Select(ValueOf).ToList());
+            })
+            .ToList();
+
     /// <summary>The comparison group a fact belongs to: product, code, fee type, setting, modifiers and rate type.</summary>
     public static string GroupKeyOf(RateFactRow fact, ReferenceCatalog catalog) =>
         string.Join('|', fact.ProductKey, fact.CodeType, fact.Code, FeeTypeOf(fact.BillingClass), catalog.SettingForPlace(fact.Pos).Key,
@@ -118,23 +129,40 @@ internal static class RateSearchAssembler
         _ => billingClass,
     };
 
-    private static RateGroup Build(GroupAccumulator group, ReferenceCatalog catalog, bool providerFilterActive)
+    /// <summary>Gathers facts into comparison groups, each provider once per group with all its rates there.</summary>
+    private static IEnumerable<GroupAccumulator> Accumulate(IReadOnlyList<RateFactRow> facts, ReferenceCatalog catalog)
     {
-        var values = group.Providers.Values.Select(p => p.Value).Order().ToList();
-        var count = values.Count;
-        var level = RateStatistics.LevelFor(count);
-        var basic = count >= RateStatistics.MinimumForBasicStats;
-        var full = count >= RateStatistics.MinimumForFullStats;
+        var accumulators = new Dictionary<string, GroupAccumulator>(StringComparer.Ordinal);
+        foreach (var fact in facts)
+        {
+            var key = GroupKeyOf(fact, catalog);
+            if (!accumulators.TryGetValue(key, out var accumulator))
+            {
+                accumulator = new GroupAccumulator(key, fact, FeeTypeOf(fact.BillingClass), catalog.SettingForPlace(fact.Pos));
+                accumulators[key] = accumulator;
+            }
 
-        decimal? median = basic ? RateStatistics.Median(values) : null;
-        decimal? p25 = basic ? RateStatistics.Quantile(values, 0.25) : null;
-        decimal? p75 = basic ? RateStatistics.Quantile(values, 0.75) : null;
-        decimal? p10 = full ? RateStatistics.Quantile(values, 0.10) : null;
-        decimal? p90 = full ? RateStatistics.Quantile(values, 0.90) : null;
-        var stats = new RateStats(
-            values[0], p10, p25, median, p75, p90, values[^1],
-            full ? RateStatistics.Ratio(values[^1], values[0]) : null,
-            full && p90 is { } top ? RateStatistics.Ratio(top, p10) : null);
+            accumulator.Add(fact);
+        }
+
+        return accumulators.Values;
+    }
+
+    /// <summary>A provider's value over all its rates in the group: what an unfiltered row shows and the statistics count.</summary>
+    private static ProviderValue ValueOf(ProviderAccumulator provider)
+    {
+        var view = provider.AllRates;
+        return new ProviderValue(
+            provider.Key, provider.VerifiedEin, provider.EinDisplay, provider.EinUnverified, view.WholeTaxId,
+            provider.NameFor(view, filtered: false), view.Value, view.Low, view.High, view.RateIds.Count, view.NpiWeight,
+            view.SourceRateId);
+    }
+
+    private static RateGroup Build(GroupAccumulator group, Distribution distribution, ReferenceCatalog catalog, bool providerFilterActive)
+    {
+        var values = distribution.Values;
+        var median = distribution.Stats.Median;
+        var p25 = distribution.Stats.P25;
 
         var category = ServiceCategories.Classify(group.CodeType, group.Code);
         // A drug named in the notes of a surgery or room revenue code line is that facility's charge for the case, not a
@@ -162,7 +190,7 @@ internal static class RateSearchAssembler
                     pair.Provider.Key,
                     pair.Provider.NameFor(pair.View, filtered: true),
                     pair.View.Value,
-                    basic ? RateStatistics.PercentRank(values, pair.View.Value, pair.Provider.Value) : null,
+                    distribution.Basic ? RateStatistics.PercentRank(values, pair.View.Value, pair.Provider.Value) : null,
                     RateStatistics.Ratio(pair.View.Value, median),
                     p25 is { } low ? pair.View.Value - low : null,
                     pair.View.Low,
@@ -193,21 +221,20 @@ internal static class RateSearchAssembler
             BilledAs: group.BilledAs
                 .Select(billed => new BilledAs(billed.Type, billed.Code, LabelFor(billed.Type, billed.Code, catalog)))
                 .ToList(),
-            ProviderCount: count,
+            ProviderCount: values.Count,
             RateCount: group.RateIds.Count,
-            StatsLevel: level,
-            Stats: stats,
-            LowerQuartileGap: full && median is { } m && p25 is { } q ? m - q : null,
-            ListedRates: level == "list" ? values : [],
+            StatsLevel: distribution.Level,
+            Stats: distribution.Stats,
+            LowerQuartileGap: distribution.LowerQuartileGap,
+            ListedRates: distribution.Level == "list" ? values : [],
             Highlights: highlights,
             MatchedProviders: providerFilterActive ? group.Providers.Values.Count(provider => provider.Matched) : 0,
             Notes: NotesFor(group, category, perUnit, catalog, values));
     }
 
-    private static IEnumerable<RateRow> RowsFor(GroupAccumulator accumulator, RateGroup group, bool providerFilterActive)
+    private static IEnumerable<RateRow> RowsFor(GroupAccumulator accumulator, Distribution distribution, RateGroup group, bool providerFilterActive)
     {
-        var values = accumulator.Providers.Values.Select(p => p.Value).Order().ToList();
-        var basic = values.Count >= RateStatistics.MinimumForBasicStats;
+        var values = distribution.Values;
 
         foreach (var provider in accumulator.Providers.Values)
         {
@@ -221,7 +248,7 @@ internal static class RateSearchAssembler
             var view = providerFilterActive ? provider.MatchedRates : provider.AllRates;
             var name = provider.NameFor(view, providerFilterActive);
             string? band = null;
-            if (basic && group.Stats is { P25: { } p25, Median: { } median, P75: { } p75 })
+            if (distribution.Basic && distribution.Stats is { P25: { } p25, Median: { } median, P75: { } p75 })
             {
                 band = RateStatistics.Band(view.Value, p25, median, p75);
             }
@@ -229,7 +256,7 @@ internal static class RateSearchAssembler
             yield return new RateRow(
                 GroupKey: group.Key,
                 ProviderKey: provider.Key,
-                Ein: provider.EinUnverified ? null : provider.Ein,
+                Ein: provider.VerifiedEin,
                 EinDisplay: provider.EinDisplay,
                 EinMasked: provider.EinUnverified,
                 EinLevel: view.WholeTaxId,
@@ -239,8 +266,8 @@ internal static class RateSearchAssembler
                 RateLow: view.Low,
                 RateHigh: view.High,
                 MultipleRates: view.High != view.Low,
-                VsMedian: RateStatistics.Ratio(view.Value, group.Stats.Median),
-                Percentile: basic ? RateStatistics.PercentRank(values, view.Value, provider.Value) : null,
+                VsMedian: RateStatistics.Ratio(view.Value, distribution.Stats.Median),
+                Percentile: distribution.Basic ? RateStatistics.PercentRank(values, view.Value, provider.Value) : null,
                 Band: band,
                 NpiCount: view.LargestNpiCount,
                 Occurrences: view.Occurrences,
@@ -375,6 +402,37 @@ internal static class RateSearchAssembler
 
     private static readonly HashSet<string> CaseRateRevenueCodes = new(["036", "045", "049", "071", "075", "076", "079"], StringComparer.Ordinal);
 
+    /// <summary>
+    /// A group's provider values and their statistics: linear-interpolation quantiles rounded to cents, median and
+    /// quartiles from 5 providers, p10/p90, spread and the lower-quartile gap from 10. Search cards, search rows and the
+    /// saved statistics all take their numbers from here.
+    /// </summary>
+    /// <param name="Values">One value per provider, in ascending order.</param>
+    private sealed record Distribution(IReadOnlyList<decimal> Values, string Level, RateStats Stats, decimal? LowerQuartileGap)
+    {
+        public bool Basic => Values.Count >= RateStatistics.MinimumForBasicStats;
+
+        public static Distribution Of(GroupAccumulator group)
+        {
+            var values = group.Providers.Values.Select(provider => provider.Value).Order().ToList();
+            var basic = values.Count >= RateStatistics.MinimumForBasicStats;
+            var full = values.Count >= RateStatistics.MinimumForFullStats;
+
+            decimal? median = basic ? RateStatistics.Median(values) : null;
+            decimal? p25 = basic ? RateStatistics.Quantile(values, 0.25) : null;
+            decimal? p75 = basic ? RateStatistics.Quantile(values, 0.75) : null;
+            decimal? p10 = full ? RateStatistics.Quantile(values, 0.10) : null;
+            decimal? p90 = full ? RateStatistics.Quantile(values, 0.90) : null;
+            var stats = new RateStats(
+                values[0], p10, p25, median, p75, p90, values[^1],
+                full ? RateStatistics.Ratio(values[^1], values[0]) : null,
+                full && p90 is { } top ? RateStatistics.Ratio(top, p10) : null);
+
+            return new Distribution(
+                values, RateStatistics.LevelFor(values.Count), stats, full && median is { } m && p25 is { } q ? m - q : null);
+        }
+    }
+
     private sealed class GroupAccumulator(string key, RateFactRow first, string feeType, SettingInfo setting)
     {
         public string Key { get; } = key;
@@ -463,6 +521,9 @@ internal static class RateSearchAssembler
 
         public IReadOnlyList<string> NamesOtherThan(string name) => _names.Where(other => other != name).ToList();
 
+        /// <summary>The EIN when it can be shown: null when masked (a prefix the IRS never issues).</summary>
+        public string? VerifiedEin => EinUnverified ? null : Ein;
+
         public string EinDisplay => Ein switch
         {
             null => Key.Replace(":", " ", StringComparison.Ordinal).ToUpperInvariant(),
@@ -550,9 +611,10 @@ internal static class RateSearchAssembler
     /// <param name="LargestNpiCount">NPIs under the largest single rate: a lower bound until the handler counts them exactly.</param>
     /// <param name="WholeTaxId">At least one of the rates comes from a contract with the whole tax ID (npi [0]).</param>
     /// <param name="WholeTaxIdRateId">Such a whole-tax-ID rate, when <paramref name="SourceRateId"/> isn't one.</param>
+    /// <param name="NpiWeight">The total weight the weighted median used: each rate's NPI count, at least 1, summed.</param>
     private sealed record RateView(
         decimal Value, decimal Low, decimal High, long SourceRateId, IReadOnlyList<long> RateIds, int Occurrences, int LargestNpiCount,
-        bool WholeTaxId, long? WholeTaxIdRateId)
+        bool WholeTaxId, long? WholeTaxIdRateId, long NpiWeight)
     {
         public static RateView Of(IEnumerable<RateEntry> entries)
         {
@@ -568,7 +630,8 @@ internal static class RateSearchAssembler
                 list.Sum(entry => entry.Occurrences),
                 list.Max(entry => entry.NpiCount),
                 list.Any(entry => entry.WholeTaxId),
-                source.WholeTaxId ? null : list.FirstOrDefault(entry => entry.WholeTaxId)?.RateId);
+                source.WholeTaxId ? null : list.FirstOrDefault(entry => entry.WholeTaxId)?.RateId,
+                list.Sum(entry => RateStatistics.MedianWeight(entry.NpiCount)));
         }
     }
 }

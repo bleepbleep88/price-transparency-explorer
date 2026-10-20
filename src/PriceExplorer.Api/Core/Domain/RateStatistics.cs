@@ -39,16 +39,19 @@ internal static class RateStatistics
 
     public static decimal Median(IReadOnlyList<decimal> sorted) => Quantile(sorted, 0.5);
 
+    /// <summary>How much a rate counts toward its provider's weighted median: its NPI count, at least 1.</summary>
+    public static long MedianWeight(int npiCount) => Math.Max(1, npiCount);
+
     /// <summary>
     /// The lower weighted median: the smallest value at which the running weight reaches half the total. It is always one
     /// of the given values, never a midpoint, so a provider with several rates is represented by one it is really paid.
-    /// Weights below 1 count as 1 (a contract with the whole tax ID lists no NPIs).
+    /// Weights below 1 count as 1 (a contract with the whole tax ID lists no NPIs; see <see cref="MedianWeight"/>).
     /// </summary>
     public static decimal WeightedMedian(IEnumerable<(decimal Value, int Weight)> items)
     {
         var ordered = items
             .GroupBy(item => item.Value)
-            .Select(same => (Value: same.Key, Weight: same.Sum(item => (long)Math.Max(1, item.Weight))))
+            .Select(same => (Value: same.Key, Weight: same.Sum(item => MedianWeight(item.Weight))))
             .OrderBy(item => item.Value)
             .ToList();
         if (ordered.Count == 0)
