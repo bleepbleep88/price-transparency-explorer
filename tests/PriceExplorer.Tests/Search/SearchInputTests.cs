@@ -139,6 +139,7 @@ public sealed class SearchInputTests
     [InlineData("1396747861", true)]
     [InlineData("1396-747-861", true)]
     [InlineData("1861171663", true)]   // fails the check digit, but is a real published NPI: searched with a warning
+    [InlineData("124507857", true)]    // published without its leading zero; read as 0124507857
     [InlineData("12345", false)]
     [InlineData("13967478AB", false)]
     public void Npi_must_be_ten_digits(string npi, bool valid)

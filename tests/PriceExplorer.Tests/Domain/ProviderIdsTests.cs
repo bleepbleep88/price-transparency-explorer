@@ -42,7 +42,8 @@ public sealed class ProviderIdsTests
     [Theory]
     [InlineData("1396747861", 1396747861L)]
     [InlineData(" 1396-747-861 ", 1396747861L)]
-    [InlineData("139674786", null)]
+    [InlineData("124507857", 124507857L)]   // published without its leading zero
+    [InlineData("13967478", null)]
     [InlineData("abc", null)]
     public void Npi_input_is_parsed_from_digits(string input, long? expected)
     {

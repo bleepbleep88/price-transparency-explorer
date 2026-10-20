@@ -44,13 +44,14 @@ internal static class Npi
     public static bool HasStandardPrefix(long npi) => npi is >= 1_000_000_000L and <= 2_999_999_999L;
 
     /// <summary>
-    /// Parses user input ("1396747861", "1396-747-861"). Returns null unless exactly 10 digits remain. A leading zero is
-    /// kept as typed when shown back (see SearchContext.NpiText): one file publishes the 9-digit NPI 124507857.
+    /// Parses user input ("1396747861", "1396-747-861"). Returns null unless 10 digits remain, or 9: one file publishes the
+    /// NPI 124507857 without its leading zero, and the NPI list shows it that way, so it is read as 0124507857 and shown
+    /// back with all 10 digits (see SearchContext.NpiText).
     /// </summary>
     public static long? Parse(string? input)
     {
         var digits = Digits(input);
-        return digits.Length == 10 && long.TryParse(digits, out var npi) ? npi : null;
+        return digits.Length is 9 or 10 && long.TryParse(digits, out var npi) ? npi : null;
     }
 
     internal static string Digits(string? input) =>

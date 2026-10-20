@@ -27,6 +27,11 @@ public sealed class SyntheticHintTests(SyntheticHintTests.Factory factory) : ICl
           { "npi": [1245319599], "tin": { "type": "ein", "value": "33-2222222", "business_name": "Beta Surgery Center" } } ] }
         """;
 
+    private const string GammaEmergency = """
+        { "provider_group_id": 8, "network_name": [], "provider_groups": [
+          { "npi": [1386622339], "tin": { "type": "ein", "value": "44-3333333", "business_name": "Gamma Emergency Physicians" } } ] }
+        """;
+
     /// <summary>Minkowitz's NPI is also listed under the masked tax ID 07-1234567.</summary>
     private const string CountyClinicWithMinkowitz = """
         { "provider_group_id": 7, "network_name": [], "provider_groups": [
@@ -34,11 +39,13 @@ public sealed class SyntheticHintTests(SyntheticHintTests.Factory factory) : ICl
         """;
 
     private static readonly string SyntheticFile = File(
-        [Minkowitz, CountyClinicWholeTin, AlphaEndoscopy, BetaSurgery, CountyClinicWithMinkowitz],
+        [Minkowitz, CountyClinicWholeTin, AlphaEndoscopy, BetaSurgery, CountyClinicWithMinkowitz, GammaEmergency],
         [
             // Minkowitz: one emergency room rate billed under revenue code 0450, one filed under CPT 99284.
             Item("RC", "0450", "EMERGENCY ROOM", "[1]", Price(rate: "500.00", serviceCode: "[\"23\"]")),
             Item("RC", "0450", "EMERGENCY ROOM", "[1]", Price(rate: "300.00", serviceCode: "[\"23\"]", additionalInformation: "99284")),
+            // Gamma: an emergency room rate filed under CPT 99285 only.
+            Item("RC", "0450", "EMERGENCY ROOM", "[8]", Price(rate: "350.00", serviceCode: "[\"23\"]", additionalInformation: "99285")),
             // Revenue code 0490: Beta bills it directly; Alpha's rate is filed under CPT 45378.
             Item("RC", "0490", "AMBULATORY SURGERY", "[6]", Price(rate: "900.00")),
             Item("RC", "0490", "AMBULATORY SURGERY", "[5]", Price(rate: "600.00", additionalInformation: "45378")),
@@ -65,6 +72,31 @@ public sealed class SyntheticHintTests(SyntheticHintTests.Factory factory) : ICl
         result.GetProperty("hints").EnumerateArray().Select(h => h.GetProperty("message").GetString()).Should().Contain(
             "Providers whose name contains \"endoscopy\" (3 tax IDs) have 3 facility rates under revenue code 0490 (Ambulatory surgery), " +
             "none listed for NPI 1396747861. They're filed under the procedure code in the notes field (1 code). Search one to see them:");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_name_matching_only_other_providers_keeps_the_way_back_to_the_npis_own_rates()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken, $"code=0450&npi={MinkowitzNpi}&provider=gamma");
+
+        var hint = result.GetProperty("hints").EnumerateArray().Single(h => h.GetProperty("kind").GetString() == "provider_name_no_match");
+        hint.GetProperty("message").GetString().Should()
+            .Be("NPI 1396747861 has rates for RC 0450, but not under a name containing \"gamma\".");
+        hint.GetProperty("links")[0].GetProperty("label").GetString().Should().Be("Clear the name filter");
+        result.GetProperty("hints").EnumerateArray().Select(h => h.GetProperty("message").GetString())
+            .Should().Contain(m => m!.StartsWith("Providers whose name contains \"gamma\" (1 tax ID) have 1 facility rate"));
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task A_wrong_code_type_link_keeps_the_npi_when_only_its_ein_is_wrong()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken, $"code=0450&codeType=CPT&npi={MinkowitzNpi}&ein=999999999");
+
+        var link = result.GetProperty("hints").EnumerateArray().Single(h => h.GetProperty("kind").GetString() == "code_type_mismatch")
+            .GetProperty("links").EnumerateArray().Single();
+        link.GetProperty("label").GetString().Should().Be("Search RC 0450 for NPI 1396747861");
+        link.GetProperty("query").GetProperty("ein").ValueKind.Should().Be(JsonValueKind.Null);
+        link.GetProperty("query").TryGetProperty("npi", out _).Should().BeFalse("the link keeps the NPI");
     }
 
     [Fact(Timeout = 60_000)]

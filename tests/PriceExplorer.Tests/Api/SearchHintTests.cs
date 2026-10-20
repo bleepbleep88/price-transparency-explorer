@@ -181,7 +181,7 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
 
         own.GetProperty("message").GetString().Should().EndWith("Codes that start the same way, for NPI 1174873780:");
         own.GetProperty("links")[0].GetProperty("query").TryGetProperty("npi", out _).Should().BeFalse("the link keeps the NPI");
-        others.GetProperty("message").GetString().Should().EndWith("Codes that start the same way (none for NPI 1649596081):");
+        others.GetProperty("message").GetString().Should().EndWith("Codes that start the same way, none of them for NPI 1649596081:");
         others.GetProperty("links")[0].GetProperty("query").GetProperty("npi").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
@@ -238,6 +238,8 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
         var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "45378", ["npi"] = "0123456789" });
 
         result.GetProperty("query").GetProperty("npi").GetString().Should().Be("0123456789");
+        var nineDigits = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "45378", ["npi"] = "124507857" });
+        nineDigits.GetProperty("query").GetProperty("npi").GetString().Should().Be("0124507857", "the files publish this NPI without its leading zero");
         Hint(result, "npi_check_digit").GetProperty("message").GetString().Should()
             .StartWith("NPI 0123456789 isn't a standard NPI: NPIs are 10 digits starting with 1 or 2.");
         Hint(result, "npi_not_listed").GetProperty("message").GetString().Should().Be("NPI 0123456789 isn't listed in this snapshot's files.");

@@ -184,7 +184,7 @@ internal static class RateSearchAssembler
             },
             SettingKey: group.Setting.Key,
             SettingLabel: group.Setting.Label,
-            SettingNote: group.Setting.Note,
+            SettingNote: ClinicPerUnit(group, perUnit) ? null : group.Setting.Note,
             Places: group.Places.Select(pos => new PlaceRef(pos, catalog.PlaceName(pos))).ToList(),
             Modifiers: modifiers,
             NegotiatedType: group.NegotiatedType,
@@ -331,7 +331,7 @@ internal static class RateSearchAssembler
         }
 
         // A clinic's all-inclusive visit note doesn't apply to a drug or supply priced per unit there.
-        if (group.Setting.Note is { } settingNote && !perUnit)
+        if (group.Setting.Note is { } settingNote && !ClinicPerUnit(group, perUnit))
         {
             notes.Add(settingNote);
         }
@@ -369,6 +369,9 @@ internal static class RateSearchAssembler
         BillingCodes.RevenueCode => $"Revenue code {billingCode} ({catalog.RevenueCodeLabel(billingCode)})",
         _ => $"{billingCodeType} {billingCode}",
     };
+
+    /// <summary>A drug or supply priced per unit at a health center or rural clinic, where visits are paid all-inclusive.</summary>
+    private static bool ClinicPerUnit(GroupAccumulator group, bool perUnit) => perUnit && group.Setting.Key is "fqhc" or "rhc";
 
     private static readonly HashSet<string> CaseRateRevenueCodes = new(["036", "045", "049", "071", "075", "076", "079"], StringComparer.Ordinal);
 

@@ -236,6 +236,7 @@ public sealed class RateSearchAssemblerTests
         group.SettingKey.Should().Be("fqhc");
         group.Unit.Should().Be("per HCPCS unit (see the code's description)");
         group.Notes.Should().NotContain(note => note.Contains("all-inclusive"));
+        group.SettingNote.Should().BeNull("the per-visit note is about visits, not drugs priced per unit");
     }
 
     [Fact]

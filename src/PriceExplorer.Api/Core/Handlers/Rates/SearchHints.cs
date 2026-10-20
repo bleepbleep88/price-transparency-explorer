@@ -69,7 +69,11 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         {
             hints.Add(CodeTypeMismatch(facts
                 .GroupBy(fact => new CodeKind(fact.CodeType, fact.Code))
-                .Select(kind => new KindOption(kind.Key, ForProvider: !search.ProviderFilterActive || kind.Any(fact => fact.FilterMatch)))
+                .Select(kind => new KindOption(
+                    kind.Key,
+                    ForProvider: !search.ProviderFilterActive || kind.Any(fact => fact.FilterMatch),
+                    ForId: kind.Any(fact => fact.IdMatch),
+                    ForNpi: kind.Any(fact => fact.NpiMatch)))
                 .OrderBy(option => option.Kind.CodeType, StringComparer.Ordinal)
                 .ToList()));
         }
@@ -122,7 +126,9 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         var searchable = kinds.Where(kind => kind.Searchable).ToList();
         if (searchable.Count > 0)
         {
-            hints.Add(CodeTypeMismatch(searchable.Select(kind => new KindOption(new CodeKind(kind.CodeType, kind.Code), kind.ForProvider)).ToList()));
+            hints.Add(CodeTypeMismatch(searchable
+                .Select(kind => new KindOption(new CodeKind(kind.CodeType, kind.Code), kind.ForProvider, kind.ForId, kind.ForNpi))
+                .ToList()));
         }
 
         // Facility rates filed under a revenue code with these digits are found under their procedure codes.
@@ -160,7 +166,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         if (similar.Count > 0)
         {
             message += providerScoped ? $" Codes that start the same way, for {FilterLabel()}:"
-                : search.ProviderFilterActive ? $" Codes that start the same way (none for {FilterLabel()}):"
+                : search.ProviderFilterActive ? $" Codes that start the same way, none of them for {FilterLabel()}:"
                 : " Codes that start the same way:";
         }
 
@@ -195,7 +201,8 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
     /// <summary>
     /// The first 3 characters as typed, in the type asked for (any type when none was); then each zero-padded form
     /// without its last digit, within the code type it stands for: a 4-digit form is a revenue code, a 5-digit one a
-    /// CPT code ("4537" suggests 4537x first; "999" never suggests anesthesia codes 009xx).
+    /// CPT code ("4537" suggests 453xx colonoscopy codes before any revenue code 045x; "999" never suggests anesthesia
+    /// codes 009xx).
     /// </summary>
     private IEnumerable<(string Prefix, string? CodeType)> SimilarPrefixes()
     {
@@ -225,15 +232,36 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
                 provider = forProvider ? search.Name : null,
             })).ToList();
 
-    /// <summary>The code is in these files as other kinds; each link searches one, for all providers when this one lacks it.</summary>
+    /// <summary>
+    /// The code is in these files as other kinds. Each link searches one, keeping as much of the provider filter as has
+    /// rates there: all of it, the NPI/EIN without the name, the NPI alone, or nobody.
+    /// </summary>
     private SearchHint CodeTypeMismatch(IReadOnlyList<KindOption> options) =>
         Hint("code_type_mismatch", "info",
             $"No {search.CodeType} rates for {search.Code}. It's in these files as {string.Join(" and ", options.Select(option => option.Kind.Label))}.",
-            options.Select(option => option.ForProvider
-                    ? Link($"Search {option.Kind.Label}", [("code", option.Kind.Code), ("codeType", option.Kind.CodeType), .. ClearNarrowing])
-                    : Link($"Search {option.Kind.Label} for all providers",
-                        [("code", option.Kind.Code), ("codeType", option.Kind.CodeType), .. ClearNarrowing, .. ClearProvider]))
-                .ToList());
+            options.Select(KindLink).ToList());
+
+    private HintLink KindLink(KindOption option)
+    {
+        (string Key, string? Value)[] kind = [("code", option.Kind.Code), ("codeType", option.Kind.CodeType)];
+        if (option.ForProvider)
+        {
+            return Link($"Search {option.Kind.Label}", [.. kind, .. ClearNarrowing]);
+        }
+
+        if (search.NameTyped is not null && search.IdFilter && option.ForId)
+        {
+            return Link($"Search {option.Kind.Label} for {FilterLabel(search.Npi, search.Ein, null, sentenceStart: false)}",
+                [.. kind, ("provider", null), .. ClearNarrowing]);
+        }
+
+        if (search.Npi is not null && (search.Ein is not null || search.NameTyped is not null) && option.ForNpi)
+        {
+            return Link($"Search {option.Kind.Label} for NPI {search.NpiText}", [.. kind, ("ein", null), ("provider", null), .. ClearNarrowing]);
+        }
+
+        return Link($"Search {option.Kind.Label} for all providers", [.. kind, .. ClearNarrowing, .. ClearProvider]);
+    }
 
     private IEnumerable<SearchHint> CodeShape(List<RateFactRow> facts, AssembledSearch assembled)
     {
@@ -254,9 +282,11 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             // The number also matches another kind of code whose rates the current filters hide.
             yield return Hint("ambiguous_code", "info",
                 $"\"{search.Code}\" also matches {string.Join(" and ", hidden.Select(kind => kind.Label))}, hidden by the current filters.",
-                hidden.Select(kind => ProviderHas(facts, kind)
-                        ? Link($"Search {kind.Label}", [("code", kind.Code), ("codeType", kind.CodeType), .. ClearNarrowing])
-                        : Link($"Search {kind.Label} for all providers", [("code", kind.Code), ("codeType", kind.CodeType), .. ClearNarrowing, .. ClearProvider]))
+                hidden.Select(kind => KindLink(new KindOption(
+                        kind,
+                        ForProvider: ProviderHas(facts, kind),
+                        ForId: facts.Any(fact => fact.CodeType == kind.CodeType && fact.Code == kind.Code && fact.IdMatch),
+                        ForNpi: facts.Any(fact => fact.CodeType == kind.CodeType && fact.Code == kind.Code && fact.NpiMatch))))
                     .ToList());
         }
 
@@ -548,21 +578,29 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
 
         if (nameProblem)
         {
-            if (search.IdFilter && await NameRevenueHintAsync() is { } named)
+            // The name may match other providers' facility rates filed under procedure codes: then say so, rather than
+            // "no provider whose name contains it has a rate".
+            var nameRevenue = search.IdFilter ? await NameRevenueHintAsync() : null;
+            if (nameRevenue is not null)
             {
-                // The name has rates under the revenue code, filed under procedure codes; the NPI/EIN is what fails.
-                hints.Add(named);
+                hints.Add(nameRevenue);
             }
-            else
+
+            if (!idProblem)
             {
-                var message = $"No provider whose name contains \"{search.NameTyped}\" has a rate for {codeLabel}.";
-                // The label names one kind of code, so the link searches exactly that kind.
+                // The NPI/EIN has rates for the code itself: clearing the name leads to them.
+                hints.Add(Hint("provider_name_no_match", "info",
+                    $"{FilterLabel(search.Npi, search.Ein, null, sentenceStart: true)} has rates for {codeLabel}, but not under a name containing \"{search.NameTyped}\".",
+                    [ClearNameLink(facts)]));
+            }
+            else if (nameRevenue is null)
+            {
+                // The NPI/EIN fails too, so clearing only the name would still find nothing. The label names one kind of
+                // code, so the link searches exactly that kind.
                 (string Key, string? Value)[] exactCode = code is null ? [] : [("code", code.Code), ("codeType", code.CodeType)];
-                hints.Add(idProblem
-                    // The NPI/EIN fails too, so clearing only the name would still find nothing.
-                    ? Hint("provider_name_no_match", "info", message,
-                        [Link($"Search {codeLabel} for all providers", [.. exactCode, .. ClearProvider, .. ClearNarrowing])])
-                    : Hint("provider_name_no_match", "info", message, [ClearNameLink(facts)]));
+                hints.Add(Hint("provider_name_no_match", "info",
+                    $"No provider whose name contains \"{search.NameTyped}\" has a rate for {codeLabel}.",
+                    [Link($"Search {codeLabel} for all providers", [.. exactCode, .. ClearProvider, .. ClearNarrowing])]));
             }
         }
 
@@ -810,10 +848,14 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         public string Label => $"{CodeType} {Code}";
     }
 
-    /// <summary>A kind of code to offer, and whether the filtered provider has rates under it.</summary>
-    private sealed record KindOption(CodeKind Kind, bool ForProvider);
+    /// <summary>
+    /// A kind of code to offer, and who among the filtered provider has rates under it: the whole filter, the NPI/EIN
+    /// without the name, or the NPI alone.
+    /// </summary>
+    private sealed record KindOption(CodeKind Kind, bool ForProvider, bool ForId = false, bool ForNpi = false);
 
-    private sealed record CodeKindRow(string CodeType, string Code, bool Searchable, bool ForProvider, bool InProduct, bool ForProviderInProduct);
+    private sealed record CodeKindRow(
+        string CodeType, string Code, bool Searchable, bool ForProvider, bool InProduct, bool ForProviderInProduct, bool ForId, bool ForNpi);
 
     private sealed record SimilarCodeRow(string CodeType, string Code, long Rates, string? Name);
 
