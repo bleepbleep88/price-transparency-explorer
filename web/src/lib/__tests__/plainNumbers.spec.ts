@@ -204,7 +204,10 @@ describe('the lower-priced quarter', () => {
 
 describe('how much prices vary', () => {
   it('compares the high end with the low end, leaving out the extremes, from 10 providers', () => {
-    expect(spreadLine(colonoscopy)).toBe('Even leaving out the extremes, the high end is about 1.8 times the low end.')
+    // Under twice: dollars from the figures as shown ($664 - $372), never "about 1.8 times".
+    expect(spreadLine(colonoscopy)).toBe('Even leaving out the extremes, the high end is $292 more than the low end.')
+    expect(spreadLine({ ...colonoscopy, p10: 50.25, p90: 99.5 })).toBe('Even leaving out the extremes, the high end is $49.25 more than the low end.')
+    expect(spreadLine({ ...colonoscopy, p10: 100, p90: 200 })).toBe('Even leaving out the extremes, the high end is about 2 times the low end.')
     expect(spreadLine({ ...colonoscopy, p10: 100, p90: 602 })).toBe('Even leaving out the extremes, the high end is about 6 times the low end.')
     // Within 5%: "Most providers get between $167 and $170." already says it.
     expect(spreadLine({ ...colonoscopy, p10: 167.09, p90: 170 })).toBeNull()

@@ -300,7 +300,7 @@ export function widestSpread(lines: SpreadLine[], count = 3): SpreadLine[] {
     .slice(0, count)
 }
 
-/** "Even leaving out the extremes, the high end is about 1.8 times the low end. $124 less per case at a lower-priced provider." */
+/** "Even leaving out the extremes, the high end is $292 more than the low end. $124 less per case at a lower-priced provider." */
 export function spreadText(line: SpreadLine): string {
   return [spreadLine(line.summary), perCaseLine(line.gap, line.perUnit)].filter(Boolean).join(' ')
 }
