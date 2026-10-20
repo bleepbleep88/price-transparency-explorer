@@ -162,15 +162,17 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
 
     <template #[`item.vsMedian`]="{ item }">
       <div class="py-1" data-testid="row-compared">
-        <template v-if="item.compared.label">
-          <v-chip :color="bandColor[item.band ?? '']" size="small" variant="outlined" data-testid="band-chip">
-            {{ item.compared.label }}
-          </v-chip>
-          <div v-if="item.compared.difference" class="text-body-small text-medium-emphasis" data-testid="row-difference">
-            {{ item.compared.difference }}
-          </div>
-        </template>
-        <span v-else class="text-body-small text-medium-emphasis">Too few to compare</span>
+        <v-chip v-if="item.compared.label" :color="bandColor[item.band ?? '']" size="small" variant="outlined" data-testid="band-chip">
+          {{ item.compared.label }}
+        </v-chip>
+        <div
+          v-if="item.compared.difference"
+          :class="item.compared.label ? 'text-body-small text-medium-emphasis' : 'text-body-medium'"
+          data-testid="row-difference"
+        >
+          {{ item.compared.difference }}
+        </div>
+        <span v-if="!item.compared.label && !item.compared.difference" class="text-body-small text-medium-emphasis">Too few to compare</span>
       </div>
     </template>
 

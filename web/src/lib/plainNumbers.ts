@@ -129,8 +129,10 @@ export function differenceLine(rate: number, typical: number | null | undefined)
 }
 
 /**
- * Position and dollars, kept apart for layouts that stack them. `difference` is null when it would only repeat "About
- * typical" (a typical price within 5% of typical).
+ * Position and dollars, kept apart for layouts that stack them. The API's middle band covers the middle half of
+ * providers, which can run well past typical ($80.72 against a typical $51.45). "About typical" is said only when the
+ * price is within 5% of typical, and then alone; further away the middle band gets just the dollars, because "About
+ * typical · $29.27 more than typical" contradicts itself.
  */
 export function positionParts(
   band: string | null | undefined,
@@ -138,8 +140,8 @@ export function positionParts(
   typical: number | null | undefined,
 ): { label: string | null; difference: string | null } {
   const difference = differenceLine(rate, typical)
-  const repeats = band === 'typical' && difference === 'about the same as typical'
-  return { label: positionLabel(band), difference: repeats ? null : difference }
+  if (band !== 'typical' || difference == null) return { label: positionLabel(band), difference }
+  return difference === 'about the same as typical' ? { label: positionLabel(band), difference: null } : { label: null, difference }
 }
 
 /**

@@ -79,6 +79,7 @@ function makeRow(name: string, groupKey: string, rate: number, band: RateRow['ba
 const rows = [
   makeRow('Low Cost ASC', 'asc', 454.44, 'low'),
   makeRow('Typical ASC', 'asc', 578.31, 'typical'),
+  makeRow('Middle ASC', 'asc', 610, 'typical'),
   makeRow('Pricey ASC', 'asc', 1405.33, 'high'),
   makeRow('Small Practice', 'office', 300, null),
 ]
@@ -104,6 +105,8 @@ describe('ProviderTable', () => {
     expect(compared).toEqual([
       ['Lower than most', '$124 less than typical'],
       ['About typical', null],
+      // In the API's middle band but over 5% above typical: the dollars, not "About typical".
+      ['$31.69 more than typical', '$31.69 more than typical'],
       ['Higher than most', 'About 2.4 times the typical price'],
       ['Too few to compare', null],
     ])

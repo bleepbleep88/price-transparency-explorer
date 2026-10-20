@@ -173,6 +173,11 @@ describe('providers lens', () => {
     expect(highlightHeading(byName([office], 'heel'))).toBe('How providers whose name contains "heel" compare')
   })
 
+  it('gives just the dollars for a price in the middle band but well away from typical', () => {
+    const middle = { ...office, stats: { ...office.stats, p75: 90 } }
+    expect(yourRateLines(byNpi([middle]))[0]!.text).toBe('Your price $80.72: $29.27 more than typical. Typical price: $51.45.')
+  })
+
   it('calls the typical price the most common one only when the quarter marks prove it', () => {
     const feeSchedule = makeGroup({
       key: 'fee-schedule',

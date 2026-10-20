@@ -118,7 +118,9 @@ describe('a provider against the others', () => {
   it('puts position and dollars together, without saying "typical" twice', () => {
     expect(positionLine('low', 143.75, 167.09)).toBe('Lower than most · $23.34 less than typical')
     expect(positionLine('typical', 578.31, 578.31)).toBe('About typical')
-    expect(positionLine('typical', 610, 578.31)).toBe('About typical · $31.69 more than typical')
+    // The middle band, but more than 5% from typical: just the dollars, never "About typical · $31.69 more".
+    expect(positionLine('typical', 610, 578.31)).toBe('$31.69 more than typical')
+    expect(positionLine('typical', 80.72, 51.45, ', ')).toBe('$29.27 more than typical')
     expect(positionLine('high', 1405.33, 578.31, ', ')).toBe('Higher than most, about 2.4 times the typical price')
     // Bunched-up prices: lower than most, yet only a little.
     expect(positionLine('low', 570, 578.31)).toBe('Lower than most · about the same as typical')
@@ -128,6 +130,7 @@ describe('a provider against the others', () => {
   it('keeps position and dollars apart for stacked layouts, dropping dollars that only repeat "about typical"', () => {
     expect(positionParts('low', 143.75, 167.09)).toEqual({ label: 'Lower than most', difference: '$23.34 less than typical' })
     expect(positionParts('typical', 578.31, 578.31)).toEqual({ label: 'About typical', difference: null })
+    expect(positionParts('typical', 610, 578.31)).toEqual({ label: null, difference: '$31.69 more than typical' })
     expect(positionParts('low', 570, 578.31)).toEqual({ label: 'Lower than most', difference: 'about the same as typical' })
     expect(positionParts(null, 300, null)).toEqual({ label: null, difference: null })
   })
