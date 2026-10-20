@@ -39,14 +39,14 @@ afterEach(() => {
 })
 
 describe('DataStatusChip', () => {
-  it('says statistics are being built once every rate file is saved', () => {
+  it('says comparisons are being prepared once every rate file is saved', () => {
     const chip = mountChip(
       statusOf('buildingStatistics', { message: 'Building statistics for snapshot 2026-08-31: 600 of 1,631 codes…' }),
       1,
     )
 
-    expect(chip.get('[data-testid="data-status"]').text()).toBe('Building statistics')
-    expect(chip.get('[role="status"]').text()).toBe('Building statistics')
+    expect(chip.get('[data-testid="data-status"]').text()).toBe('Preparing comparisons')
+    expect(chip.get('[role="status"]').text()).toBe('Preparing comparisons')
   })
 
   it('shows how far loading has got while rate files are read', () => {

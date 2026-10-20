@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { mdiInformationOutline } from '@mdi/js'
 import { plural, shortDate, wholeNumber } from '@/lib/format'
 import type { ProductFileSummary, RateSearchResult, SettingOption } from '../api/types'
+import { groupName } from '../lib/lenses'
 import type { QueryPatch, SearchParams } from '../lib/searchParams'
 
 const props = defineProps<{
@@ -26,8 +27,11 @@ const activeFilters = computed(() => {
   if (p.provider) chips.push({ key: 'provider', label: `Name contains "${p.provider}"`, yours: true })
   if (p.product) chips.push({ key: 'product', label: props.products.find((x) => x.productKey === p.product)?.productLabel ?? p.product })
   if (p.setting) chips.push({ key: 'setting', label: props.settings.find((x) => x.key === p.setting)?.label ?? p.setting })
-  if (p.feeType) chips.push({ key: 'feeType', label: p.feeType === 'facility' ? 'Facility fees' : 'Professional fees' })
-  if (p.group) chips.push({ key: 'group', label: 'One comparison group' })
+  if (p.feeType) chips.push({ key: 'feeType', label: p.feeType === 'facility' ? 'Facility fees' : "Doctor's fees" })
+  if (p.group) {
+    const picked = props.result.groups.find((group) => group.key === p.group)
+    chips.push({ key: 'group', label: picked ? `Only ${groupName(picked)}` : 'One card' })
+  }
   return chips
 })
 
@@ -43,7 +47,7 @@ const qualityChips = computed(() => {
   if (q.providersWithMultipleRates > 0) {
     chips.push({
       text: `${plural(q.providersWithMultipleRates, 'provider')} with more than one rate`,
-      tip: 'Same provider, code and setting but different prices. Shown as a range; stats use the middle value.',
+      tip: 'Same provider, code and setting but different prices. Shown as a range; comparisons use the middle one.',
     })
   }
   if (q.maskedTaxIds > 0) {
@@ -87,7 +91,7 @@ const qualityChips = computed(() => {
       <span class="text-medium-emphasis">· Snapshot {{ shortDate(result.snapshot.indexDate) }}</span>
     </div>
     <p v-if="code?.levelFamily" class="text-body-medium text-medium-emphasis">
-      {{ code.levelFamily }} codes come in levels. Compare level to level; how often each level is billed isn't in these files.
+      {{ code.levelFamily }} codes come in levels. Compare level to level.
     </p>
 
     <div v-if="activeFilters.length" class="d-flex flex-wrap ga-2" aria-label="Active filters">

@@ -82,7 +82,7 @@ const providerItems = computed<ProviderSuggestion[]>(() => providerSuggestions.d
 const npiWarning = computed(() => npiCheckDigitWarning(draft.npi))
 const feeTypes = [
   { title: 'Facility fee', value: 'facility' },
-  { title: 'Professional (clinician) fee', value: 'professional' },
+  { title: "Doctor's fee", value: 'professional' },
 ]
 const productItems = computed(() => props.products.map((product) => ({ title: product.productLabel, value: product.productKey })))
 const settingItems = computed(() => props.settings.map((setting) => ({ title: setting.label, value: setting.key })))
@@ -204,7 +204,7 @@ function onSubmit() {
               <v-select v-model="draft.setting" :items="settingItems" label="Setting" clearable placeholder="All settings" persistent-placeholder />
             </v-col>
             <v-col cols="12" sm="6" md="3">
-              <v-select v-model="draft.feeType" :items="feeTypes" label="Fee type" clearable placeholder="Facility and professional" persistent-placeholder />
+              <v-select v-model="draft.feeType" :items="feeTypes" label="Fee type" clearable placeholder="Facility and doctor's fees" persistent-placeholder />
             </v-col>
             <v-col cols="12" sm="6" md="3">
               <v-combobox

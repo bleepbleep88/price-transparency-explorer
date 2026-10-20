@@ -17,9 +17,9 @@ const view = computed(() => {
   if (current.phase === 'failed') {
     return { color: 'error', icon: mdiAlertCircleOutline, text: 'Data failed to load', spoken: 'Data failed to load' }
   }
-  // Every file is saved and searchable; the server is saving each comparison group's statistics.
+  // Every file is saved and searchable; the server is saving the numbers behind each card.
   if (current.phase === 'buildingStatistics') {
-    return { color: 'info', icon: mdiChartBoxOutline, text: 'Building statistics', spoken: 'Building statistics' }
+    return { color: 'info', icon: mdiChartBoxOutline, text: 'Preparing comparisons', spoken: 'Preparing comparisons' }
   }
   const percent = progress.value == null ? '' : ` ${Math.round(progress.value * 100)}%`
   return { color: 'info', icon: mdiCloudDownloadOutline, text: `Loading data${percent}`, spoken: 'Loading data' }

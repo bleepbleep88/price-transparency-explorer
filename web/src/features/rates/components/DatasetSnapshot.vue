@@ -49,7 +49,7 @@ const totals = computed(() =>
           {{ wholeNumber(product.pricesPublished) }} prices → {{ wholeNumber(product.uniqueRates) }} unique rates
         </p>
         <p class="text-body-small text-medium-emphasis">
-          Dates: index {{ shortDate(snapshot.indexDate) }} · file says {{ shortDate(product.fileLastUpdatedOn) }} · server
+          Dates: list of files {{ shortDate(snapshot.indexDate) }} · file says {{ shortDate(product.fileLastUpdatedOn) }} · server
           {{ shortDate(product.httpLastModified) }}
         </p>
         <p v-if="product.warning || product.error" class="text-body-small text-warning">{{ product.warning ?? product.error }}</p>
@@ -61,7 +61,7 @@ const totals = computed(() =>
       <div class="d-flex flex-wrap ga-2">
         <v-btn variant="tonal" size="small" @click="plansOpen = true">See the plans</v-btn>
         <v-btn :href="snapshot.indexUrl" target="_blank" rel="noopener" variant="text" size="small" :append-icon="mdiOpenInNew">
-          Index file
+          List of files
         </v-btn>
       </div>
     </v-card-text>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ALWAYS_TRUE } from '@/lib/plainNumbers'
 import { mdiMagnify, mdiThemeLightDark } from '@mdi/js'
 import { useTheme } from 'vuetify'
 import DataStatusChip from '@/features/status/components/DataStatusChip.vue'
@@ -41,8 +42,7 @@ const navItems = [{ title: 'Search', to: { name: 'search' }, icon: mdiMagnify }]
     </v-main>
 
     <v-footer color="background" border="t" class="text-body-small text-medium-emphasis justify-center text-center px-4">
-      Negotiated rates as published by the plan in its Transparency in Coverage files. A negotiated rate is not your
-      out-of-pocket cost. CPT® is a registered trademark of the American Medical Association; descriptions are shown as
+      {{ ALWAYS_TRUE }} CPT® is a registered trademark of the American Medical Association; descriptions are shown as
       published by the payer.
     </v-footer>
   </v-app>
