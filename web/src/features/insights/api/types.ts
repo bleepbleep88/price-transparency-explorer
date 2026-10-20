@@ -9,7 +9,10 @@ export interface StatisticsBasis {
   snapshot: { snapshotId: number; indexDate: string | null; isLatest: boolean }
   /** When the snapshot's statistics were built; null until the first build finishes. */
   builtAt: string | null
-  /** False while they're missing or being rebuilt (a reload, or a rate expired since): numbers may not match a search yet. */
+  /**
+   * False until the statistics are first built, and whenever they no longer match search: a rate file was saved again, a
+   * different build of the app built them, or a rate in them expired. The saved numbers still answer meanwhile.
+   */
   isCurrent: boolean
 }
 
@@ -24,7 +27,7 @@ export interface ProductRef {
   label: string
 }
 
-export type GapSort = 'gap' | 'spread'
+export type GapSort = 'gap' | 'spread' | 'range'
 
 export interface GapRow {
   rank: number
@@ -68,6 +71,8 @@ export interface GapLeaderboard {
   categories: CategoryOption[]
   /** Groups of charges filed under a revenue code with no procedure named; ranked only with includeFacilityCharges. */
   facilityCharges: number
+  /** Groups where the lower-priced quarter get the typical price: never ranked. */
+  noDifference: number
   rows: { total: number; page: number; pageSize: number; items: GapRow[] }
   notes: string[]
 }
@@ -100,6 +105,8 @@ export interface ScorecardGroup {
   percentile: number | null
   vsMedian: number | null
   band: Band | null
+  /** Filed under a revenue code with no procedure named: left out of the overall reading unless included. */
+  facilityCharge: boolean
   search: SearchLink
 }
 
@@ -129,6 +136,10 @@ export interface ProviderScorecard {
   highest: ScorecardGroup[]
   lowest: ScorecardGroup[]
   groups: ScorecardGroup[]
+  includeFacilityCharges: boolean
+  /** Its facility charges with a typical price: what including them adds to the overall reading and the lists. */
+  facilityCharges: number
+  notes: string[]
 }
 
 export type CompareSort = 'difference' | 'ratio' | '-ratio'
@@ -163,6 +174,8 @@ export interface ComparisonPair {
   /** productValue ÷ versusValue, rounded to 2 decimals. */
   ratio: number
   difference: number
+  /** The two rates are exactly equal (a ratio that rounds to 1.00 can still differ). */
+  same: boolean
   productSearch: SearchLink
   versusSearch: SearchLink
 }
@@ -174,6 +187,7 @@ export interface ProductComparison {
     matchedCodes: string[]
     category: string | null
     setting: string | null
+    includeFacilityCharges: boolean
     sort: CompareSort
     page: number
     pageSize: number
@@ -182,6 +196,8 @@ export interface ProductComparison {
   versus: ProductRef
   products: ProductRef[]
   categories: CategoryOption[]
+  facilityCharges: number
+  /** Middle points need 5 distinct providers and the 10th/90th need 10; otherwise null. */
   summary: {
     pairs: number
     providers: number
@@ -196,7 +212,7 @@ export interface ProductComparison {
     p90: number | null
   }
   distribution: RatioBand[]
-  byCategory: { key: string; label: string; pairs: number; identical: number; lower: number; higher: number; median: number }[]
+  byCategory: { key: string; label: string; pairs: number; providers: number; identical: number; lower: number; higher: number; median: number | null }[]
   pairs: { total: number; page: number; pageSize: number; items: ComparisonPair[] }
   notes: string[]
 }

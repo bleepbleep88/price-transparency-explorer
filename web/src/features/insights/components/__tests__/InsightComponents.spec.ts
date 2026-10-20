@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { ScorecardGroup, StatisticsBasis } from '../../api/types'
 import ScorecardExtremes from '../ScorecardExtremes.vue'
 import StatisticsNote from '../StatisticsNote.vue'
+
+// The note asks the live data status whether a rebuild is running; here none is.
+vi.mock('@/features/status/useDataStatus', () => ({ useDataStatus: () => ({ status: ref({ phase: 'ready' }) }) }))
 
 function plugins() {
   const empty = { template: '<div />' }
@@ -49,6 +53,7 @@ function scorecardGroup(overrides: Partial<ScorecardGroup> = {}): ScorecardGroup
     percentile: 86,
     vsMedian: 14.72,
     band: 'high',
+    facilityCharge: true,
     search: { code: '0460', codeType: 'RC', group: 'essential-plan|RC|0460|facility|hospital-outpatient||negotiated', ein: '131740126' },
     ...overrides,
   }

@@ -5,15 +5,17 @@ import { useDisplay } from 'vuetify'
 import { mdiMagnify, mdiRefresh } from '@mdi/js'
 import { ApiError } from '@/lib/apiClient'
 import { money, plural, wholeNumber } from '@/lib/format'
+import { dollars } from '@/lib/plainNumbers'
 import LoadingPanel from '@/features/status/components/LoadingPanel.vue'
 import { useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import type { GapRow } from '@/features/insights/api/types'
+import FacilityChargesSwitch from '@/features/insights/components/FacilityChargesSwitch.vue'
 import StatisticsNote from '@/features/insights/components/StatisticsNote.vue'
 import { useGapLeaderboard } from '@/features/insights/composables/useInsightQueries'
 import { searchLocation } from '@/features/insights/lib/insightLinks'
 import { INSIGHT_PAGE_SIZES, mergeInsightQuery, parseGapQuery, type InsightPatch } from '@/features/insights/lib/insightParams'
-import { RATES_NOT_COSTS, serviceName } from '@/features/insights/lib/insightText'
-import { dollars, groupLine, spreadWords } from '@/features/insights/lib/plainWords'
+import { serviceName } from '@/features/insights/lib/insightText'
+import { cents, groupLine, rangeWords, shown, shownDifference, unitSuffix } from '@/features/insights/lib/plainWords'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,7 +28,10 @@ const reference = useReferenceLists()
 
 const result = computed(() => (leaderboard.isError.value ? undefined : leaderboard.data.value))
 const apiError = computed(() => (leaderboard.error.value instanceof ApiError ? leaderboard.error.value : null))
+const problem = computed(() => (apiError.value ? (Object.values(apiError.value.fieldErrors).flat()[0] ?? apiError.value.message) : null))
 const filtered = computed(() => Boolean(params.value.product || params.value.category || params.value.setting || params.value.feeType || params.value.code))
+// Until the first statistics build there is nothing to rank; the note above says so, and the page claims nothing else.
+const saved = computed(() => result.value?.statistics.builtAt != null)
 
 const snapshot = computed(() => {
   const list = snapshots.data.value ?? []
@@ -39,6 +44,7 @@ const feeTypes = [
   { title: 'Facility fee', value: 'facility' },
   { title: "Doctor's fee", value: 'professional' },
 ]
+const pages = computed(() => (result.value ? Math.ceil(result.value.rows.total / result.value.rows.pageSize) : 0))
 
 // The code is typed, so it applies on Enter or when the field loses focus, not on every keystroke.
 const code = ref('')
@@ -49,7 +55,14 @@ function update(patch: InsightPatch) {
 }
 
 function applyCode() {
-  if (code.value.trim() !== (params.value.code ?? '')) void update({ code: code.value.trim() || null })
+  // Clearing the field sets it to null before it loses focus.
+  const typed = (code.value ?? '').trim()
+  if (typed !== (params.value.code ?? '')) void update({ code: typed || null })
+}
+
+function clearCode() {
+  code.value = ''
+  void update({ code: null })
 }
 
 function clearFilters() {
@@ -68,8 +81,42 @@ const headers = [
   { title: 'Search', key: 'actions', sortable: false, align: 'end' as const },
 ]
 
-function perUnit(row: GapRow): string {
-  return row.perUnit ? ' per unit' : ''
+// When whole dollars would show the typical price and the lower-priced quarter as the same ($269 and $269), the row
+// shows both to the cent so the difference beside them adds up.
+function toTheCent(row: GapRow): boolean {
+  const { median, p25 } = row.stats
+  return median != null && p25 != null && row.lowerQuartileGap > 0 && shown(median) === shown(p25)
+}
+
+function figure(row: GapRow, value: number | null): string {
+  if (value == null) return '—'
+  return `${toTheCent(row) ? money(value) : dollars(value)}${unitSuffix(row)}`
+}
+
+function difference(row: GapRow): string {
+  if (row.lowerQuartileGap <= 0) return 'None: the lower-priced quarter get the typical price'
+  const { median, p25 } = row.stats
+  const show = toTheCent(row) ? cents : shown
+  // Between the two figures shown beside it, so the row adds up.
+  const gap = median != null && p25 != null ? shownDifference(median, p25, show, show) : row.lowerQuartileGap
+  return `${dollars(gap)}${unitSuffix(row)} less than typical`
+}
+
+// One string, so the space after "ranked." survives the template's whitespace trimming.
+const rankedNote = computed(() => {
+  const counts = result.value
+  if (!counts) return ''
+  const ranked = `${plural(counts.rows.total, 'service')} ranked.`
+  return counts.noDifference
+    ? `${ranked} ${wholeNumber(counts.noDifference)} more, where the lower-priced quarter of providers get the typical price, aren't ranked: there's no difference to show.`
+    : ranked
+})
+
+function range(row: GapRow): string {
+  const { p10, p90 } = row.stats
+  if (p10 == null || p90 == null) return '—'
+  // Statistics read in whole dollars from $100, as on the search cards; the rates themselves keep their cents.
+  return p10 === p90 ? `${dollars(p10)}${unitSuffix(row)}` : `${dollars(p10)} to ${dollars(p90)}${unitSuffix(row)}`
 }
 
 function onOptions(options: { page: number; itemsPerPage: number }) {
@@ -83,9 +130,9 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
   <v-container class="py-6" max-width="1280">
     <h1 class="text-headline-medium mb-1">Where prices differ most</h1>
     <p class="text-body-medium text-medium-emphasis mb-1">
-      The same service, in the same setting, under the same plan, where 10 or more providers are paid quite different
-      amounts. For plans and employers that's room to choose lower-priced providers; for providers it's context for
-      negotiating.
+      The same service, in the same setting, under the same plan, where 10 or more providers are paid different amounts:
+      biggest difference first. For plans and employers that's room to choose lower-priced providers; for providers it's
+      context for negotiating.
     </p>
     <StatisticsNote v-if="result" :basis="result.statistics" class="mb-3" />
 
@@ -98,6 +145,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           placeholder="All plans"
           persistent-placeholder
           clearable
+          :error-messages="apiError?.fieldErrors.product ?? []"
           @update:model-value="(value) => update({ product: value })"
         />
       </v-col>
@@ -109,6 +157,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           placeholder="All kinds"
           persistent-placeholder
           clearable
+          :error-messages="apiError?.fieldErrors.category ?? []"
           data-testid="gaps-category"
           @update:model-value="(value) => update({ category: value })"
         />
@@ -121,6 +170,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           placeholder="All settings"
           persistent-placeholder
           clearable
+          :error-messages="apiError?.fieldErrors.setting ?? []"
           @update:model-value="(value) => update({ setting: value })"
         />
       </v-col>
@@ -132,6 +182,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           placeholder="Both"
           persistent-placeholder
           clearable
+          :error-messages="apiError?.fieldErrors.feeType ?? []"
           @update:model-value="(value) => update({ feeType: value })"
         />
       </v-col>
@@ -147,7 +198,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           data-testid="gaps-code"
           @keydown.enter="applyCode"
           @update:focused="(focused) => !focused && applyCode()"
-          @click:clear="update({ code: null })"
+          @click:clear="clearCode"
         />
       </v-col>
     </v-row>
@@ -167,27 +218,31 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
       >
         <!-- Vuetify's toggle sets no ARIA state, so each button says whether it's the one in use. -->
         <v-btn value="gap" :aria-pressed="params.sort === 'gap'" data-testid="sort-gap">Biggest dollar difference</v-btn>
-        <v-btn value="spread" :aria-pressed="params.sort === 'spread'" data-testid="sort-spread">Widest price range</v-btn>
+        <v-btn value="range" :aria-pressed="params.sort === 'range'" data-testid="sort-range">Widest price range</v-btn>
       </v-btn-toggle>
       <v-btn v-if="filtered" variant="text" size="small" @click="clearFilters">Clear filters</v-btn>
     </div>
-    <v-switch
+    <p class="text-body-small text-medium-emphasis mb-1">
+      {{
+        params.sort === 'range'
+          ? 'Widest price range: how many dollars apart most providers\' prices are, leaving out the highest and lowest tenth.'
+          : 'Biggest dollar difference: how much less the lower-priced quarter of providers get than the typical price.'
+      }}
+    </p>
+    <FacilityChargesSwitch
+      class="mb-3"
       :model-value="params.includeFacilityCharges ?? false"
-      color="primary"
-      density="compact"
-      hide-details
-      inset
-      :label="`Include facility charges with no procedure named${result?.facilityCharges ? ` (${wholeNumber(result.facilityCharges)})` : ''}`"
-      data-testid="gaps-facility-charges"
+      :count="result?.facilityCharges ?? 0"
       @update:model-value="(value) => update({ includeFacilityCharges: value ? 'true' : null })"
     />
-    <p class="text-body-small text-medium-emphasis mb-3">
-      Charges filed under a hospital revenue code alone, like "RC 0360 Operating room", cover whatever each hospital
-      bundles under them, so they don't compare like for like and are left out unless you include them.
-    </p>
 
     <LoadingPanel v-if="apiError?.isLoading" />
-    <v-alert v-else-if="apiError?.status === 400" type="warning" variant="tonal">{{ apiError.message }}</v-alert>
+    <v-alert v-else-if="apiError?.status === 400" type="warning" variant="tonal">
+      {{ problem }}
+      <template #append>
+        <v-btn variant="text" :to="{ name: 'gaps' }">Start over</v-btn>
+      </template>
+    </v-alert>
     <v-alert v-else-if="apiError" type="error" variant="tonal" data-testid="gaps-error">
       <p>{{ apiError.message }}</p>
       <template #append>
@@ -196,8 +251,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
     </v-alert>
     <v-skeleton-loader v-else-if="leaderboard.isPending.value" type="table" />
 
-    <template v-else-if="result">
-      <p class="text-body-small text-medium-emphasis mb-2" data-testid="gaps-note">{{ RATES_NOT_COSTS }}</p>
+    <template v-else-if="result && saved">
       <v-card :style="{ opacity: leaderboard.isPlaceholderData.value ? 0.6 : 1 }">
         <v-data-table-server
           :headers="headers"
@@ -231,20 +285,18 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           </template>
           <template #[`item.providerCount`]="{ item }">{{ wholeNumber(item.providerCount) }}</template>
           <template #[`item.typical`]="{ item }">
-            <span class="text-no-wrap" data-testid="gap-typical">{{ money(item.stats.median) }}{{ perUnit(item) }}</span>
+            <span class="text-no-wrap" data-testid="gap-typical">{{ figure(item, item.stats.median) }}</span>
           </template>
           <template #[`item.lowerQuarter`]="{ item }">
-            <span class="text-no-wrap">{{ money(item.stats.p25) }} or less</span>
+            <span class="text-no-wrap">{{ figure(item, item.stats.p25) }} or less</span>
           </template>
           <template #[`item.difference`]="{ item }">
-            <span class="text-no-wrap font-weight-medium" data-testid="gap-value">
-              {{ dollars(item.lowerQuartileGap) }} less than typical{{ perUnit(item) }}
-            </span>
+            <span class="text-no-wrap font-weight-medium" data-testid="gap-value">{{ difference(item) }}</span>
           </template>
           <template #[`item.range`]="{ item }">
             <div class="py-1">
-              <div class="text-no-wrap">{{ money(item.stats.p10) }} to {{ money(item.stats.p90) }}</div>
-              <div class="text-body-small text-medium-emphasis">{{ spreadWords(item.stats.p10, item.stats.p90) }}</div>
+              <div class="text-no-wrap" data-testid="gap-range">{{ range(item) }}</div>
+              <div class="text-body-small text-medium-emphasis">{{ rangeWords(item.stats.p10, item.stats.p90, unitSuffix(item)) }}</div>
             </div>
           </template>
           <template #[`item.actions`]="{ item }">
@@ -258,20 +310,36 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
             />
           </template>
           <template #no-data>
-            <div class="py-4 d-flex flex-column align-start ga-2">
-              <p class="text-body-medium">
-                {{ filtered ? 'Nothing with 10 or more providers matches these filters.' : 'Nothing has 10 or more providers yet.' }}
-              </p>
-              <v-btn v-if="filtered" variant="tonal" color="primary" size="small" @click="clearFilters">Clear filters</v-btn>
+            <div class="py-4 d-flex flex-column align-start ga-2" data-testid="gaps-no-data">
+              <template v-if="result.rows.total > 0">
+                <p class="text-body-medium">This list has {{ plural(pages, 'page') }}, so this page is past the end.</p>
+                <v-btn variant="tonal" color="primary" size="small" data-testid="gaps-first-page" @click="update({ page: null })">
+                  Go to page 1
+                </v-btn>
+              </template>
+              <template v-else>
+                <p class="text-body-medium">
+                  <template v-if="result.noDifference">
+                    For these, the lower-priced quarter of providers get the typical price, so there's no difference to rank.
+                  </template>
+                  <template v-else>
+                    {{ filtered ? 'Nothing with 10 or more providers matches these filters.' : 'Nothing has 10 or more providers yet.' }}
+                  </template>
+                </p>
+                <v-btn v-if="filtered" variant="tonal" color="primary" size="small" @click="clearFilters">Clear filters</v-btn>
+              </template>
             </div>
           </template>
         </v-data-table-server>
       </v-card>
-      <p class="text-body-small text-medium-emphasis mt-2">
-        {{ plural(result.rows.total, 'service') }} ranked. "Lower-priced quarter get" is what a quarter of providers are
-        paid or less; "Difference" is how much less that is than the typical price. "Most providers get" leaves out the
-        highest and lowest tenth.
-      </p>
+      <div class="text-body-small text-medium-emphasis mt-2 d-flex flex-column ga-1" data-testid="gaps-note">
+        <p>{{ rankedNote }}</p>
+        <p>
+          "Lower-priced quarter get": a quarter of providers are paid this or less. "Difference": how far that is below the
+          typical price. "Most providers get" leaves out the highest and lowest tenth. The files don't say how often a service
+          happens, so these are per visit or service, never yearly totals.
+        </p>
+      </div>
     </template>
   </v-container>
 </template>

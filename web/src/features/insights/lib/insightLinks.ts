@@ -14,9 +14,9 @@ function snapshotQuery(result: RateSearchResult): Record<string, string> {
   return result.snapshot.isLatest ? {} : { snapshot: String(result.snapshot.snapshotId) }
 }
 
-/** True when a group in the result has 10+ providers, so the gap leaderboard ranks it. */
+/** True when a group in the result is on the leaderboard: 10+ providers, and the lower-priced quarter get less than typical. */
 export function hasRankedGroup(result: RateSearchResult): boolean {
-  return result.groups.some((group) => group.statsLevel === 'full')
+  return result.groups.some((group) => group.statsLevel === 'full' && (group.lowerQuartileGap ?? 0) > 0)
 }
 
 /**
@@ -53,6 +53,8 @@ export function compareLink(result: RateSearchResult): RouteLocationRaw | null {
   if (![...products.values()].some((keys) => keys.size >= 2)) return null
   const query: Record<string, string> = { ...snapshotQuery(result), code: codeFilter(result) }
   if (result.query.setting) query.setting = result.query.setting
+  // A revenue code searched on its own is a facility charge with no procedure named: compared only when asked for.
+  if (result.code?.codeType === 'RC') query.includeFacilityCharges = 'true'
   return { name: 'compare', query }
 }
 

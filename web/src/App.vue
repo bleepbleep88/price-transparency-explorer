@@ -1,22 +1,26 @@
 <script setup lang="ts">
 import { ALWAYS_TRUE } from '@/lib/plainNumbers'
 import { mdiAccountSearchOutline, mdiChartBar, mdiCompareHorizontal, mdiDatabaseOutline, mdiMagnify, mdiMenu, mdiThemeLightDark } from '@mdi/js'
+import { useRoute } from 'vue-router'
 import { useTheme } from 'vuetify'
 import DataStatusChip from '@/features/status/components/DataStatusChip.vue'
 import { useDataStatus } from '@/features/status/useDataStatus'
 
 const theme = useTheme()
+const route = useRoute()
 
 // Start the live status stream once for the whole app.
 useDataStatus()
 
+// Each item is current on its own pages: a scorecard (/providers/:key) belongs to Provider scorecards.
 const navItems = [
-  { title: 'Search', to: { name: 'search' }, icon: mdiMagnify },
-  { title: 'Price differences', to: { name: 'gaps' }, icon: mdiChartBar },
-  { title: 'Plan comparison', to: { name: 'compare' }, icon: mdiCompareHorizontal },
-  { title: 'Provider scorecards', to: { name: 'providers' }, icon: mdiAccountSearchOutline },
-  { title: 'Sources', to: { name: 'sources' }, icon: mdiDatabaseOutline },
+  { title: 'Search', to: { name: 'search' }, icon: mdiMagnify, names: ['search'] },
+  { title: 'Price differences', to: { name: 'gaps' }, icon: mdiChartBar, names: ['gaps'] },
+  { title: 'Plan comparison', to: { name: 'compare' }, icon: mdiCompareHorizontal, names: ['compare'] },
+  { title: 'Provider scorecards', to: { name: 'providers' }, icon: mdiAccountSearchOutline, names: ['providers', 'scorecard'] },
+  { title: 'Sources', to: { name: 'sources' }, icon: mdiDatabaseOutline, names: ['sources'] },
 ]
+const isCurrent = (item: (typeof navItems)[number]) => item.names.includes(String(route.name))
 </script>
 
 <template>
@@ -27,7 +31,16 @@ const navItems = [
       </v-app-bar-title>
 
       <nav aria-label="Main" class="d-none d-lg-flex ga-1">
-        <v-btn v-for="item in navItems" :key="item.title" :to="item.to" :prepend-icon="item.icon" variant="text" exact>
+        <v-btn
+          v-for="item in navItems"
+          :key="item.title"
+          :to="item.to"
+          :prepend-icon="item.icon"
+          :active="isCurrent(item)"
+          :aria-current="isCurrent(item) ? 'page' : undefined"
+          variant="text"
+          :data-testid="`nav-${item.to.name}`"
+        >
           {{ item.title }}
         </v-btn>
       </nav>
@@ -40,7 +53,15 @@ const navItems = [
             <v-btn v-bind="menu" :icon="mdiMenu" variant="text" class="d-lg-none" aria-label="Pages" data-testid="nav-menu" />
           </template>
           <v-list density="compact" aria-label="Pages" nav>
-            <v-list-item v-for="item in navItems" :key="item.title" :to="item.to" :prepend-icon="item.icon" :title="item.title" exact />
+            <v-list-item
+              v-for="item in navItems"
+              :key="item.title"
+              :to="item.to"
+              :prepend-icon="item.icon"
+              :title="item.title"
+              :active="isCurrent(item)"
+              :aria-current="isCurrent(item) ? 'page' : undefined"
+            />
           </v-list>
         </v-menu>
         <v-btn

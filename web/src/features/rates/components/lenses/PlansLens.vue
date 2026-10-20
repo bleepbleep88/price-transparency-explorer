@@ -60,7 +60,7 @@ function showHighest(groupKey: string) {
     </template>
     <p v-if="outOfNetworkLine" class="text-body-medium" data-testid="lens-oon-line">{{ outOfNetworkLine }}</p>
     <div class="d-flex flex-wrap ga-2">
-      <v-btn :to="gapsLink(result, 'spread')" variant="text" color="primary" class="px-1" data-testid="lens-gaps-link">
+      <v-btn :to="gapsLink(result, 'range')" variant="text" color="primary" class="px-1" data-testid="lens-gaps-link">
         {{ ranked ? 'See how widely prices range for this code' : 'See where prices range widest' }}
       </v-btn>
       <v-btn v-if="compare" :to="compare" variant="text" color="primary" class="px-1" data-testid="lens-compare-link">

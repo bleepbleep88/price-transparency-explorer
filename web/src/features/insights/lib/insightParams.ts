@@ -6,7 +6,7 @@ import type { CompareSort, GapSort } from '../api/types'
 
 // Each insights page keeps its filters in the URL, like search: shareable, bookmarkable, and Back works.
 
-export const GAP_SORTS = ['gap', 'spread'] as const satisfies readonly GapSort[]
+export const GAP_SORTS = ['gap', 'spread', 'range'] as const satisfies readonly GapSort[]
 export const COMPARE_SORTS = ['difference', 'ratio', '-ratio'] as const satisfies readonly CompareSort[]
 export const INSIGHT_PAGE_SIZES = [10, 25, 50, 100] as const
 export const DEFAULT_INSIGHT_PAGE_SIZE = 25
@@ -31,6 +31,10 @@ export interface CompareParams {
   code?: string
   category?: string
   setting?: string
+  /** Also compare charges filed under a revenue code with no procedure named (off by default: not like for like). */
+  includeFacilityCharges?: boolean
+  /** The "By kind of service" table's order, e.g. "label" or "-pairs"; page state only, never sent to the API. */
+  categorySort?: string
   sort: CompareSort
   page: number
   pageSize: number
@@ -78,6 +82,8 @@ export function parseCompareQuery(query: LocationQuery): CompareParams {
     code: first(query.code),
     category: first(query.category),
     setting: first(query.setting),
+    includeFacilityCharges: first(query.includeFacilityCharges) === 'true' || undefined,
+    categorySort: categorySort.parse(first(query.categorySort)),
     sort: compareSort.parse(first(query.sort)),
     page: positiveInteger(first(query.page)) ?? 1,
     pageSize: positiveInteger(first(query.pageSize), 100) ?? DEFAULT_INSIGHT_PAGE_SIZE,
@@ -90,7 +96,50 @@ export function gapApiQuery(params: GapParams): Record<string, QueryValue> {
 }
 
 export function compareApiQuery(params: CompareParams): Record<string, QueryValue> {
-  return { ...params }
+  const api: Record<string, QueryValue> = { ...params }
+  delete api.categorySort
+  return api
+}
+
+const CATEGORY_SORT_KEYS = ['label', 'pairs', 'identical', 'lower', 'higher', 'median'] as const
+const categorySort = z.enum([...CATEGORY_SORT_KEYS, ...CATEGORY_SORT_KEYS.map((key) => `-${key}` as const)]).optional().catch(undefined)
+
+export const SCORECARD_SORT_KEYS = ['code', 'providerCount', 'value', 'median', 'vsMedian'] as const
+const scorecardSort = z.enum([...SCORECARD_SORT_KEYS, ...SCORECARD_SORT_KEYS.map((key) => `-${key}` as const)]).optional().catch(undefined)
+
+/** A scorecard page's own state: the table's filter text, order and page, and whether facility charges count. */
+export interface ScorecardParams {
+  q?: string
+  sort?: string
+  page: number
+  includeFacilityCharges?: boolean
+  snapshot?: number
+}
+
+export function parseScorecardQuery(query: LocationQuery): ScorecardParams {
+  return {
+    q: first(query.q),
+    sort: scorecardSort.parse(first(query.sort)),
+    page: positiveInteger(first(query.page)) ?? 1,
+    includeFacilityCharges: first(query.includeFacilityCharges) === 'true' || undefined,
+    snapshot: positiveInteger(first(query.snapshot)),
+  }
+}
+
+/** A table order as the URL keeps it ("-median") and as Vuetify wants it ([{ key: 'median', order: 'desc' }]). */
+export function sortBy(sort: string | undefined): { key: string; order: 'asc' | 'desc' }[] {
+  if (!sort) return []
+  return sort.startsWith('-') ? [{ key: sort.slice(1), order: 'desc' }] : [{ key: sort, order: 'asc' }]
+}
+
+export function sortParam(sortBy: readonly { key: string; order?: boolean | 'asc' | 'desc' }[]): string | null {
+  const first = sortBy[0]
+  return first ? `${first.order === 'desc' ? '-' : ''}${first.key}` : null
+}
+
+/** The provider lookup page's typed text. */
+export function parseLookupQuery(query: LocationQuery): { q?: string } {
+  return { q: first(query.q) }
 }
 
 /**

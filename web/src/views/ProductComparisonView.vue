@@ -5,9 +5,11 @@ import { useDisplay } from 'vuetify'
 import { mdiRefresh, mdiSwapHorizontal } from '@mdi/js'
 import { ApiError } from '@/lib/apiClient'
 import { money, plural, wholeNumber } from '@/lib/format'
+import { MIN_PROVIDERS_FOR_RANGE, MIN_PROVIDERS_FOR_TYPICAL } from '@/lib/plainNumbers'
 import LoadingPanel from '@/features/status/components/LoadingPanel.vue'
-import { useReferenceLists } from '@/features/rates/composables/useRateQueries'
+import { useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import type { ComparisonPair, CompareSort } from '@/features/insights/api/types'
+import FacilityChargesSwitch from '@/features/insights/components/FacilityChargesSwitch.vue'
 import StatisticsNote from '@/features/insights/components/StatisticsNote.vue'
 import { useProductComparison } from '@/features/insights/composables/useInsightQueries'
 import { searchLocation } from '@/features/insights/lib/insightLinks'
@@ -16,10 +18,12 @@ import {
   mergeInsightQuery,
   parseCompareQuery,
   pickProducts,
+  sortBy,
+  sortParam,
   type InsightPatch,
 } from '@/features/insights/lib/insightParams'
-import { RATES_NOT_COSTS, serviceName, share } from '@/features/insights/lib/insightText'
-import { groupLine, paysWords } from '@/features/insights/lib/plainWords'
+import { serviceName, share } from '@/features/insights/lib/insightText'
+import { groupLine, pairWords, paysWords, unitSuffix } from '@/features/insights/lib/plainWords'
 
 // ECharts is large: load it only when a comparison has something to draw.
 const RatioBandsChart = defineAsyncComponent(() => import('@/features/insights/components/RatioBandsChart.vue'))
@@ -30,15 +34,27 @@ const { smAndDown } = useDisplay()
 
 const params = computed(() => parseCompareQuery(route.query))
 const comparison = useProductComparison(params)
+const snapshots = useSnapshots()
 const reference = useReferenceLists()
 
 const result = computed(() => (comparison.isError.value ? undefined : comparison.data.value))
 const apiError = computed(() => (comparison.error.value instanceof ApiError ? comparison.error.value : null))
+const problem = computed(() => (apiError.value ? (Object.values(apiError.value.fieldErrors).flat()[0] ?? apiError.value.message) : null))
 const filtered = computed(() => Boolean(params.value.code || params.value.category || params.value.setting))
-const product = computed(() => result.value?.product.label ?? 'The first product')
+// Until the first statistics build there is nothing to compare; the note says so, and the page claims nothing else.
+const saved = computed(() => result.value?.statistics.builtAt != null)
+const product = computed(() => result.value?.product.label ?? 'The first plan')
 const versus = computed(() => result.value?.versus.label ?? 'the second')
+const providers = computed(() => result.value?.summary.providers ?? 0)
 
-const productItems = computed(() => (result.value?.products ?? []).map((p) => ({ title: p.label, value: p.key })))
+// The plan menus come from the loaded files, so they still work when a stale or mistyped plan made the request fail.
+const snapshot = computed(() => {
+  const list = snapshots.data.value ?? []
+  return list.find((s) => s.snapshotId === params.value.snapshot) ?? list.find((s) => s.isLatest) ?? null
+})
+const productItems = computed(() => (snapshot.value?.products ?? []).map((p) => ({ title: p.productLabel, value: p.productKey })))
+const productKey = computed(() => params.value.product ?? result.value?.product.key ?? null)
+const versusKey = computed(() => params.value.versus ?? result.value?.versus.key ?? null)
 const settingItems = computed(() => (reference.data.value?.settings ?? []).map((s) => ({ title: s.label, value: s.key })))
 const categoryItems = computed(() => (result.value?.categories ?? []).map((c) => ({ title: `${c.label} (${wholeNumber(c.count)})`, value: c.key })))
 const sortItems = computed(() => [
@@ -55,7 +71,14 @@ function update(patch: InsightPatch) {
 }
 
 function applyCode() {
-  if (code.value.trim() !== (params.value.code ?? '')) void update({ code: code.value.trim() || null })
+  // Clearing the field sets it to null before it loses focus.
+  const typed = (code.value ?? '').trim()
+  if (typed !== (params.value.code ?? '')) void update({ code: typed || null })
+}
+
+function clearCode() {
+  code.value = ''
+  void update({ code: null })
 }
 
 function clearFilters() {
@@ -63,32 +86,40 @@ function clearFilters() {
 }
 
 function choose(side: 'product' | 'versus', key: string | null) {
-  const current = result.value
-  if (current && key) void update(pickProducts({ product: current.product.key, versus: current.versus.key }, side, key))
+  if (!key) return
+  const [current, other] = [productKey.value, versusKey.value]
+  if (current && other) {
+    void update(pickProducts({ product: current, versus: other }, side, key))
+    return
+  }
+  // Without both sides known (a failed request), set this side; the API picks the other when there are two plans.
+  const otherSide = side === 'product' ? 'versus' : 'product'
+  const otherKey = side === 'product' ? other : current
+  void update({ [side]: key, [otherSide]: otherKey === key ? null : otherKey })
 }
 
 function swap() {
-  const current = result.value
-  if (current) void update({ product: current.versus.key, versus: current.product.key })
+  if (productKey.value && versusKey.value) void update({ product: versusKey.value, versus: productKey.value })
 }
 
+// The middle 80% needs 10 providers and "usually" 5, as everywhere; with fewer the page lists the prices only.
 const summaryCards = computed(() => {
   const summary = result.value?.summary
-  if (!summary) return []
+  if (!summary || summary.providers < MIN_PROVIDERS_FOR_TYPICAL) return []
   const of = (part: number) => `${wholeNumber(part)} of ${wholeNumber(summary.pairs)}`
-  // The middle 80% of the ratios, said as what the plan pays: "about 11% less to about 16% more".
-  const most =
-    summary.p10 == null || summary.p90 == null
-      ? '—'
-      : summary.p10 === summary.p90
-        ? paysWords(summary.p10)
-        : `${paysWords(summary.p10)} to ${paysWords(summary.p90)}`
-  return [
+  const cards = [
     { key: 'same', title: `Pays the same as ${versus.value}`, figure: share(summary.identical, summary.pairs), text: of(summary.identical) },
     { key: 'lower', title: 'Pays less', figure: share(summary.lower, summary.pairs), text: of(summary.lower) },
     { key: 'higher', title: 'Pays more', figure: share(summary.higher, summary.pairs), text: of(summary.higher) },
-    { key: 'middle', title: 'Most of the time it pays', figure: most, text: summary.median == null ? '' : `usually ${paysWords(summary.median)}` },
   ]
+  const usually = paysWords(summary.median)
+  if (summary.providers >= MIN_PROVIDERS_FOR_RANGE && summary.p10 != null && summary.p90 != null) {
+    const [low, high] = [paysWords(summary.p10), paysWords(summary.p90)]
+    cards.push({ key: 'middle', title: 'Most of the time it pays', figure: low === high ? (low ?? '—') : `${low} to ${high}`, text: usually ? `usually ${usually}` : '' })
+  } else if (usually) {
+    cards.push({ key: 'middle', title: 'Usually it pays', figure: usually, text: `from ${plural(summary.providers, 'provider')}` })
+  }
+  return cards
 })
 
 const pairHeaders = computed(() => [
@@ -109,14 +140,20 @@ const categoryHeaders = computed(() => [
   { title: 'Usually it pays', key: 'median', sortable: true, align: 'end' as const },
 ])
 
-function perUnit(pair: ComparisonPair): string {
-  return pair.perUnit ? ' per unit' : ''
+/** A share for a kind of service with 5+ providers; under that, the plain count ("1 of 1"), so one price isn't "100%". */
+function categoryShare(part: number, item: { pairs: number; providers: number }): string {
+  return item.providers >= MIN_PROVIDERS_FOR_TYPICAL ? share(part, item.pairs) : `${wholeNumber(part)} of ${wholeNumber(item.pairs)}`
 }
 
 function onOptions(options: { page: number; itemsPerPage: number }) {
   const pairs = result.value?.pairs
   if (!pairs || (options.page === pairs.page && options.itemsPerPage === pairs.pageSize)) return
   void update({ page: options.itemsPerPage === pairs.pageSize ? options.page : 1, pageSize: options.itemsPerPage })
+}
+
+/** The kinds table's order lives in the address, replacing the entry so Back leaves the page. */
+function sortCategories(value: readonly { key: string; order?: boolean | 'asc' | 'desc' }[]) {
+  void router.replace({ name: 'compare', query: mergeInsightQuery(route.query, { categorySort: sortParam(value), page: params.value.page }, 'difference') })
 }
 </script>
 
@@ -131,21 +168,30 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
     <v-row density="compact">
       <v-col cols="12" sm="5" md="4">
         <v-select
-          :model-value="result?.product.key ?? null"
+          :model-value="productKey"
           :items="productItems"
           label="Compare"
+          :error-messages="apiError?.fieldErrors.product ?? []"
           data-testid="compare-product"
           @update:model-value="(value) => choose('product', value)"
         />
       </v-col>
       <v-col cols="12" sm="2" md="1" class="d-flex justify-center align-start">
-        <v-btn :icon="mdiSwapHorizontal" variant="text" aria-label="Swap the two plans" :disabled="!result" data-testid="compare-swap" @click="swap" />
+        <v-btn
+          :icon="mdiSwapHorizontal"
+          variant="text"
+          aria-label="Swap the two plans"
+          :disabled="!productKey || !versusKey"
+          data-testid="compare-swap"
+          @click="swap"
+        />
       </v-col>
       <v-col cols="12" sm="5" md="4">
         <v-select
-          :model-value="result?.versus.key ?? null"
+          :model-value="versusKey"
           :items="productItems"
           label="With"
+          :error-messages="apiError?.fieldErrors.versus ?? []"
           data-testid="compare-versus"
           @update:model-value="(value) => choose('versus', value)"
         />
@@ -164,7 +210,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           data-testid="compare-code"
           @keydown.enter="applyCode"
           @update:focused="(focused) => !focused && applyCode()"
-          @click:clear="update({ code: null })"
+          @click:clear="clearCode"
         />
       </v-col>
       <v-col cols="12" sm="4" md="3">
@@ -175,6 +221,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           placeholder="All kinds"
           persistent-placeholder
           clearable
+          :error-messages="apiError?.fieldErrors.category ?? []"
           @update:model-value="(value) => update({ category: value })"
         />
       </v-col>
@@ -186,14 +233,26 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           placeholder="All settings"
           persistent-placeholder
           clearable
+          :error-messages="apiError?.fieldErrors.setting ?? []"
           @update:model-value="(value) => update({ setting: value })"
         />
       </v-col>
     </v-row>
     <v-btn v-if="filtered" variant="text" size="small" class="mb-2" @click="clearFilters">Clear filters</v-btn>
+    <FacilityChargesSwitch
+      class="mb-3"
+      :model-value="params.includeFacilityCharges ?? false"
+      :count="result?.facilityCharges ?? 0"
+      @update:model-value="(value) => update({ includeFacilityCharges: value ? 'true' : null })"
+    />
 
     <LoadingPanel v-if="apiError?.isLoading" />
-    <v-alert v-else-if="apiError?.status === 400" type="warning" variant="tonal" data-testid="compare-problem">{{ apiError.message }}</v-alert>
+    <v-alert v-else-if="apiError?.status === 400" type="warning" variant="tonal" data-testid="compare-problem">
+      {{ problem }}
+      <template #append>
+        <v-btn variant="text" :to="{ name: 'compare' }" data-testid="compare-start-over">Start over</v-btn>
+      </template>
+    </v-alert>
     <v-alert v-else-if="apiError" type="error" variant="tonal">
       <p>{{ apiError.message }}</p>
       <template #append>
@@ -202,7 +261,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
     </v-alert>
     <v-skeleton-loader v-else-if="comparison.isPending.value" type="card, table" />
 
-    <div v-else-if="result" class="d-flex flex-column ga-4" :style="{ opacity: comparison.isPlaceholderData.value ? 0.6 : 1 }">
+    <div v-else-if="result && saved" class="d-flex flex-column ga-4" :style="{ opacity: comparison.isPlaceholderData.value ? 0.6 : 1 }">
       <v-alert v-if="!result.summary.pairs" type="info" variant="tonal" data-testid="compare-empty">
         No provider has this service in both plans{{ filtered ? ' under these filters' : '' }}.
         <template v-if="filtered" #append>
@@ -211,84 +270,94 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
       </v-alert>
 
       <template v-else>
-        <p class="text-body-medium">
-          What {{ product }} pays compared with {{ versus }}, for the same provider, service and setting:
-        </p>
-        <v-row>
-          <v-col v-for="card in summaryCards" :key="card.key" cols="6" md="3">
-            <v-card class="h-100" :data-testid="`compare-${card.key}`">
-              <v-card-item>
-                <v-card-subtitle class="text-wrap">{{ card.title }}</v-card-subtitle>
-              </v-card-item>
-              <v-card-text>
-                <p class="stat-figure text-headline-small">{{ card.figure }}</p>
-                <p class="text-body-medium text-medium-emphasis">{{ card.text }}</p>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-        <p class="text-body-small text-medium-emphasis">
-          {{ wholeNumber(result.summary.pairs) }} prices compared, from {{ plural(result.summary.providers, 'provider') }} and
-          {{ plural(result.summary.codes, 'billing code') }}. {{ RATES_NOT_COSTS }}
+        <template v-if="summaryCards.length">
+          <p class="text-body-medium">
+            What {{ product }} pays compared with {{ versus }}, for the same provider, service and setting:
+          </p>
+          <v-row>
+            <v-col v-for="card in summaryCards" :key="card.key" cols="6" md="3">
+              <v-card class="h-100" :data-testid="`compare-${card.key}`">
+                <v-card-item>
+                  <v-card-subtitle class="text-wrap">{{ card.title }}</v-card-subtitle>
+                </v-card-item>
+                <v-card-text>
+                  <p class="stat-figure text-headline-small">{{ card.figure }}</p>
+                  <p class="text-body-medium text-medium-emphasis">{{ card.text }}</p>
+                </v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+        </template>
+        <p class="text-body-small text-medium-emphasis" data-testid="compare-counts">
+          {{ plural(result.summary.pairs, 'price') }} compared, from {{ plural(result.summary.providers, 'provider') }} and
+          {{ plural(result.summary.codes, 'billing code') }}.<template v-if="providers < MIN_PROVIDERS_FOR_TYPICAL">
+            That's too few providers to sum up, so each price is listed below.</template>
         </p>
 
-        <v-row>
-          <v-col cols="12" md="7">
-            <v-card class="h-100">
-              <v-card-item>
-                <v-card-title tag="h2">How the prices compare</v-card-title>
-                <v-card-subtitle class="text-wrap">What {{ product }} pays compared with {{ versus }}, one price at a time</v-card-subtitle>
-              </v-card-item>
-              <v-card-text>
-                <RatioBandsChart :bands="result.distribution" />
-              </v-card-text>
-            </v-card>
-          </v-col>
-          <v-col cols="12" md="5">
-            <v-card class="h-100">
-              <v-card-item>
-                <v-card-title tag="h2">In numbers</v-card-title>
-              </v-card-item>
-              <v-table density="compact">
-                <thead>
-                  <tr>
-                    <th scope="col">{{ product }} pays</th>
-                    <th scope="col" class="text-end">How many</th>
-                    <th scope="col" class="text-end">Share</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="band in result.distribution" :key="band.key" data-testid="ratio-band">
-                    <td>{{ band.label }}</td>
-                    <td class="text-end">{{ wholeNumber(band.count) }}</td>
-                    <td class="text-end">{{ share(band.count, result.summary.pairs) }}</td>
-                  </tr>
-                </tbody>
-              </v-table>
-            </v-card>
-          </v-col>
-        </v-row>
+        <template v-if="providers >= MIN_PROVIDERS_FOR_TYPICAL">
+          <v-row>
+            <v-col cols="12" md="7">
+              <v-card class="h-100">
+                <v-card-item>
+                  <v-card-title tag="h2">How the prices compare</v-card-title>
+                  <v-card-subtitle class="text-wrap">What {{ product }} pays compared with {{ versus }}, one price at a time</v-card-subtitle>
+                </v-card-item>
+                <v-card-text>
+                  <RatioBandsChart :bands="result.distribution" />
+                </v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" md="5">
+              <v-card class="h-100">
+                <v-card-item>
+                  <v-card-title tag="h2">In numbers</v-card-title>
+                </v-card-item>
+                <v-table density="compact">
+                  <thead>
+                    <tr>
+                      <th scope="col">{{ product }} pays</th>
+                      <th scope="col" class="text-end">How many</th>
+                      <th scope="col" class="text-end">Share</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="band in result.distribution" :key="band.key" data-testid="ratio-band">
+                      <td>{{ band.label }}</td>
+                      <td class="text-end">{{ wholeNumber(band.count) }}</td>
+                      <td class="text-end">{{ share(band.count, result.summary.pairs) }}</td>
+                    </tr>
+                  </tbody>
+                </v-table>
+              </v-card>
+            </v-col>
+          </v-row>
 
-        <v-card>
-          <v-card-item>
-            <v-card-title tag="h2">By kind of service</v-card-title>
-          </v-card-item>
-          <v-data-table
-            :headers="categoryHeaders"
-            :items="result.byCategory"
-            item-value="key"
-            :items-per-page="-1"
-            hide-default-footer
-            :mobile="smAndDown"
-            density="compact"
-          >
-            <template #[`item.pairs`]="{ item }">{{ wholeNumber(item.pairs) }}</template>
-            <template #[`item.identical`]="{ item }">{{ share(item.identical, item.pairs) }}</template>
-            <template #[`item.lower`]="{ item }">{{ share(item.lower, item.pairs) }}</template>
-            <template #[`item.higher`]="{ item }">{{ share(item.higher, item.pairs) }}</template>
-            <template #[`item.median`]="{ item }">{{ paysWords(item.median) }}</template>
-          </v-data-table>
-        </v-card>
+          <v-card>
+            <v-card-item>
+              <v-card-title tag="h2">By kind of service</v-card-title>
+            </v-card-item>
+            <v-data-table
+              :headers="categoryHeaders"
+              :items="result.byCategory"
+              item-value="key"
+              :items-per-page="-1"
+              :sort-by="sortBy(params.categorySort)"
+              hide-default-footer
+              :mobile="smAndDown"
+              density="compact"
+              data-testid="compare-by-category"
+              @update:sort-by="sortCategories"
+            >
+              <template #[`item.pairs`]="{ item }">{{ wholeNumber(item.pairs) }}</template>
+              <template #[`item.identical`]="{ item }">{{ categoryShare(item.identical, item) }}</template>
+              <template #[`item.lower`]="{ item }">{{ categoryShare(item.lower, item) }}</template>
+              <template #[`item.higher`]="{ item }">{{ categoryShare(item.higher, item) }}</template>
+              <template #[`item.median`]="{ item }">
+                {{ item.median == null ? 'Too few providers to say' : paysWords(item.median) }}
+              </template>
+            </v-data-table>
+          </v-card>
+        </template>
 
         <v-card>
           <v-card-item>
@@ -344,7 +413,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
                 :aria-label="`${money(item.productValue)}: search ${item.codeType} ${item.code} for ${item.businessName} in ${product}`"
                 data-testid="pair-product-value"
               >
-                {{ money(item.productValue) }}{{ perUnit(item) }}
+                {{ money(item.productValue) }}{{ unitSuffix(item) }}
               </v-btn>
             </template>
             <template #[`item.versusValue`]="{ item }">
@@ -356,17 +425,19 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
                 :aria-label="`${money(item.versusValue)}: search ${item.codeType} ${item.code} for ${item.businessName} in ${versus}`"
                 data-testid="pair-versus-value"
               >
-                {{ money(item.versusValue) }}{{ perUnit(item) }}
+                {{ money(item.versusValue) }}{{ unitSuffix(item) }}
               </v-btn>
             </template>
             <template #[`item.ratio`]="{ item }">
-              <span class="text-no-wrap font-weight-medium" data-testid="pair-ratio">{{ paysWords(item.ratio) }}</span>
+              <span class="text-no-wrap font-weight-medium" data-testid="pair-ratio">{{ pairWords(item) }}</span>
             </template>
           </v-data-table-server>
         </v-card>
       </template>
 
-      <p v-for="note in result.notes" :key="note" class="text-body-small text-medium-emphasis" data-testid="compare-note">{{ note }}</p>
+      <p v-for="note in result.notes.filter((note) => !note.includes('facility charges'))" :key="note" class="text-body-small text-medium-emphasis" data-testid="compare-note">
+        {{ note }}
+      </p>
     </div>
   </v-container>
 </template>

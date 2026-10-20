@@ -111,6 +111,16 @@ describe('compareLink', () => {
     expect(compareLink(result([group(), essential], { setting: 'asc' }))).toEqual({ name: 'compare', query: { code: 'CPT 45378', setting: 'asc' } })
   })
 
+  it('includes facility charges when the code searched is a revenue code on its own', () => {
+    const rc = (productKey: string) => group({ key: `${productKey}|RC|0360|facility|er||negotiated`, productKey, codeType: 'RC', code: '0360', settingKey: 'er' })
+    const search = { ...result([rc('ambetter'), rc('essential')]), code: { ...code, codeType: 'RC', code: '0360' } }
+    expect(compareLink(search)).toEqual({ name: 'compare', query: { code: 'RC 0360', includeFacilityCharges: 'true' } })
+  })
+
+  it('stays away from the leaderboard filter when no group there has a difference to rank', () => {
+    expect(gapsLink(result([group({ lowerQuartileGap: 0 })]), 'gap')).toEqual({ name: 'gaps', query: {} })
+  })
+
   it('stays away when the groups differ in more than the product', () => {
     const office = group({ key: 'essential|CPT|45378|professional|office||negotiated', productKey: 'essential', feeType: 'professional', settingKey: 'office' })
     expect(compareLink(result([group(), office]))).toBeNull()

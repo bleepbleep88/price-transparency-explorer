@@ -110,7 +110,7 @@ describe('lens links to the insights', () => {
     const essential = group({ key: 'essential|CPT|45378|facility|asc||negotiated', productKey: 'essential', productLabel: 'Essential Plan' })
     const wrapper = mountPanel(result([group(), essential]), { lens: 'plans' })
 
-    expect(link(wrapper, 'lens-gaps-link')).toEqual({ path: '/insights/gaps', query: { code: '45378', sort: 'spread' } })
+    expect(link(wrapper, 'lens-gaps-link')).toEqual({ path: '/insights/gaps', query: { code: '45378', sort: 'range' } })
     expect(link(wrapper, 'lens-compare-link')).toEqual({ path: '/insights/compare', query: { code: '45378' } })
     expect(wrapper.get('[data-testid="lens-gaps-link"]').text()).toBe('See how widely prices range for this code')
   })
@@ -119,7 +119,7 @@ describe('lens links to the insights', () => {
     const wrapper = mountPanel(result([group({ statsLevel: 'basic', stats: { ...group().stats, p10: null, p90: null, p90ToP10: null } })]), { lens: 'plans' })
 
     expect(wrapper.find('[data-testid="lens-compare-link"]').exists()).toBe(false)
-    expect(link(wrapper, 'lens-gaps-link')).toEqual({ path: '/insights/gaps', query: { sort: 'spread' } })
+    expect(link(wrapper, 'lens-gaps-link')).toEqual({ path: '/insights/gaps', query: { sort: 'range' } })
     expect(wrapper.get('[data-testid="lens-gaps-link"]').text()).toBe('See where prices range widest')
   })
 

@@ -7,7 +7,8 @@ import { compareApiQuery, gapApiQuery, type CompareParams, type GapParams } from
 export const insightKeys = {
   all: ['insights'] as const,
   gaps: (params: GapParams) => [...insightKeys.all, 'gaps', gapApiQuery(params)] as const,
-  scorecard: (provider: string, snapshot: number | undefined) => [...insightKeys.all, 'scorecard', provider, snapshot] as const,
+  scorecard: (provider: string, snapshot: number | undefined, includeFacilityCharges = false) =>
+    [...insightKeys.all, 'scorecard', provider, snapshot, includeFacilityCharges] as const,
   compare: (params: CompareParams) => [...insightKeys.all, 'compare', compareApiQuery(params)] as const,
 }
 
@@ -20,11 +21,17 @@ export function useGapLeaderboard(params: MaybeRefOrGetter<GapParams>) {
   })
 }
 
-export function useProviderScorecard(provider: MaybeRefOrGetter<string>, snapshot: MaybeRefOrGetter<number | undefined>) {
+export function useProviderScorecard(
+  provider: MaybeRefOrGetter<string>,
+  snapshot: MaybeRefOrGetter<number | undefined>,
+  includeFacilityCharges: MaybeRefOrGetter<boolean> = false,
+) {
   return useQuery({
-    queryKey: computed(() => insightKeys.scorecard(toValue(provider), toValue(snapshot))),
-    queryFn: ({ signal }) => insightsApi.scorecard(toValue(provider), toValue(snapshot), signal),
+    queryKey: computed(() => insightKeys.scorecard(toValue(provider), toValue(snapshot), toValue(includeFacilityCharges))),
+    queryFn: ({ signal }) => insightsApi.scorecard(toValue(provider), toValue(snapshot), toValue(includeFacilityCharges), signal),
     enabled: computed(() => toValue(provider) !== ''),
+    // Turning facility charges on or off keeps the page on screen while the other answer loads.
+    placeholderData: keepPreviousData,
   })
 }
 

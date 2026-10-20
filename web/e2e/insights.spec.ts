@@ -15,6 +15,8 @@ test('plans and employers lenses open the leaderboard and the comparison for the
   await expect(page.getByRole('heading', { name: 'Where prices differ most' })).toBeVisible()
   await expect(page.getByTestId('gaps-note')).toContainText("don't say how often a service happens")
   await expectPlainWords(page)
+  // "Times" only from twice, and nothing ranked without a difference.
+  await expect(page.locator('main')).not.toContainText(/about 1(\.\d)? times|\$0\.00 less than typical/)
 
   const ranked = page.getByTestId('gap-row').first()
   await expect(ranked).toContainText('CPT 45378')
@@ -23,6 +25,12 @@ test('plans and employers lenses open the leaderboard and the comparison for the
   await expect(page).toHaveURL(/[?&]group=/)
   const picked = page.getByTestId('group-card').filter({ hasText: 'Showing these providers' })
   await expect(picked).toContainText(typical)
+
+  // A stale page number says it's past the end and offers the way back.
+  await page.goto('/insights/gaps?page=99')
+  await expect(page.getByTestId('gaps-no-data')).toContainText('past the end')
+  await page.getByTestId('gaps-first-page').click()
+  await expect(page.getByTestId('gap-row').first()).toBeVisible()
 
   // Plans: the comparison of the two products for the same code.
   await page.goto('/?code=45378&lens=plans')
@@ -56,9 +64,12 @@ test("an EIN's providers lens opens its scorecard, and a scorecard row reads as 
   await expect(page.getByTestId('scorecard-ein')).toHaveText(`EIN ${ein}`)
   await expect(page.getByTestId('scorecard-overall')).toBeVisible()
   await expectPlainWords(page)
+  await expect(page.getByTestId('nav-providers')).toHaveAttribute('aria-current', 'page')
 
   // The scorecard's row for 99213 shows the price the search for 99213 with this EIN shows.
   await page.getByRole('textbox', { name: 'Filter by code, name, plan or setting' }).fill('99213')
+  // The table's filter lives in the address, so a reload or a shared link keeps it.
+  await expect(page).toHaveURL(/[?&]q=99213(&|$)/)
   const row = page.getByTestId('scorecard-row').filter({ hasText: 'CPT 99213' }).first()
   const rate = await row.getByTestId('scorecard-rate').innerText()
   await row.getByTestId('scorecard-search').click()
