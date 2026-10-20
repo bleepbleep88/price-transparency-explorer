@@ -35,6 +35,9 @@ public sealed class DirectoryHintTests(LogCaptureApiFactory factory) : IClassFix
         "code=45399&county=Queens",
         "code=0490&county=Manhattan",
         "code=0490&specialty=gastro",
+        $"code=0490&npi={YorkvilleNpi}&specialty=gastro",
+        $"code=0490&npi={YorkvilleNpi}&county=Queens",
+        "code=0490&provider=yorkville&county=Queens",
         "code=812&specialty=gastro",
     ];
 
@@ -74,27 +77,25 @@ public sealed class DirectoryHintTests(LogCaptureApiFactory factory) : IClassFix
     }
 
     [Fact(Timeout = 60_000)]
-    public async Task A_place_without_rates_for_the_code_says_so_as_typed()
+    public async Task A_place_without_rates_for_the_code_is_named_as_it_matched()
     {
         var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "29881", ["county"] = "Tompkins" });
 
         var hint = Hint(result, "county_no_match");
-        hint.GetProperty("message").GetString().Should().Be("No provider in \"Tompkins\" has a rate for CPT 29881.");
+        hint.GetProperty("message").GetString().Should().Be("No provider in Tompkins County has a rate for CPT 29881.");
         Links(hint).Should().Equal(("Clear the location filter", """{"county":null}"""));
     }
 
     [Fact(Timeout = 60_000)]
-    public async Task A_place_or_specialty_nobody_in_the_files_has_is_told_apart_from_no_rate()
+    public async Task A_place_or_specialty_that_matches_no_one_says_only_that()
     {
         var ct = TestContext.Current.CancellationToken;
         var place = await SearchAsync(ct, new() { ["code"] = "45378", ["county"] = "Manhatan" });
         var specialty = await SearchAsync(ct, new() { ["code"] = "45378", ["specialty"] = "zzzz" });
         var noRate = await SearchAsync(ct, new() { ["code"] = "29881", ["specialty"] = "Podiatr" });
 
-        Hint(place, "county_no_match").GetProperty("message").GetString().Should().Be(
-            "No provider in these files practices in \"Manhatan\". Locations are New York counties and New York City boroughs.");
-        Hint(specialty, "specialty_no_match").GetProperty("message").GetString().Should().Be(
-            "No provider in these files has a specialty matching \"zzzz\".");
+        Hint(place, "county_no_match").GetProperty("message").GetString().Should().Be("No providers here matched \"Manhatan\".");
+        Hint(specialty, "specialty_no_match").GetProperty("message").GetString().Should().Be("No providers here matched \"zzzz\".");
         Hint(noRate, "specialty_no_match").GetProperty("message").GetString().Should().Be(
             "No provider with a specialty matching \"Podiatr\" has a rate for CPT 29881.");
     }
@@ -116,7 +117,7 @@ public sealed class DirectoryHintTests(LogCaptureApiFactory factory) : IClassFix
             new() { ["code"] = "45378", ["npi"] = YorkvilleNpi, ["county"] = "Queens" });
 
         var hint = Hint(result, "provider_filters_conflict");
-        hint.GetProperty("message").GetString().Should().Be("NPI 1174873780 has rates for CPT 45378, but none in \"Queens\".");
+        hint.GetProperty("message").GetString().Should().Be("NPI 1174873780 has rates for CPT 45378, but none in Queens.");
         Links(hint).Should().Equal(("Clear the location filter", """{"county":null}"""));
     }
 
@@ -140,7 +141,7 @@ public sealed class DirectoryHintTests(LogCaptureApiFactory factory) : IClassFix
 
         var hint = Hint(result, "provider_filters_conflict");
         hint.GetProperty("message").GetString().Should().Be(
-            "No CPT 45378 rate lists an NPI with a specialty matching \"gastro\" in \"Oneida\". Each filter finds rates on its own.");
+            "No CPT 45378 rate lists an NPI with a specialty matching \"gastro\" in Oneida County. Each filter finds rates on its own.");
         Links(hint).Select(link => link.Label).Should().Equal("Clear the specialty filter", "Clear the location filter");
     }
 
@@ -163,9 +164,9 @@ public sealed class DirectoryHintTests(LogCaptureApiFactory factory) : IClassFix
         var similar = await SearchAsync(ct, new() { ["code"] = "4537", ["county"] = "Manhattan" });
 
         Hint(hidden, "filters_hide_results").GetProperty("message").GetString().Should()
-            .StartWith("This code has rates for providers in \"Albany\", but none match the filters (facility fee).");
+            .StartWith("This code has rates for providers in Albany County, but none match the filters (facility fee).");
         var codes = Hint(similar, "code_not_found");
-        codes.GetProperty("message").GetString().Should().EndWith("Codes that start the same way, for providers in \"Manhattan\":");
+        codes.GetProperty("message").GetString().Should().EndWith("Codes that start the same way, for providers in Manhattan:");
         codes.GetProperty("links")[0].GetProperty("query").TryGetProperty("county", out _).Should().BeFalse("the link keeps the location");
     }
 
@@ -190,7 +191,7 @@ public sealed class DirectoryHintTests(LogCaptureApiFactory factory) : IClassFix
         var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "0490", ["county"] = "Manhattan" });
 
         var hint = Hint(result, "revenue_code_procedures");
-        hint.GetProperty("message").GetString().Should().Contain("under revenue code 0490 (Ambulatory surgery) for providers in \"Manhattan\" (");
+        hint.GetProperty("message").GetString().Should().Contain("under revenue code 0490 (Ambulatory surgery) for providers in Manhattan (");
         hint.GetProperty("links")[0].GetProperty("query").TryGetProperty("county", out _).Should().BeFalse("the links keep the location");
     }
 
@@ -206,14 +207,29 @@ public sealed class DirectoryHintTests(LogCaptureApiFactory factory) : IClassFix
     }
 
     [Fact(Timeout = 60_000)]
-    public async Task The_search_echoes_the_specialty_and_location_as_typed()
+    public async Task The_search_echoes_the_specialty_and_location_as_typed_and_the_place_matched()
     {
         var result = await SearchAsync(TestContext.Current.CancellationToken,
             new() { ["code"] = "45378", ["specialty"] = " Gastro ", ["county"] = "MANHATTAN" });
 
         result.GetProperty("query").GetProperty("specialty").GetString().Should().Be("Gastro");
         result.GetProperty("query").GetProperty("county").GetString().Should().Be("MANHATTAN");
+        result.GetProperty("query").GetProperty("countyPlace").GetString().Should().Be("Manhattan");
         result.GetProperty("rows").GetProperty("total").GetInt32().Should().BePositive("matching ignores case");
+    }
+
+    [Theory(Timeout = 60_000)]
+    [InlineData("Kings County", "Brooklyn")]
+    [InlineData("the bronx", "Bronx")]
+    [InlineData("NYC", "New York City")]
+    [InlineData("Delaware", "Delaware County")]
+    [InlineData("Manhatan", null)]
+    public async Task The_place_a_location_matched_is_echoed(string typed, string? place)
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "45378", ["county"] = typed });
+
+        var echoed = result.GetProperty("query").GetProperty("countyPlace");
+        (echoed.ValueKind == JsonValueKind.Null ? null : echoed.GetString()).Should().Be(place);
     }
 
     private async Task<JsonElement> SearchAsync(CancellationToken cancellationToken, Dictionary<string, string> query)

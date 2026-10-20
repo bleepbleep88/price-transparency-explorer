@@ -15,6 +15,8 @@ public sealed record RateSearchResult(
 /// <summary>The search as the server understood it (normalized), so the UI can show exactly what ran.</summary>
 /// <param name="Specialty">The specialty filter as typed.</param>
 /// <param name="County">The location filter as typed.</param>
+/// <param name="CountyPlace">The place the location filter matched, the way to show it ("Manhattan", "Delaware County",
+/// "New York City"); null without a location filter or when it matches no one.</param>
 public sealed record RateSearchEcho(
     string Code,
     IReadOnlyList<string> MatchedCodes,
@@ -27,6 +29,7 @@ public sealed record RateSearchEcho(
     string? Provider,
     string? Specialty,
     string? County,
+    string? CountyPlace,
     string? Group,
     string Sort,
     int Page,

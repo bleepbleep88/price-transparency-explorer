@@ -32,6 +32,12 @@ internal sealed record SearchContext(
     /// <summary>The location filter as the SQL compares it (lower case).</summary>
     public string? County => CountyTyped?.ToLowerInvariant();
 
+    /// <summary>
+    /// The place the location filter matched ("Manhattan", "Delaware County", "New York City"), set by the handler
+    /// (CountyPlace.sql). Null without a location filter or when it matches no one: hints then quote the text as typed.
+    /// </summary>
+    public string? CountyPlace { get; init; }
+
     public bool IdFilter => Npi is not null || Ein is not null;
 
     /// <summary>A specialty or location filter: both pick providers by the NPIs they list (provider directory).</summary>

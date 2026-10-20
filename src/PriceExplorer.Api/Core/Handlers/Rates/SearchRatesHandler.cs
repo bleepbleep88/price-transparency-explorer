@@ -27,6 +27,14 @@ public sealed class SearchRatesHandler(
 
         await using var connection = await connections.OpenAsync(cancellationToken);
         var snapshot = await SnapshotResolver.ResolveAsync(connection, request.Snapshot);
+        if (search.County is not null && directory.IsLoaded)
+        {
+            search = search with
+            {
+                CountyPlace = await connection.QuerySingleOrDefaultAsync<string?>(
+                    SqlFile.For<SearchRatesHandler>("CountyPlace.sql"), new { county = search.County }),
+            };
+        }
 
         var (facts, assembled) = await RunAsync(connection, snapshot, search, sort, request.Page, request.PageSize, catalog);
         var rows = await ProfileRowsAsync(connection, assembled.Rows, assembled.Groups, search);
@@ -38,7 +46,7 @@ public sealed class SearchRatesHandler(
 
         var echo = new RateSearchEcho(
             search.Code, search.Candidates, search.CodeType, search.NpiText, search.Ein,
-            search.Product, search.Setting, search.FeeType, search.NameTyped, search.SpecialtyTyped, search.CountyTyped, search.Group, sort,
+            search.Product, search.Setting, search.FeeType, search.NameTyped, search.SpecialtyTyped, search.CountyTyped, search.CountyPlace, search.Group, sort,
             request.Page, request.PageSize);
 
         return new RateSearchResult(
