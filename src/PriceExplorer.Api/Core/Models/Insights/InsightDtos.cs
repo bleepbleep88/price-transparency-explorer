@@ -19,11 +19,14 @@ public sealed record ProductRef(string Key, string Label);
 /// </summary>
 /// <param name="MinimumProviders">Only groups with at least this many providers are ranked (full statistics).</param>
 /// <param name="Categories">Categories with ranked groups under the other filters, most groups first.</param>
+/// <param name="FacilityCharges">Groups under the other filters whose rates are filed under a revenue code with no
+/// procedure named; they are ranked only with includeFacilityCharges.</param>
 public sealed record GapLeaderboard(
     StatisticsBasis Statistics,
     GapLeaderboardEcho Query,
     int MinimumProviders,
     IReadOnlyList<CategoryOption> Categories,
+    int FacilityCharges,
     GapRowsPage Rows,
     IReadOnlyList<string> Notes);
 
@@ -35,6 +38,7 @@ public sealed record GapLeaderboardEcho(
     string? FeeType,
     string? Code,
     IReadOnlyList<string> MatchedCodes,
+    bool IncludeFacilityCharges,
     string Sort,
     int Page,
     int PageSize);

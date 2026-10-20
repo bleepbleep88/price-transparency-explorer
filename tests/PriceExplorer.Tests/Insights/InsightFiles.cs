@@ -37,6 +37,8 @@ internal static class InsightFiles
     //                                     → p10 445, p25 512.50, median 625, p90 930, gap 112.50, p90/p10 2.09
     //   HCPCS J0585 office, 10 providers: 1 2 3 4 5 6 7 8 9 30 → p10 1.90, p25 3.25, median 5.50, p90 11.10, p90/p10 5.84
     //   CPT 99214 office: A01, A02, T (a list group); J0585 hospital outpatient, billed per unit: A01 at 10
+    //   RC 0360 billed directly (no procedure named) at hospital outpatient departments, hospitals H30–H39:
+    //                                     1000 1100 … 1900 → p10 1090, p25 1225, median 1450, p90 1810, gap 225
     public static readonly string AmbetterFile = File(
         [
             .. Enumerable.Range(1, 12).Select(provider => Reference(provider, "ein", Key(provider), Name(provider), provider switch
@@ -46,6 +48,7 @@ internal static class InsightFiles
                 _ => [Npi(provider)],
             })),
             Reference(13, "npi", "1234567893", "Typed Tax ID Telehealth", Npi(13)),
+            .. Enumerable.Range(30, 10).Select(hospital => Reference(hospital, "ein", Key(hospital), $"Hospital H{hospital}", Npi(hospital))),
         ],
         [
             .. Rates("CPT", "99213", Office, (1, 80), (2, 90), (3, 100), (4, 100), (5, 100), (6, 110), (7, 120), (8, 130), (9, 140), (10, 150), (11, 160), (12, 200)),
@@ -53,6 +56,7 @@ internal static class InsightFiles
             .. Rates("HCPCS", "J0585", Office, (1, 1), (2, 2), (3, 3), (4, 4), (5, 5), (6, 6), (7, 7), (8, 8), (9, 9), (10, 30)),
             .. Rates("CPT", "99214", Office, (1, 150), (2, 160), (13, 170)),
             .. Rates("HCPCS", "J0585", rate => HospitalOutpatient(rate), (1, 10)),
+            .. Rates("RC", "0360", rate => HospitalOutpatient(rate), [.. Enumerable.Range(0, 10).Select(i => (30 + i, 1000m + (100m * i)))]),
         ]);
 
     // Essential Plan:

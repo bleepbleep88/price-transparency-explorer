@@ -14,6 +14,8 @@ namespace PriceExplorer.Api.Core.Queries.Insights;
 /// <param name="Setting">Optional care setting key, e.g. "asc", "hospital-outpatient", "office".</param>
 /// <param name="FeeType">Optional: "facility" or "professional".</param>
 /// <param name="Code">Optional billing code as typed ("45378", "0490", "812").</param>
+/// <param name="IncludeFacilityCharges">Also rank charges filed under a revenue code with no procedure named (RC 0360
+/// "Operating room"). Off by default: hospitals bundle different services under them, so they don't compare like for like.</param>
 /// <param name="Sort">gap (largest gap to the lower quartile first; the default) | spread (largest 90th ÷ 10th percentile first).</param>
 /// <param name="Snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
 public sealed record GetGapLeaderboardQuery(
@@ -22,6 +24,7 @@ public sealed record GetGapLeaderboardQuery(
     string? Setting = null,
     string? FeeType = null,
     string? Code = null,
+    bool IncludeFacilityCharges = false,
     string? Sort = null,
     int? Snapshot = null,
     int Page = 1,

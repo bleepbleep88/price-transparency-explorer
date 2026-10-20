@@ -46,15 +46,22 @@ internal sealed class GetGapLeaderboardHandler(DuckDbConnectionFactory connectio
             .Select(group => (Group: group, Category: ServiceCategories.Classify(group.CodeType, group.Code)))
             .ToList();
 
+        // A charge filed under a revenue code with no procedure named covers whatever each hospital bundles under it
+        // (RC 0360 "Operating room"), so ranking those against each other misleads. They're left out unless asked for.
+        var facilityCharges = groups.Count(entry => entry.Group.CodeType == BillingCodes.RevenueCode);
+        var comparable = request.IncludeFacilityCharges
+            ? groups
+            : groups.Where(entry => entry.Group.CodeType != BillingCodes.RevenueCode).ToList();
+
         // Each category's count is under the other filters, so the reader sees what picking it would leave.
-        var categories = groups
+        var categories = comparable
             .GroupBy(entry => entry.Category.Key, StringComparer.Ordinal)
             .Select(same => new CategoryOption(same.Key, same.First().Category.Label, same.Count()))
             .OrderByDescending(option => option.Count)
             .ThenBy(option => option.Label, StringComparer.Ordinal)
             .ToList();
 
-        var ranked = Rank(groups.Where(entry => category is null || entry.Category.Key == category), sort).ToList();
+        var ranked = Rank(comparable.Where(entry => category is null || entry.Category.Key == category), sort).ToList();
         var skip = (long)(request.Page - 1) * request.PageSize;
         var page = skip >= ranked.Count ? [] : ranked.Skip((int)skip).Take(request.PageSize).ToList();
         var names = await InsightSupport.CodeNamesAsync(connection, snapshot.SnapshotId, page.Select(entry => entry.Group.Code), transaction);
@@ -90,12 +97,18 @@ internal sealed class GetGapLeaderboardHandler(DuckDbConnectionFactory connectio
             statistics,
             new GapLeaderboardEcho(
                 InsightSupport.Clean(request.Product), category, InsightSupport.Clean(request.Setting), InsightSupport.Clean(request.FeeType),
-                InsightSupport.Clean(request.Code), codes, sort, request.Page, request.PageSize),
+                InsightSupport.Clean(request.Code), codes, request.IncludeFacilityCharges, sort, request.Page, request.PageSize),
             RateStatistics.MinimumForFullStats,
             categories,
+            facilityCharges,
             new GapRowsPage(ranked.Count, request.Page, request.PageSize, rows),
-            [NoClaimCounts]);
+            request.IncludeFacilityCharges || facilityCharges == 0 ? [NoClaimCounts] : [NoClaimCounts, FacilityChargesLeftOut(facilityCharges)]);
     }
+
+    private static string FacilityChargesLeftOut(int count) =>
+        $"{(count == 1 ? "1 group of facility charges" : $"{count:N0} groups of facility charges")} filed under a revenue code with " +
+        "no procedure named are left out: hospitals bundle different services under them, so they don't compare like for like. " +
+        "Ask with includeFacilityCharges=true to rank them too.";
 
     /// <summary>Largest first. Ties go to the group with more providers, then the group key, so pages never overlap.</summary>
     private static IEnumerable<(GapGroupRow Group, ServiceCategory Category)> Rank(

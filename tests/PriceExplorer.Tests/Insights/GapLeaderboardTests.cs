@@ -37,6 +37,27 @@ public sealed class GapLeaderboardTests(InsightsApiFactory factory) : IClassFixt
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task Facility_charges_with_no_procedure_named_are_left_out_unless_asked_for()
+    {
+        var plain = await GetAsync("/api/v1/insights/gaps", TestContext.Current.CancellationToken);
+        var all = await GetAsync("/api/v1/insights/gaps?includeFacilityCharges=true", TestContext.Current.CancellationToken);
+
+        plain.GetProperty("facilityCharges").GetInt32().Should().Be(1);
+        Keys(plain).Should().NotContain(key => key.Contains("|RC|", StringComparison.Ordinal));
+        plain.GetProperty("notes").EnumerateArray().Select(note => note.GetString())
+            .Should().Contain(note => note!.StartsWith("1 group of facility charges filed under a revenue code", StringComparison.Ordinal));
+
+        all.GetProperty("query").GetProperty("includeFacilityCharges").GetBoolean().Should().BeTrue();
+        var first = Items(all)[0];
+        first.GetProperty("groupKey").GetString().Should().Be(GroupKey(Ambetter, "RC", "0360", "facility", "hospital-outpatient"));
+        first.GetProperty("lowerQuartileGap").GetDecimal().Should().Be(225m);
+        first.GetProperty("codeName").GetString().Should().Be("Operating room");
+        Keys(all).Should().HaveCount(5);
+        Categories(all).Should().Contain(("facility", 1));
+        all.GetProperty("notes").GetArrayLength().Should().Be(1);
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task Spread_ranks_by_the_90th_over_the_10th_percentile()
     {
         var result = await GetAsync("/api/v1/insights/gaps?sort=spread", TestContext.Current.CancellationToken);
