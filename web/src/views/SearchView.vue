@@ -100,6 +100,11 @@ async function onLensUpdate(patch: QueryPatch) {
   }
 }
 
+/** A lens's "See the trend": bring that group's card into view. */
+function showTrend(groupKey: string) {
+  document.querySelector(`[data-group-key="${CSS.escape(groupKey)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
 function onTableOptions(options: { page: number; pageSize: number; sort: SortKey }) {
   void update({ page: options.page, pageSize: options.pageSize, sort: options.sort })
 }
@@ -171,6 +176,8 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
             :result="result"
             :params="params"
             :out-of-network="outOfNetworkResult"
+            :trend="trendResult"
+            @show-trend="showTrend"
             @update="onLensUpdate"
             @cases="(cases) => replace({ cases })"
             @focus-npi="searchForm?.focusNpi()"
