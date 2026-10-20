@@ -17,6 +17,8 @@ export const lensSchema = z.enum(LENSES)
 export type Lens = z.infer<typeof lensSchema>
 /** Upper bound for the employers lens's cases-a-year input. */
 export const MAX_CASES = 1_000_000
+/** Upper bound for the dose calculator's dose, in the drug code's unit. */
+export const MAX_DOSE = 1_000_000
 
 export interface SearchParams {
   code: string
@@ -40,6 +42,8 @@ export interface SearchParams {
   lens?: Lens
   /** Employers lens: cases a year for the searched code; a search for a different code drops it. */
   cases?: number
+  /** Dose calculator: a dose of the searched drug, in its code's unit; a search for a different code drops it. */
+  dose?: number
 }
 
 /** Keys a link or chip can change. null removes the parameter. */
@@ -54,6 +58,11 @@ function first(value: LocationQuery[string] | undefined): string | undefined {
 function positiveInteger(value: string | undefined, max = Number.MAX_SAFE_INTEGER): number | undefined {
   const number = Number(value)
   return Number.isInteger(number) && number >= 1 && number <= max ? number : undefined
+}
+
+function positiveNumber(value: string | undefined, max: number): number | undefined {
+  const number = Number(value)
+  return Number.isFinite(number) && number > 0 && number <= max ? number : undefined
 }
 
 /** Tolerant: unknown or malformed values fall back to defaults instead of breaking the page. */
@@ -78,6 +87,7 @@ export function parseRouteQuery(query: LocationQuery): SearchParams {
     snapshot: positiveInteger(first(query.snapshot)),
     lens: lensSchema.safeParse(first(query.lens)).data,
     cases: positiveInteger(first(query.cases), MAX_CASES),
+    dose: positiveNumber(first(query.dose), MAX_DOSE),
   }
 }
 
@@ -89,16 +99,18 @@ export function mergeQuery(current: LocationQuery, patch: QueryPatch): LocationQ
     if (value === null || value === '') delete next[key]
     else next[key] = String(value)
   }
-  // Cases a year belong to one service: a different code starts without them (unless the patch sets them).
+  // Cases a year and a dose belong to one service: a different code starts without them (unless the patch sets them).
   const code = typeof patch.code === 'string' ? patch.code.trim() : ''
-  if (code && code.toUpperCase() !== (first(current.code) ?? '').toUpperCase() && !('cases' in patch)) delete next.cases
+  const otherCode = code && code.toUpperCase() !== (first(current.code) ?? '').toUpperCase()
+  if (otherCode && !('cases' in patch)) delete next.cases
+  if (otherCode && !('dose' in patch)) delete next.dose
   if (next.sort === 'rate') delete next.sort
   if (next.page === '1') delete next.page
   if (next.pageSize === String(DEFAULT_PAGE_SIZE)) delete next.pageSize
   return next
 }
 
-/** Only what the API understands; lens and cases are interpretation and never reach it. */
+/** Only what the API understands; lens, cases and dose are interpretation and never reach it. */
 export function toApiQuery(params: SearchParams): Record<string, QueryValue> {
   return {
     code: params.code,

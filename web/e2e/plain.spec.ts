@@ -16,6 +16,9 @@ const routes = [
   // Specialty and location filters: who-lines, the lens note and the card headings.
   '/?code=45378&county=Manhattan&lens=providers',
   '/?code=45378&specialty=gastro&lens=employers',
+  // The level ladder and the dose calculator.
+  '/?code=99214',
+  '/?code=J3301&dose=45&lens=life-sciences',
 ]
 
 test('the home page uses no statistics words', async ({ page }) => {

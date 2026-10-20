@@ -5,8 +5,10 @@ import { ApiError } from '@/lib/apiClient'
 import { plural } from '@/lib/format'
 import LoadingPanel from '@/features/status/components/LoadingPanel.vue'
 import DatasetSnapshot from '@/features/rates/components/DatasetSnapshot.vue'
+import DoseCalculator from '@/features/rates/components/DoseCalculator.vue'
 import GroupCard from '@/features/rates/components/GroupCard.vue'
 import LensPanel from '@/features/rates/components/LensPanel.vue'
+import LevelLadder from '@/features/rates/components/LevelLadder.vue'
 import NpiDialog from '@/features/rates/components/NpiDialog.vue'
 import ProviderTable from '@/features/rates/components/ProviderTable.vue'
 import ResultSummary from '@/features/rates/components/ResultSummary.vue'
@@ -182,6 +184,15 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
             @cases="(cases) => replace({ cases })"
             @focus-npi="searchForm?.focusNpi()"
             @search="(code) => startOver(code)"
+          />
+
+          <!-- Visit levels side by side, and a drug's cost for a dose: each shows only when the search has them. -->
+          <LevelLadder v-if="result.groups.length && result.code?.levelFamily" :result="result" :params="params" />
+          <DoseCalculator
+            v-if="result.groups.length && result.code?.doseUnit"
+            :result="result"
+            :dose="params.dose"
+            @dose="(dose) => replace({ dose })"
           />
 
           <p v-if="result.groups.length" class="text-body-medium text-medium-emphasis" data-testid="like-for-like">
