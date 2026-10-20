@@ -86,6 +86,21 @@ public sealed class SearchInputTests
         RateStatistics.Median([1.00m, 1.01m]).Should().Be(1.01m);
     }
 
+    [Theory]
+    [InlineData("J0585", "drugs", true)]
+    [InlineData("Q0138", "drugs", true)]    // ferumoxytol
+    [InlineData("Q5101", "drugs", true)]    // a biosimilar
+    [InlineData("Q9967", "drugs", true)]    // contrast, per ml
+    [InlineData("Q4100", "supplies", true)] // skin substitute
+    [InlineData("Q0091", "other", false)]   // Pap smear collection: a service, not a drug
+    public void Hcpcs_q_codes_split_into_drugs_supplies_and_services(string code, string key, bool perUnit)
+    {
+        var category = ServiceCategories.Classify("HCPCS", code);
+
+        category.Key.Should().Be(key);
+        category.PerUnit.Should().Be(perUnit);
+    }
+
     [Fact]
     public void A_missing_code_is_rejected_with_a_helpful_message()
     {

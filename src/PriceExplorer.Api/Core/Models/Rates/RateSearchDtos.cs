@@ -46,6 +46,7 @@ public sealed record CodeInfo(
 /// A fair comparison group: same code, product, fee type, setting, modifiers and rate type. Stats count each provider (tax ID) once.
 /// </summary>
 /// <param name="StatsLevel">"list" (fewer than 5 providers: rates listed, no stats), "basic" (5–9: median and range), "full" (10+).</param>
+/// <param name="MatchedProviders">Providers matching the NPI/EIN/name filter in this group; <c>Highlights</c> lists the first 5 by rate. 0 without a filter.</param>
 /// <param name="LowerQuartileGap">Median minus 25th percentile: how far a typical (median) rate sits above the lower quartile. Plans and employers read it as room to steer care; providers as negotiating context. Full stats only.</param>
 public sealed record RateGroup(
     string Key,
@@ -71,6 +72,7 @@ public sealed record RateGroup(
     decimal? LowerQuartileGap,
     IReadOnlyList<decimal> ListedRates,
     IReadOnlyList<ProviderPosition> Highlights,
+    int MatchedProviders,
     IReadOnlyList<string> Notes);
 
 /// <param name="SpreadMultiple">Highest ÷ lowest. Only with 10+ providers; single outliers make it jumpy.</param>
@@ -87,13 +89,18 @@ public sealed record RateStats(
     decimal? P90ToP10);
 
 /// <summary>Where a provider matched by the NPI/EIN/name filter sits within its group.</summary>
+/// <param name="Rate">The provider's value from its matched rates (an NPI's own rate).</param>
+/// <param name="RateLow">Lowest of those matched rates (equal to <paramref name="Rate"/> for a single rate).</param>
+/// <param name="RateHigh">Highest of those matched rates.</param>
 public sealed record ProviderPosition(
     string ProviderKey,
     string DisplayName,
     decimal Rate,
     int? Percentile,
     decimal? VsMedian,
-    decimal? AboveP25);
+    decimal? AboveP25,
+    decimal RateLow,
+    decimal RateHigh);
 
 public sealed record BilledAs(string BillingCodeType, string BillingCode, string Label);
 

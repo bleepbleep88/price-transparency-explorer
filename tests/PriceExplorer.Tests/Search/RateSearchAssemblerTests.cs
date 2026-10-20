@@ -99,6 +99,9 @@ public sealed class RateSearchAssemblerTests
         highlight.Rate.Should().Be(200m);
         highlight.Percentile.Should().Be(20);
         highlight.VsMedian.Should().Be(0.57m);
+        (highlight.RateLow, highlight.RateHigh).Should().Be((200m, 200m));
+        filtered.Groups.Single().MatchedProviders.Should().Be(1);
+        unfiltered.MatchedProviders.Should().Be(0, "without a filter nobody is picked out");
         filtered.Rows.Items.Should().ContainSingle().Which.Matched.Should().BeTrue();
     }
 

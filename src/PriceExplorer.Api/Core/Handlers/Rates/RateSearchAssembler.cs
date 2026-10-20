@@ -163,7 +163,9 @@ internal static class RateSearchAssembler
                     pair.View.Value,
                     basic ? RateStatistics.PercentRank(values, pair.View.Value, pair.Provider.Value) : null,
                     RateStatistics.Ratio(pair.View.Value, median),
-                    p25 is { } low ? pair.View.Value - low : null))
+                    p25 is { } low ? pair.View.Value - low : null,
+                    pair.View.Low,
+                    pair.View.High))
                 .ToList();
 
         return new RateGroup(
@@ -197,6 +199,7 @@ internal static class RateSearchAssembler
             LowerQuartileGap: full && median is { } m && p25 is { } q ? m - q : null,
             ListedRates: level == "list" ? values : [],
             Highlights: highlights,
+            MatchedProviders: providerFilterActive ? group.Providers.Values.Count(provider => provider.Matched) : 0,
             Notes: NotesFor(group, category, catalog, values));
     }
 

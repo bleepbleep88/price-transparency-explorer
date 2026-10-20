@@ -39,7 +39,8 @@ internal static class ServiceCategories
         {
             return code[0] switch
             {
-                'J' or 'Q' => Drugs,
+                'J' => Drugs,
+                'Q' => TemporaryCode(code),
                 'A' or 'E' or 'K' or 'L' or 'B' => Supplies,
                 'G' => new ServiceCategory("medicare-g-codes", "Procedures & services (HCPCS G-codes)", "per service", false),
                 'H' or 'T' => new ServiceCategory("community-services", "Behavioral health & community services", "per service or unit", false),
@@ -83,6 +84,30 @@ internal static class ServiceCategories
             >= 90785 and <= 90899 => BehavioralHealth,
             >= 99202 and <= 99499 => Visits,
             >= 90281 and <= 99199 => Medicine,
+            _ => Other,
+        };
+    }
+
+    /// <summary>
+    /// HCPCS Q codes (CMS temporary codes) mix drugs, supplies and services: Q0138–Q0181 (drugs such as ferumoxytol and
+    /// antiemetics), Q2xxx, Q5101 on (biosimilars) and Q9950 on (contrast and radiopharmaceuticals) are drugs; Q4001–Q4051
+    /// (casting) and Q4100 on (skin substitutes) are supplies; the rest are services (Q0091 is a Pap smear collection).
+    /// </summary>
+    private static ServiceCategory TemporaryCode(string code)
+    {
+        if (!int.TryParse(code.AsSpan(1), NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+        {
+            return Other;
+        }
+
+        return number switch
+        {
+            >= 138 and <= 181 => Drugs,
+            >= 2000 and <= 2999 => Drugs,
+            >= 4001 and <= 4051 => Supplies,
+            >= 4100 and <= 4999 => Supplies,
+            >= 5101 and <= 5999 => Drugs,
+            >= 9950 => Drugs,
             _ => Other,
         };
     }
