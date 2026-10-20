@@ -19,6 +19,8 @@ namespace PriceExplorer.Api.Core.Queries.History;
 /// <param name="Code">Optional billing code, as search takes it ("45378", "490", "RC 0490").</param>
 /// <param name="Kind">changed | new | dropped. Omit for all three.</param>
 /// <param name="MinChangePct">Only changes of at least this many percent, up or down (changed rates only).</param>
+/// <param name="ListedElsewhere">false leaves out new and dropped rates whose provider the other file lists for the same
+/// code under other modifiers or another setting; true keeps only those.</param>
 /// <param name="Sort">largest (biggest moves first) | -changePct | changePct | code | -code | provider | -provider.</param>
 public sealed record GetChangesQuery(
     int? From = null,
@@ -27,6 +29,7 @@ public sealed record GetChangesQuery(
     string? Code = null,
     string? Kind = null,
     decimal? MinChangePct = null,
+    bool? ListedElsewhere = null,
     string? Sort = null,
     int Page = 1,
     int PageSize = 25) : IRequest<ChangesResult>, IRequiresData;

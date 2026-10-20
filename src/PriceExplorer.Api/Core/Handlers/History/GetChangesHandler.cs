@@ -60,13 +60,14 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
             codeType,
             kind = request.Kind,
             minChangePct = (double?)request.MinChangePct,
+            listedElsewhere = request.ListedElsewhere,
             sort,
             limit = request.PageSize,
             offset = (request.Page - 1) * request.PageSize,
         };
         var pairs = SqlFile.For<GetChangesHandler>("ChangePairs.sql");
         var counts = compared.Count == 0
-            ? new ChangeCounts(0, 0, 0, 0, 0, 0)
+            ? new ChangeCounts(0, 0, 0, 0, 0, 0, 0, 0)
             : await connection.QuerySingleAsync<ChangeCounts>(pairs + SqlFile.For<GetChangesHandler>("ChangeCounts.sql"), args, transaction);
         var rows = compared.Count == 0
             ? []
@@ -86,7 +87,7 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
 
         return new ChangesResult(
             new ChangesEcho(from.SnapshotId, to.SnapshotId, product, code.Length == 0 ? null : code, codeType, request.Kind,
-                request.MinChangePct, sort, request.Page, request.PageSize),
+                request.MinChangePct, request.ListedElsewhere, sort, request.Page, request.PageSize),
             Snapshot(from, fromState),
             Snapshot(to, toState),
             fromCurrent && toCurrent,
@@ -104,7 +105,8 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
                 row.ProviderKey, row.Ein, row.EinDisplay, row.EinMasked, row.BusinessName,
                 row.FromValue, row.ToValue, row.Change, row.ChangePct is { } pct ? (decimal)pct : null,
                 fromCurrent ? row.FromRateId : null,
-                toCurrent ? row.ToRateId : null)).ToList()));
+                toCurrent ? row.ToRateId : null,
+                row.FromRates, row.ToRates, row.ListedElsewhere)).ToList()));
     }
 
     private static async Task<ResolvedSnapshot?> PreviousAsync(DuckDBConnection connection, ResolvedSnapshot to)
@@ -195,5 +197,5 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
         string Kind, string GroupKey, string ProductKey, string ProductLabel, string CodeType, string Code, string FeeType,
         string SettingKey, string Modifiers, string NegotiatedType, string Unit, string ProviderKey, string? Ein, string EinDisplay,
         bool EinMasked, string BusinessName, decimal? FromValue, decimal? ToValue, decimal? Change, double? ChangePct,
-        long? FromRateId, long? ToRateId);
+        long? FromRateId, long? ToRateId, int? FromRates, int? ToRates, bool ListedElsewhere);
 }

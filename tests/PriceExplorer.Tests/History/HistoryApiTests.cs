@@ -52,7 +52,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
         result.GetProperty("to").GetProperty("isLatest").GetBoolean().Should().BeTrue();
         result.GetProperty("current").GetBoolean().Should().BeTrue();
         result.GetProperty("products").EnumerateArray().Should().OnlyContain(product => product.GetProperty("compared").GetBoolean());
-        Counts(result).Should().Equal(5, 4, 1, 2, 2, 8);
+        Counts(result).Should().Equal(5, 4, 1, 2, 1, 2, 1, 8);
 
         // Biggest moves first, then new and dropped rates by amount.
         Rows(result).Select(Describe).Should().Equal(
@@ -84,6 +84,8 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
         alpha.GetProperty("businessName").GetString().Should().Be(Alpha.Name);
         alpha.GetProperty("einDisplay").GetString().Should().Be(Alpha.Ein);
         alpha.GetProperty("change").GetDecimal().Should().Be(60m);
+        alpha.GetProperty("fromRates").GetInt32().Should().Be(1);
+        alpha.GetProperty("toRates").GetInt32().Should().Be(1);
 
         // The masked tax ID is matched across files by its key, and stays masked.
         county.GetProperty("providerKey").GetString().Should().MatchRegex("^u[0-9a-f]{12}$");
@@ -109,6 +111,23 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
 
         delta.Select(row => (row.GetProperty("kind").GetString(), row.GetProperty("groupKey").GetString()))
             .Should().BeEquivalentTo([("dropped", AmbetterColonoscopyAsc), ("new", AmbetterColonoscopyHospital)]);
+        delta.Should().OnlyContain(row => row.GetProperty("listedElsewhere").GetBoolean(), "each file lists Delta for 45378, in another setting");
+        Rows(result).Where(row => row.GetProperty("ein").GetString() != Delta.Key)
+            .Should().OnlyContain(row => !row.GetProperty("listedElsewhere").GetBoolean());
+    }
+
+    [Theory(Timeout = 60_000)]
+    [InlineData("false", 5, "dropped 77-6666666 45378 800.00→|new 66-5555555 45378 →750.00", 1, 0, 1, 0)]
+    [InlineData("true", 0, "dropped 55-4444444 45378 700.00→|new 55-4444444 45378 →700.00", 1, 1, 1, 1)]
+    public async Task New_and_dropped_rates_listed_elsewhere_can_be_left_out_or_shown_alone(
+        string listedElsewhere, int changed, string rows, int newCount, int newElsewhere, int droppedCount, int droppedElsewhere)
+    {
+        var result = await GetAsync($"/api/v1/changes?listedElsewhere={listedElsewhere}", TestContext.Current.CancellationToken);
+
+        string.Join('|', Rows(result).Where(row => row.GetProperty("kind").GetString() != "changed").Select(Describe)).Should().Be(rows);
+        Counts(result)[0].Should().Be(changed, "a changed rate is in the same group in both files, so it's never listed elsewhere");
+        Counts(result)[3..7].Should().Equal(newCount, newElsewhere, droppedCount, droppedElsewhere);
+        result.GetProperty("query").GetProperty("listedElsewhere").GetBoolean().Should().Be(listedElsewhere == "true");
     }
 
     [Fact(Timeout = 60_000)]
@@ -126,7 +145,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
             .Be("Left out: the 2026-07-27 file looks partial. Its unique rates are 14% of what nearby snapshots have.");
         products[Ambetter].GetProperty("compared").GetBoolean().Should().BeTrue();
         products[Ambetter].GetProperty("notComparedBecause").ValueKind.Should().Be(JsonValueKind.Null);
-        Counts(result).Should().Equal([0, 0, 0, 0, 0, 8], "July's Ambetter file equals August's");
+        Counts(result).Should().Equal([0, 0, 0, 0, 0, 0, 0, 8], "July's Ambetter file equals August's");
         Rows(result).Should().BeEmpty();
     }
 
@@ -149,6 +168,17 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task A_provider_with_several_rates_in_a_group_says_how_many_on_each_side()
+    {
+        var result = await GetAsync("/api/v1/changes?code=99213&kind=changed", TestContext.Current.CancellationToken);
+        var tele = Rows(result).Single();
+
+        tele.GetProperty("fromRates").GetInt32().Should().Be(2);
+        tele.GetProperty("toRates").GetInt32().Should().Be(2);
+        tele.GetProperty("from").GetDecimal().Should().Be(45m, "its value is the NPI-weighted median of 45 and 90");
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task Counts_ignore_the_kind_filter_and_a_minimum_change_only_narrows_changed_rates()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -156,8 +186,8 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
         var all = await GetAsync("/api/v1/changes?kind=new", ct);
         var bigOnes = await GetAsync("/api/v1/changes?minChangePct=5", ct);
 
-        Counts(all).Should().Equal(5, 4, 1, 2, 2, 8);
-        Counts(bigOnes).Should().Equal(3, 2, 1, 2, 2, 8);
+        Counts(all).Should().Equal(5, 4, 1, 2, 1, 2, 1, 8);
+        Counts(bigOnes).Should().Equal(3, 2, 1, 2, 1, 2, 1, 8);
         bigOnes.GetProperty("rows").GetProperty("total").GetInt32().Should().Be(7);
     }
 
@@ -189,6 +219,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     [InlineData("code=4537-8", "code")]
     [InlineData("from=1&to=1", "from")]
     [InlineData("to=0", "to")]
+    [InlineData("listedElsewhere=maybe", "listedElsewhere")]
     public async Task Bad_change_inputs_are_400s_naming_the_field(string query, string field)
     {
         using var client = factory.CreateClient();
@@ -345,7 +376,8 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     private static int[] Counts(JsonElement result)
     {
         var counts = result.GetProperty("counts");
-        return new[] { "changed", "increased", "decreased", "new", "dropped", "unchanged" }.Select(name => counts.GetProperty(name).GetInt32()).ToArray();
+        return new[] { "changed", "increased", "decreased", "new", "newListedElsewhere", "dropped", "droppedListedElsewhere", "unchanged" }
+            .Select(name => counts.GetProperty(name).GetInt32()).ToArray();
     }
 
     private static List<JsonElement> Rows(JsonElement result) => result.GetProperty("rows").GetProperty("items").EnumerateArray().ToList();

@@ -23,7 +23,10 @@ SELECT
     s.change                                 AS Change,
     s.change_pct                             AS ChangePct,
     s.from_rate_id                           AS FromRateId,
-    s.to_rate_id                             AS ToRateId
+    s.to_rate_id                             AS ToRateId,
+    s.from_rates                             AS FromRates,
+    s.to_rates                               AS ToRates,
+    s.listed_elsewhere                       AS ListedElsewhere
 FROM shown s
 LEFT JOIN group_stats g
     ON g.snapshot_id = CASE WHEN s.kind = 'dropped' THEN $from ELSE $to END AND g.group_key = s.group_key

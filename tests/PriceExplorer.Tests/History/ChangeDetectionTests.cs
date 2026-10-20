@@ -62,7 +62,8 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
 
         var result = await ChangesAsync(new GetChangesQuery());
 
-        result.Counts.Should().Be(new ChangeCounts(Changed: 1, Increased: 1, Decreased: 0, New: 1, Dropped: 1, Unchanged: 1));
+        result.Counts.Should().Be(new ChangeCounts(
+            Changed: 1, Increased: 1, Decreased: 0, New: 1, NewListedElsewhere: 0, Dropped: 1, DroppedListedElsewhere: 0, Unchanged: 1));
         result.Rows.Items.Select(row => (row.Kind, row.ProviderKey, row.From, row.To, row.Change, row.ChangePct)).Should().Equal(
             ("changed", "111111111", 600m, 660m, 60m, 10m),
             ("new", "444444444", null, 750m, null, null),
@@ -114,6 +115,29 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_rate_listed_under_other_modifiers_is_new_and_dropped_and_says_it_is_listed_elsewhere()
+    {
+        // The same telehealth rate, with GQ dropped from its modifiers, as Centene did between 2026-07-27 and 2026-08-31.
+        await ValueAsync(August, "ambetter|CPT|99213|professional|telehealth-other|95,GQ,GT|negotiated", "111111111", 75m);
+        await ValueAsync(September, "ambetter|CPT|99213|professional|telehealth-other|95,GT|negotiated", "111111111", 75m);
+        // Another code for the same provider, and another provider for the same code: really new and dropped.
+        await ValueAsync(August, "ambetter|CPT|99214|professional|telehealth-other|95,GT|negotiated", "111111111", 110m);
+        await ValueAsync(September, "ambetter|CPT|99213|professional|telehealth-other|95,GT|negotiated", "222222222", 75m);
+
+        var result = await ChangesAsync(new GetChangesQuery(Sort: "code"));
+
+        result.Rows.Items.Select(row => (row.Kind, row.Code, row.ProviderKey, row.ListedElsewhere)).Should().BeEquivalentTo(
+        [
+            ("dropped", "99213", "111111111", true), ("new", "99213", "111111111", true),
+            ("new", "99213", "222222222", false), ("dropped", "99214", "111111111", false),
+        ]);
+        result.Counts.Should().Match<ChangeCounts>(counts =>
+            counts.New == 2 && counts.NewListedElsewhere == 1 && counts.Dropped == 2 && counts.DroppedListedElsewhere == 1);
+        (await ChangesAsync(new GetChangesQuery(ListedElsewhere: false))).Rows.Items.Should().OnlyContain(row => !row.ListedElsewhere)
+            .And.HaveCount(2);
+    }
+
+    [Fact]
     public async Task The_newer_file_names_the_provider()
     {
         await ValueAsync(August, Colonoscopy, "111111111", 600m, name: "Alpha Surgery Center");
@@ -147,7 +171,7 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
 
         result.Products.Should().ContainEquivalentOf(new ChangesProduct(Essential, "essential label", false, "Not in the 2026-08-31 snapshot."));
         result.Products.Should().ContainEquivalentOf(new ChangesProduct(Ambetter, "ambetter label", true, null));
-        result.Counts.Should().Be(new ChangeCounts(0, 0, 0, 0, 0, 0), "the provider isn't new: the product wasn't in the older snapshot at all");
+        result.Counts.Should().Be(new ChangeCounts(0, 0, 0, 0, 0, 0, 0, 0), "the provider isn't new: the product wasn't in the older snapshot at all");
     }
 
     [Fact]
