@@ -36,7 +36,7 @@ const view = computed(() => {
       </v-chip>
     </template>
 
-    <v-card max-width="440" title="Data loading">
+    <v-card max-width="440" title="Data status">
       <v-card-text class="d-flex flex-column ga-2">
         <p class="text-body-medium">{{ status?.message ?? 'Waiting for the server…' }}</p>
         <v-progress-linear v-if="progress != null" :model-value="progress * 100" color="info" rounded height="6" />

@@ -9,6 +9,7 @@ import {
   hasProviderFilter,
   highlightHeading,
   isDrugCode,
+  modifierText,
   LENS_OPTIONS,
   qualityLines,
   spreadLines,
@@ -111,9 +112,12 @@ describe('lens options and start cards', () => {
     expect(codes).toEqual(expect.arrayContaining(['45378', '29881', '99214', '812', 'J0585']))
   })
 
-  it('names a group by product, fee type, setting and modifiers', () => {
+  it('names a group by product, fee type, setting and modifiers, never a bare modifier number', () => {
     expect(groupName(makeGroup({ modifiers: [{ code: 'TC', label: 'Technical component' }] }))).toBe(
-      'Ambetter from Fidelis Care · Facility fee · Hospital outpatient department (TC)',
+      'Ambetter from Fidelis Care · Facility fee · Hospital outpatient department · Technical component (modifier TC)',
+    )
+    expect(modifierText([{ code: 'Q1', label: 'Modifier Q1' }, { code: '33', label: 'Preventive service' }])).toBe(
+      'modifier Q1, Preventive service (modifier 33)',
     )
   })
 })
@@ -340,7 +344,7 @@ describe('life sciences lens', () => {
     const lines = unitPriceLines(makeResult([office, small]))
     expect(lines.map((line) => [line.site, unitPriceText(line)])).toEqual([
       ["Doctor's office · Professional (clinician) fee", '$7.16 to $9.77'],
-      ["Doctor's office · Professional (clinician) fee (JW)", '$6.97 median'],
+      ["Doctor's office · Professional (clinician) fee · Drug amount discarded (modifier JW)", '$6.97 median'],
     ])
   })
 

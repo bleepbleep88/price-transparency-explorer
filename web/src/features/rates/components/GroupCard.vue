@@ -25,7 +25,7 @@ const facilityBilling = computed(() => props.group.billedAs.filter((billed) => b
 function positionText(position: ProviderPosition): string {
   const parts: string[] = []
   if (position.percentile != null) parts.push(`${ordinal(position.percentile)} percentile`)
-  if (position.vsMedian != null) parts.push(`${times(position.vsMedian)} median`)
+  if (position.vsMedian != null) parts.push(`${times(position.vsMedian)} the median`)
   if (position.aboveP25 != null) {
     parts.push(
       position.aboveP25 === 0
@@ -112,8 +112,8 @@ function positionText(position: ProviderPosition): string {
         </p>
         <v-sheet v-else-if="group.lowerQuartileGap != null" rounded class="quartile-gap pa-3" data-testid="quartile-gap">
           <p class="text-body-medium">
-            <strong>{{ money(group.lowerQuartileGap) }}</strong> gap to the lower quartile: the median rate is
-            {{ money(stats.median) }}; a quarter of providers are paid {{ money(stats.p25) }} or less.
+            <strong>{{ money(group.lowerQuartileGap) }}</strong> gap to the lower quartile: the median minus the 25th
+            percentile.
           </p>
         </v-sheet>
       </div>

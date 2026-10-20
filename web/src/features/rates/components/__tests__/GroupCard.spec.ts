@@ -94,10 +94,10 @@ describe('GroupCard', () => {
 
     const full = wrapper.get('[data-testid="stats-full"]')
     for (const value of [454.44, 578.31, 627.5]) expect(full.text()).toContain(money(value))
-    const gap = wrapper.get('[data-testid="quartile-gap"]').text()
-    expect(gap).toContain(`${money(123.87)} gap to the lower quartile`)
-    expect(gap).toContain(`the median rate is ${money(578.31)}`)
-    expect(gap).toContain(`a quarter of providers are paid ${money(454.44)} or less`)
+    // Defines the term once instead of repeating the numbers printed just above it.
+    expect(wrapper.get('[data-testid="quartile-gap"]').text()).toBe(
+      `${money(123.87)} gap to the lower quartile: the median minus the 25th percentile.`,
+    )
   })
 
   it('says there is no gap when the 25th percentile equals the median', () => {

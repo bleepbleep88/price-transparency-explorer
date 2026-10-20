@@ -1,6 +1,6 @@
 import { buildUrl } from '@/lib/apiClient'
 import { money, ordinal, plural, times, wholeNumber } from '@/lib/format'
-import type { CodeInfo, RateGroup, RateSearchResult, SearchQuality } from '../api/types'
+import type { CodeInfo, ModifierRef, RateGroup, RateSearchResult, SearchQuality } from '../api/types'
 import { toApiQuery, type Lens, type SearchParams } from './searchParams'
 
 // Audience lenses read the current search response; they never fetch anything and never change the numbers.
@@ -16,7 +16,7 @@ export interface LensOption {
 export const LENS_OPTIONS: readonly LensOption[] = [
   { key: 'providers', label: 'Providers', answers: 'Where your negotiated rate sits among other providers for the same service.' },
   { key: 'plans', label: 'Plans', answers: 'How far rates spread for the same service, and where the outliers are.' },
-  { key: 'employers', label: 'Employers', answers: 'What a service typically costs, and the gap to lower-priced providers.' },
+  { key: 'employers', label: 'Employers', answers: 'What a service typically costs (the median), and the gap to the lower quartile.' },
   { key: 'innovators', label: 'Innovators', answers: 'How the raw files clean up, with every rate traceable to its source.' },
   { key: 'life-sciences', label: 'Life sciences', answers: 'Drug prices per billing unit, side by side by site of care.' },
 ]
@@ -51,7 +51,7 @@ export const START_HERE: readonly StartCard[] = [
   {
     ...lensOption('providers'),
     examples: [
-      { code: '99213', npi: '1801474036', label: "Office visit, level 3, with one podiatry practice's NPI" },
+      { code: '99213', npi: '1801474036', label: "Office visit, level 3, with one podiatrist's NPI" },
       { code: '99214', label: 'Office visit, level 4: visit codes come in levels' },
     ],
   },
@@ -73,7 +73,7 @@ export const START_HERE: readonly StartCard[] = [
     ...lensOption('innovators'),
     examples: [
       { code: '29881', label: 'Knee arthroscopy: published only as a facility rate under revenue code 0490' },
-      { code: '812', label: 'Colonoscopy anesthesia: published without its leading zeros' },
+      { code: '812', label: 'Colonoscopy anesthesia: published as 812, searched as 00812' },
     ],
     links: API_REFERENCE_LINKS,
   },
@@ -86,9 +86,19 @@ export const START_HERE: readonly StartCard[] = [
   },
 ]
 
-/** "Ambetter from Fidelis Care · Facility fee · Ambulatory surgery center (TC)" */
+/**
+ * Modifiers named as modifiers, never as bare numbers that read like counts: "Preventive service (modifier 33)".
+ * A code the API doesn't know comes back labelled "Modifier Q1"; that reads "modifier Q1".
+ */
+export function modifierText(modifiers: readonly ModifierRef[]): string {
+  return modifiers
+    .map((modifier) => (modifier.label === `Modifier ${modifier.code}` ? `modifier ${modifier.code}` : `${modifier.label} (modifier ${modifier.code})`))
+    .join(', ')
+}
+
+/** "Ambetter from Fidelis Care · Facility fee · Ambulatory surgery center · Technical component (modifier TC)" */
 export function groupName(group: RateGroup): string {
-  const modifiers = group.modifiers.length ? ` (${group.modifiers.map((modifier) => modifier.code).join(', ')})` : ''
+  const modifiers = group.modifiers.length ? ` · ${modifierText(group.modifiers)}` : ''
   return `${group.productLabel} · ${group.feeTypeLabel} · ${group.settingLabel}${modifiers}`
 }
 
@@ -291,7 +301,7 @@ export function hasFacilityCharges(result: RateSearchResult): boolean {
 export interface UnitPriceLine {
   groupKey: string
   product: string
-  /** Setting, fee type and modifiers: "Doctor's office · Professional (clinician) fee (JW)". */
+  /** Setting, fee type and modifiers: "Doctor's office · Professional (clinician) fee · Drug amount discarded (modifier JW)". */
   site: string
   providers: number
   kind: 'median' | 'single' | 'range'
@@ -308,7 +318,7 @@ export function unitPriceLines(result: RateSearchResult): UnitPriceLine[] {
   return result.groups
     .filter((group) => group.perUnit && !filedUnderRevenueCode(group))
     .flatMap((group): UnitPriceLine[] => {
-      const modifiers = group.modifiers.length ? ` (${group.modifiers.map((modifier) => modifier.code).join(', ')})` : ''
+      const modifiers = group.modifiers.length ? ` · ${modifierText(group.modifiers)}` : ''
       const base = {
         groupKey: group.key,
         product: group.productLabel,

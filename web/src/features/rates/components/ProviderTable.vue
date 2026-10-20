@@ -3,7 +3,8 @@ import { computed } from 'vue'
 import { useDisplay } from 'vuetify'
 import { mdiFileSearchOutline } from '@mdi/js'
 import { money, plural, times } from '@/lib/format'
-import type { RateGroup, RateRow, RateRowsPage } from '../api/types'
+import type { ModifierRef, RateGroup, RateRow, RateRowsPage } from '../api/types'
+import { modifierText } from '../lib/lenses'
 import type { SortKey } from '../lib/searchParams'
 
 const props = defineProps<{
@@ -44,8 +45,16 @@ function groupLabel(row: RateRow): string {
   const group = groupsByKey.value.get(row.groupKey)
   if (!group) return '—'
   const fee = group.feeType === 'professional' ? 'Professional' : 'Facility'
-  const modifiers = group.modifiers.length ? ` · ${group.modifiers.map((m) => m.code).join(', ')}` : ''
-  return `${fee} · ${group.settingLabel}${modifiers}`
+  return `${fee} · ${group.settingLabel}`
+}
+
+function modifiersOf(row: RateRow): ModifierRef[] {
+  return groupsByKey.value.get(row.groupKey)?.modifiers ?? []
+}
+
+/** "modifier 25" or "modifiers 25, 95, GT": short in the cell, with the plain labels in a tooltip. */
+function modifierCodes(modifiers: ModifierRef[]): string {
+  return `${modifiers.length === 1 ? 'modifier' : 'modifiers'} ${modifiers.map((modifier) => modifier.code).join(', ')}`
 }
 
 // Stamped like a ledger mark: outlined in the band's color; typical stays neutral ink.
@@ -123,7 +132,17 @@ function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key:
 
     <template #[`item.group`]="{ item }">
       <div class="py-1">
-        <div class="text-body-medium">{{ groupLabel(item) }}</div>
+        <div class="text-body-medium">
+          {{ groupLabel(item) }}
+          <template v-if="modifiersOf(item).length">
+            ·
+            <v-tooltip :text="modifierText(modifiersOf(item))" location="top" max-width="320">
+              <template #activator="{ props: tip }">
+                <span v-bind="tip" class="has-tooltip" tabindex="0" data-testid="row-modifiers">{{ modifierCodes(modifiersOf(item)) }}</span>
+              </template>
+            </v-tooltip>
+          </template>
+        </div>
         <div class="text-body-small text-medium-emphasis">{{ groupsByKey.get(item.groupKey)?.productLabel }}</div>
       </div>
     </template>
