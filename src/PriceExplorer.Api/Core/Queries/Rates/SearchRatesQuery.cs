@@ -139,7 +139,7 @@ public sealed partial class SearchRatesQueryValidator : AbstractValidator<Search
 
         // Product keys are slugs from the snapshot ("essential-plan"); group keys come from search results.
         RuleFor(query => query.Product)
-            .Must(product => ProductKey().IsMatch(product!.Trim()))
+            .Must(product => IsProductKey(product!))
             .When(query => !string.IsNullOrWhiteSpace(query.Product))
             .WithMessage("A product is a product key from the snapshot, for example essential-plan.");
 
@@ -163,6 +163,9 @@ public sealed partial class SearchRatesQueryValidator : AbstractValidator<Search
         RuleFor(query => query.Page).InclusiveBetween(1, MaxPage).WithMessage($"Page is between 1 and {MaxPage:N0}.");
         RuleFor(query => query.PageSize).InclusiveBetween(1, 100).WithMessage("Page size is between 1 and 100.");
     }
+
+    /// <summary>The shape of a product key from the snapshot ("essential-plan"); the insights filters use it too.</summary>
+    internal static bool IsProductKey(string product) => ProductKey().IsMatch(product.Trim());
 
     [System.Text.RegularExpressions.GeneratedRegex("^[a-z0-9][a-z0-9-]{0,127}$")]
     private static partial System.Text.RegularExpressions.Regex ProductKey();

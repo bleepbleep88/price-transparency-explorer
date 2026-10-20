@@ -139,6 +139,13 @@ internal static class RateSearchAssembler
         _ => billingClass,
     };
 
+    public static string FeeTypeLabelOf(string feeType) => feeType switch
+    {
+        "facility" => "Facility fee",
+        "professional" => "Professional (clinician) fee",
+        _ => "Fee",
+    };
+
     /// <summary>Gathers facts into comparison groups, each provider once per group with all its rates there.</summary>
     private static IEnumerable<GroupAccumulator> Accumulate(IReadOnlyList<RateFactRow> facts, ReferenceCatalog catalog)
     {
@@ -208,12 +215,7 @@ internal static class RateSearchAssembler
             CodeType: group.CodeType,
             Code: group.Code,
             FeeType: group.FeeType,
-            FeeTypeLabel: group.FeeType switch
-            {
-                "facility" => "Facility fee",
-                "professional" => "Professional (clinician) fee",
-                _ => "Fee",
-            },
+            FeeTypeLabel: FeeTypeLabelOf(group.FeeType),
             SettingKey: group.Setting.Key,
             SettingLabel: group.Setting.Label,
             SettingNote: ClinicPerUnit(group, perUnit) ? null : group.Setting.Note,
@@ -542,12 +544,7 @@ internal static class RateSearchAssembler
         /// <summary>The EIN when it can be shown: null when masked (a prefix the IRS never issues).</summary>
         public string? VerifiedEin => EinUnverified ? null : Ein;
 
-        public string EinDisplay => Ein switch
-        {
-            null => Key.Replace(":", " ", StringComparison.Ordinal).ToUpperInvariant(),
-            _ when EinUnverified => Domain.Ein.Mask(Ein),
-            _ => Domain.Ein.Format(Ein),
-        };
+        public string EinDisplay => ProviderKeys.Display(Key, Ein, EinUnverified);
 
         private RateView MatchedOrAll()
         {
