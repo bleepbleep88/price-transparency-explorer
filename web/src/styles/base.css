@@ -87,6 +87,23 @@ h2,
   border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.45);
 }
 
+/* Keyboard focus a reader can see: Vuetify's focus tint on lists, chips and buttons is about 1.3:1. Primary is 5.8:1 or
+   more against paper and cards in both themes. */
+.v-list-item:focus-visible,
+.v-chip:focus-visible,
+.v-btn:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+/* Placeholders carry real hints (the example codes, "All products"), so they need 4.5:1; Vuetify draws them at the
+   disabled opacity (about 1.9:1 on paper). Only where Vuetify shows them, so a resting label never sits on one. */
+.v-field--active input::placeholder,
+.v-field--no-label input::placeholder {
+  opacity: 1;
+  color: rgba(var(--v-theme-on-surface), 0.8);
+}
+
 /* Field outlines at rest meet 3:1 against the page (Vuetify's 0.38 is about 2.4:1). Hover, focus and error keep
    Vuetify's own stronger values because this rule stops matching in those states. */
 .v-input:not(.v-input--error) .v-field:not(:hover):not(.v-field--focused) .v-field__outline {

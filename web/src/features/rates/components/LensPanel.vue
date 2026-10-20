@@ -30,11 +30,20 @@ function choose(next: unknown) {
   <v-card data-testid="lens-panel">
     <div class="d-flex flex-wrap align-center gc-4 px-4 pt-3" :class="lens ? 'pb-1' : 'pb-3'">
       <h2 id="lens-heading" class="text-title-large">{{ lens ? 'What this means for you' : 'What does this mean for…' }}</h2>
-      <v-chip-group :model-value="lens" selected-class="text-primary" aria-labelledby="lens-heading" @update:model-value="choose">
+      <v-chip-group
+        :model-value="lens"
+        selected-class="text-primary"
+        column
+        role="group"
+        aria-label="Audience"
+        @update:model-value="choose"
+      >
         <v-chip
           v-for="option in LENS_OPTIONS"
           :key="option.key"
           :value="option.key"
+          role="button"
+          :aria-pressed="lens === option.key"
           variant="outlined"
           filter
           :data-testid="`lens-pick-${option.key}`"

@@ -103,7 +103,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
     <div class="d-sr-only" aria-live="polite">{{ announcement }}</div>
 
     <div v-if="!hasCode" class="mt-6 d-flex flex-column ga-6">
-      <StartHere @start="(lens, example) => startOver(example.code, { lens, npi: example.npi ?? null })" />
+      <StartHere />
       <DatasetSnapshot v-if="currentSnapshot" :snapshot="currentSnapshot" />
       <v-skeleton-loader v-else-if="snapshots.isPending.value" type="card" />
       <LoadingPanel v-else />

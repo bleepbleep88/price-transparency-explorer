@@ -78,6 +78,14 @@ describe('LensPanel', () => {
     expect(wrapper.emitted('update')).toEqual([[{ lens: 'plans', page: 2 }]])
   })
 
+  it('exposes the picker as a named group of toggle buttons', () => {
+    const wrapper = mountPanel(result([group()]), { lens: 'plans' })
+    const picker = wrapper.get('[role="group"]')
+    expect(picker.attributes('aria-label')).toBe('Audience')
+    expect(wrapper.get('[data-testid="lens-pick-plans"]').attributes()).toMatchObject({ role: 'button', 'aria-pressed': 'true' })
+    expect(wrapper.get('[data-testid="lens-pick-employers"]').attributes('aria-pressed')).toBe('false')
+  })
+
   it('clears the lens when the active one is picked again', async () => {
     const wrapper = mountPanel(result([group()]), { lens: 'plans' })
     expect(wrapper.text()).toContain('What this means for you')

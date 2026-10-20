@@ -7,15 +7,18 @@ const { status, progress } = useDataStatus()
 
 const view = computed(() => {
   const current = status.value
-  if (!current) return { color: 'default', icon: mdiLanConnect, text: 'Connecting…' }
+  // spoken: what the live region announces; no percentages, so screen readers hear phase changes, not every tick.
+  if (!current) return { color: 'default', icon: mdiLanConnect, text: 'Connecting…', spoken: 'Connecting' }
   if (current.phase === 'ready') {
     return current.issues.length > 0
-      ? { color: 'warning', icon: mdiAlertCircleOutline, text: 'Data ready, with notes' }
-      : { color: 'success', icon: mdiCheckCircleOutline, text: 'Data ready' }
+      ? { color: 'warning', icon: mdiAlertCircleOutline, text: 'Data ready, with notes', spoken: 'Data ready, with notes' }
+      : { color: 'success', icon: mdiCheckCircleOutline, text: 'Data ready', spoken: 'Data ready' }
   }
-  if (current.phase === 'failed') return { color: 'error', icon: mdiAlertCircleOutline, text: 'Data failed to load' }
+  if (current.phase === 'failed') {
+    return { color: 'error', icon: mdiAlertCircleOutline, text: 'Data failed to load', spoken: 'Data failed to load' }
+  }
   const percent = progress.value == null ? '' : ` ${Math.round(progress.value * 100)}%`
-  return { color: 'info', icon: mdiCloudDownloadOutline, text: `Loading data${percent}` }
+  return { color: 'info', icon: mdiCloudDownloadOutline, text: `Loading data${percent}`, spoken: 'Loading data' }
 })
 </script>
 
@@ -28,12 +31,13 @@ const view = computed(() => {
         :prepend-icon="view.icon"
         variant="tonal"
         size="small"
-        role="status"
-        aria-live="polite"
+        role="button"
+        :aria-label="`Data status: ${view.text}`"
         data-testid="data-status"
       >
         {{ view.text }}
       </v-chip>
+      <span class="d-sr-only" role="status">{{ view.spoken }}</span>
     </template>
 
     <v-card max-width="440" title="Data status">
