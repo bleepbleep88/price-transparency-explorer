@@ -42,6 +42,15 @@ export function useRateNpis(
   })
 }
 
+/** The level ladder for a visit code; `code` is null for codes that aren't billed in levels. */
+export function useLevelLadder(code: MaybeRefOrGetter<string | null>, snapshot: MaybeRefOrGetter<number | undefined>) {
+  return useQuery({
+    queryKey: computed(() => rateKeys.levels(toValue(code) ?? '', toValue(snapshot))),
+    queryFn: ({ signal }) => ratesApi.levels(toValue(code)!, toValue(snapshot), signal),
+    enabled: computed(() => toValue(code) != null),
+  })
+}
+
 /** Typeahead over codes that have rates. Debounced so each keystroke doesn't hit the API. */
 export function useCodeSuggestions(search: MaybeRefOrGetter<string>, snapshot: MaybeRefOrGetter<number | undefined>) {
   const debounced = refDebounced(computed(() => (toValue(search) ?? '').trim()), 250)

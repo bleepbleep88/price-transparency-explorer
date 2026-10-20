@@ -8,6 +8,7 @@ export const rateKeys = {
   source: (rateId: number, provider: string | null) => [...rateKeys.all, 'source', rateId, provider] as const,
   npis: (rateIds: readonly number[], provider: string | null, page: number) => [...rateKeys.all, 'npis', rateIds, provider, page] as const,
   codes: (q: string, snapshot: number | undefined) => [...rateKeys.all, 'codes', q, snapshot] as const,
+  levels: (code: string, snapshot: number | undefined) => [...rateKeys.all, 'levels', code, snapshot] as const,
   providers: (q: string, snapshot: number | undefined) => [...rateKeys.all, 'providers', q, snapshot] as const,
 }
 
