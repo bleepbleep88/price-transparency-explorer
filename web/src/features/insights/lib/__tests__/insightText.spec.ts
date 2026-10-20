@@ -51,8 +51,8 @@ describe('statistics basis', () => {
 
   it('warns only when the statistics are not current', () => {
     expect(staleMessage(basis())).toBeNull()
-    expect(staleMessage(basis({ isCurrent: false }))).toContain('being rebuilt')
-    expect(staleMessage(basis({ isCurrent: false, builtAt: null }))).toContain('still being built')
+    expect(staleMessage(basis({ isCurrent: false }))).toContain('out of date')
+    expect(staleMessage(basis({ isCurrent: false, builtAt: null }))).toContain("haven't been saved yet")
   })
 })
 

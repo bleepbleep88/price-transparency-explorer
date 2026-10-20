@@ -8,7 +8,7 @@ export const insightsApi = {
 
   /** `provider` is an EIN or a provider key from results; the response names the key it resolved to. */
   scorecard: (provider: string, snapshot: number | undefined, signal?: AbortSignal) =>
-    requestJson<ProviderScorecard>(`/api/v1/insights/providers/${encodeURIComponent(provider)}`, { query: { snapshot }, signal }),
+    requestJson<ProviderScorecard>('/api/v1/insights/scorecard', { query: { provider, snapshot }, signal }),
 
   compare: (params: CompareParams, signal?: AbortSignal) =>
     requestJson<ProductComparison>('/api/v1/insights/compare', { query: compareApiQuery(params), signal }),

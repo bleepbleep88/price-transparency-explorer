@@ -37,12 +37,15 @@ export function statisticsLine(basis: StatisticsBasis): string {
   return basis.builtAt ? `${snapshot} · statistics saved ${shortDate(basis.builtAt)}` : snapshot
 }
 
-/** Why the numbers may not match a search yet, or null when they're current. */
+/**
+ * Why the numbers may not match a search, or null when they're current. Out of date means the data changed since they
+ * were saved (a reload, a rate past its end date); the page refreshes by itself when a rebuild finishes.
+ */
 export function staleMessage(basis: StatisticsBasis): string | null {
   if (basis.isCurrent) return null
   return basis.builtAt
-    ? "These statistics are being rebuilt, so some numbers may not match a search yet. The page updates on its own when they're ready."
-    : "Statistics for this snapshot are still being built. The page fills in on its own when they're ready."
+    ? "These saved statistics are out of date, so some numbers may not match a search until they're rebuilt. This page refreshes when that finishes."
+    : "Statistics for this snapshot haven't been saved yet. This page fills in when they are."
 }
 
 /** "CPT 45378 · Colonoscopy" or just "RC 0360" when the plan's files don't name the code. */

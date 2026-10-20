@@ -64,8 +64,8 @@ describe('StatisticsNote', () => {
   it('warns while they are being built or rebuilt', () => {
     const building = mount(StatisticsNote, { props: { basis: basis({ isCurrent: false, builtAt: null }) }, global: { plugins: plugins() } })
     const rebuilding = mount(StatisticsNote, { props: { basis: basis({ isCurrent: false }) }, global: { plugins: plugins() } })
-    expect(building.get('[data-testid="statistics-stale"]').text()).toContain('still being built')
-    expect(rebuilding.get('[data-testid="statistics-stale"]').text()).toContain('being rebuilt')
+    expect(building.get('[data-testid="statistics-stale"]').text()).toContain("haven't been saved yet")
+    expect(rebuilding.get('[data-testid="statistics-stale"]').text()).toContain('out of date')
   })
 })
 

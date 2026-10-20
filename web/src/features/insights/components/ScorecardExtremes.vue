@@ -17,7 +17,7 @@ function detail(group: ScorecardGroup): string {
 <template>
   <v-card class="h-100">
     <v-card-item>
-      <v-card-title>{{ title }}</v-card-title>
+      <v-card-title tag="h2">{{ title }}</v-card-title>
     </v-card-item>
     <v-card-text>
       <p v-if="!groups.length" class="text-body-medium text-medium-emphasis">{{ empty }}</p>

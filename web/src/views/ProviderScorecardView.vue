@@ -126,7 +126,7 @@ const bandView: Record<string, { label: string; color?: string }> = {
         <v-col cols="12" md="4">
           <v-card class="h-100" data-testid="price-index">
             <v-card-item>
-              <v-card-title class="d-flex align-center ga-1">
+              <v-card-title tag="h2" class="d-flex align-center ga-1">
                 Price index
                 <v-tooltip :text="indexExplainer(result.index.value)" max-width="340" location="top">
                   <template #activator="{ props: tip }">
@@ -159,7 +159,7 @@ const bandView: Record<string, { label: string; color?: string }> = {
 
       <v-card>
         <v-card-item>
-          <v-card-title>Every comparison group ({{ wholeNumber(result.groups.length) }})</v-card-title>
+          <v-card-title tag="h2">Every comparison group ({{ wholeNumber(result.groups.length) }})</v-card-title>
           <v-card-subtitle class="text-wrap">
             Each row is what a search for the code with this provider's tax ID shows: its rate, placed against every other
             provider in the same group.
@@ -185,7 +185,6 @@ const bandView: Record<string, { label: string; color?: string }> = {
             density="compact"
             hover
             :row-props="() => ({ 'data-testid': 'scorecard-row' })"
-            aria-label="Every comparison group for this provider"
           >
             <template #[`item.code`]="{ item }">
               <div class="py-1">

@@ -159,11 +159,13 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
         variant="outlined"
         divided
         color="primary"
+        role="group"
         aria-labelledby="rank-by"
         @update:model-value="(value) => update({ sort: value })"
       >
-        <v-btn value="gap" data-testid="sort-gap">Gap to the lower quartile</v-btn>
-        <v-btn value="spread" data-testid="sort-spread">Spread (90th ÷ 10th)</v-btn>
+        <!-- Vuetify's toggle sets no ARIA state, so each button says whether it's the one in use. -->
+        <v-btn value="gap" :aria-pressed="params.sort === 'gap'" data-testid="sort-gap">Gap to the lower quartile</v-btn>
+        <v-btn value="spread" :aria-pressed="params.sort === 'spread'" data-testid="sort-spread">Spread (90th ÷ 10th)</v-btn>
       </v-btn-toggle>
       <v-btn v-if="filtered" variant="text" size="small" @click="clearFilters">Clear filters</v-btn>
     </div>
@@ -194,7 +196,6 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           density="compact"
           hover
           :row-props="() => ({ 'data-testid': 'gap-row' })"
-          aria-label="Comparison groups ranked by gap"
           @update:options="onOptions"
         >
           <template #[`item.rank`]="{ item }">

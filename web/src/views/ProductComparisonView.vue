@@ -235,7 +235,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           <v-col cols="12" md="7">
             <v-card class="h-100">
               <v-card-item>
-                <v-card-title>How the ratios spread</v-card-title>
+                <v-card-title tag="h2">How the ratios spread</v-card-title>
                 <v-card-subtitle class="text-wrap">{{ product }} against {{ versus }}, pair by pair</v-card-subtitle>
               </v-card-item>
               <v-card-text>
@@ -246,9 +246,9 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
           <v-col cols="12" md="5">
             <v-card class="h-100">
               <v-card-item>
-                <v-card-title>In numbers</v-card-title>
+                <v-card-title tag="h2">In numbers</v-card-title>
               </v-card-item>
-              <v-table density="compact" aria-label="Pairs by how far apart the two rates are">
+              <v-table density="compact">
                 <thead>
                   <tr>
                     <th scope="col">{{ product }}'s rate</th>
@@ -270,7 +270,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
 
         <v-card>
           <v-card-item>
-            <v-card-title>By category</v-card-title>
+            <v-card-title tag="h2">By category</v-card-title>
           </v-card-item>
           <v-data-table
             :headers="categoryHeaders"
@@ -280,7 +280,6 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
             hide-default-footer
             :mobile="smAndDown"
             density="compact"
-            aria-label="Pairs by category of service"
           >
             <template #[`item.pairs`]="{ item }">{{ wholeNumber(item.pairs) }}</template>
             <template #[`item.identical`]="{ item }">{{ share(item.identical, item.pairs) }}</template>
@@ -292,7 +291,7 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
 
         <v-card>
           <v-card-item>
-            <v-card-title>Pair by pair</v-card-title>
+            <v-card-title tag="h2">Pair by pair</v-card-title>
           </v-card-item>
           <v-card-text class="pb-0">
             <v-select
@@ -317,7 +316,6 @@ function onOptions(options: { page: number; itemsPerPage: number }) {
             density="compact"
             hover
             :row-props="() => ({ 'data-testid': 'compare-pair' })"
-            aria-label="Pairs of rates"
             @update:options="onOptions"
           >
             <template #[`item.provider`]="{ item }">
