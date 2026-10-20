@@ -15,6 +15,8 @@ export function toTrendApiQuery(params: SearchParams): Record<string, QueryValue
     setting: params.setting,
     feeType: params.feeType,
     provider: params.provider,
+    specialty: params.specialty,
+    county: params.county,
     snapshot: params.snapshot,
   }
 }

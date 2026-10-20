@@ -138,7 +138,7 @@ Counts are of provider values: one per provider per comparison group. When a pro
 | `GET /api/v1/sources` | Every snapshot and file (rate and allowed-amount files): URL, three dates, size, SHA-256, ETag, counts, rejects by reason, timing |
 | `GET /api/v1/out-of-network?code=&codeType=&snapshot=` | What the plan allowed out of network for a code, per product and fee type |
 | `GET /api/v1/changes?from=&to=&product=&code=&kind=&minChangePct=&listedElsewhere=&sort=&page=&pageSize=` | Rates that changed, appeared or dropped between two snapshots, with counts by kind. Defaults: the newest snapshot against the one before. |
-| `GET /api/v1/rates/trend?code=&npi=&ein=&provider=&product=&setting=&feeType=&snapshot=` | Each comparison group a search shows, in every snapshot: provider count, median and quartiles, and the searched provider's rate |
+| `GET /api/v1/rates/trend?code=&npi=&ein=&provider=&specialty=&county=&product=&setting=&feeType=&snapshot=` | Each comparison group a search shows, in every snapshot: provider count, median and quartiles, and the searched provider's rate |
 | `/health/live` · `/health/ready` | Ready once rate data can be searched |
 
 ## Assumptions and tradeoffs

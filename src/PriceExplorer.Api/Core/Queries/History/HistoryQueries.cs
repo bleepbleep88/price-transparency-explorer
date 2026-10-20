@@ -97,10 +97,13 @@ public sealed record GetRateTrendQuery(
     string? Setting = null,
     string? FeeType = null,
     string? Provider = null,
+    string? Specialty = null,
+    string? County = null,
     int? Snapshot = null) : IRequest<RateTrendResult>, IRequiresData
 {
     /// <summary>The search each snapshot runs: the same inputs, every group, no paging.</summary>
-    internal SearchRatesQuery AsSearch() => new(Code, CodeType, Npi, Ein, Product, Setting, FeeType, Provider, Group: null, Snapshot);
+    internal SearchRatesQuery AsSearch() => new(
+        Code, CodeType, Npi, Ein, Product, Setting, FeeType, Provider, Specialty: Specialty, County: County, Group: null, Snapshot: Snapshot);
 }
 
 public sealed class GetRateTrendQueryValidator : AbstractValidator<GetRateTrendQuery>
