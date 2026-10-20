@@ -22,7 +22,9 @@ const code = computed(() => props.result.code)
 const categoryLabel = computed(() => {
   const classification = code.value?.classification
   if (!classification) return null
-  return classification.subcategory ? `${classification.category} · ${classification.subcategory}` : classification.category
+  // "Anesthesia · Anesthesia" says it twice: one is enough.
+  const repeats = classification.subcategory?.toLowerCase() === classification.category.toLowerCase()
+  return classification.subcategory && !repeats ? `${classification.category} · ${classification.subcategory}` : classification.category
 })
 const notes = computed(() => pricingNotes(props.result))
 
@@ -110,7 +112,17 @@ const qualityChips = computed(() => {
     <div v-if="code" class="d-flex flex-wrap align-center ga-2 text-body-medium">
       <v-tooltip v-if="code.classification.family" :text="`CMS's category for this code: ${code.classification.family}`" max-width="360" location="bottom">
         <template #activator="{ props: tip }">
-          <v-chip v-bind="tip" variant="tonal" color="primary" data-testid="category-chip">{{ categoryLabel }}</v-chip>
+          <!-- Focusable, so keyboard and touch readers reach the tooltip too. -->
+          <v-chip
+            v-bind="tip"
+            variant="tonal"
+            color="primary"
+            tabindex="0"
+            :aria-label="`${categoryLabel}. CMS's category for this code: ${code.classification.family}`"
+            data-testid="category-chip"
+          >
+            {{ categoryLabel }}
+          </v-chip>
         </template>
       </v-tooltip>
       <v-chip v-else variant="tonal" color="primary" data-testid="category-chip">{{ categoryLabel }}</v-chip>

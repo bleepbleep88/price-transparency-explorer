@@ -132,11 +132,12 @@ These include facility charges with no procedure named (3,335 and 3,816 of the c
 
 Two more small CMS files ship in `reference/` (built by the same tool, see `reference/README.md`): the HCPCS Level II names from the October 2026 quarterly file, and the RBCS (Restructured BETOS) category of every CPT and HCPCS code. Neither holds CPT descriptors (the AMA's) or dental names (the ADA's).
 
-- Each code gets **CMS's category**: "Procedures · Digestive/Gastrointestinal" for 45378, with the RBCS family in a tooltip. Codes RBCS doesn't list, like revenue codes, keep the code-range category. `/api/v1/categories` lists the tree with code and rate counts, and the code typeahead takes `category`.
+- Each code gets **CMS's category**: "Procedures · Digestive/Gastrointestinal" for 45378, with the RBCS family in a tooltip. Codes RBCS doesn't list, like revenue codes, keep the code-range category, under one root: "Not in CMS's categories". `/api/v1/categories` lists the tree with code and rate counts (a subcategory's codes with no CMS family sit in "Other …", so children add up), and the code typeahead takes `category`.
+- Two key sets, on purpose: a search result's `category` says how a code is priced (`drugs`, `anesthesia`: the unit), and its `classification` says what it is. `classification.key` (`PG004`, `PG`, `P`, `facility`) is what `/api/v1/categories` lists and `/codes?category=` takes, in any letter case; a key that isn't in the tree is a 400.
 - When the plan's file doesn't name a code (a drug named only in a revenue-code rate's notes), the name comes from **CMS's HCPCS list**, and the page says so.
 - **How it's priced** explains each way the prices are paid where it applies: anesthesia units, drugs per HCPCS unit, supplies per item, lab tests per test, facility rates under revenue codes, health centers paid per visit, imaging's reading and scan parts (modifiers 26 and TC), and visit levels.
 - **Visit levels side by side**: office visits (99202–99205, 99211–99215) and ER visits (99281–99285) show each level's typical price on the same plan, setting, fee and modifiers, as a chart and a table. `/api/v1/rates/levels` builds it from the same numbers as each level's search.
-- **What a dose costs**, for drugs: the unit comes from the code's name (J3301 is 10 mg), the dose is rounded up to whole units as billing does, and the cost is units at the typical price per unit, every step said in words. Discarded drug (modifier JW) is noted, not added.
+- **What a dose comes to at the plan's rates**, for drugs: the unit comes from the code's name (J3301 is 10 mg; a name with two amounts, like "3 mg and 3 mg", gets no calculator), the dose is rounded up to whole units as billing does (any dose is at least 1), and the cost is units at a card's typical price per unit, every step said in words. Discarded-drug (JW) and percentage cards never price a dose; when nothing else has 5 or more providers, the page says why instead.
 
 ## API
 

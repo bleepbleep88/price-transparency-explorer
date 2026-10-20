@@ -114,7 +114,31 @@ describe('ResultSummary', () => {
     })
 
     expect(wrapper.get('[data-testid="category-chip"]').text()).toBe('Procedures · Digestive/Gastrointestinal')
+    // The family is in a tooltip: the chip takes focus so keyboard and touch readers reach it.
+    expect(wrapper.get('[data-testid="category-chip"]').attributes('tabindex')).toBe('0')
+    expect(wrapper.get('[data-testid="category-chip"]').attributes('aria-label')).toContain('Lower GI Endoscopy - Other')
     expect(wrapper.find('[data-testid="cms-name"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pricing-notes"]').exists()).toBe(false)
+  })
+
+  it('says a category once when CMS gives its subcategory the same name', () => {
+    const vuetify = createVuetify({ theme: { defaultTheme: 'light' } })
+    const anesthesia: CodeInfo = {
+      codeType: 'CPT',
+      code: '00731',
+      name: 'ANESTH UPR GI VISUALIZE',
+      description: null,
+      descriptionSource: 'payer_file',
+      category: { key: 'anesthesia', label: 'Anesthesia', unit: 'per anesthesia unit', perUnit: true },
+      classification: { key: 'AA', category: 'Anesthesia', subcategory: 'Anesthesia', family: null, source: 'cms_rbcs' },
+      doseUnit: null,
+      levelFamily: null,
+      foundVia: [],
+    }
+    const wrapper = mount(ResultSummary, {
+      props: { result: { ...result({ code: '00731' }), code: anesthesia }, params: parseRouteQuery({ code: '00731' }), products: [], settings: [], locations },
+      global: { plugins: [vuetify] },
+    })
+    expect(wrapper.get('[data-testid="category-chip"]').text()).toBe('Anesthesia')
   })
 })
