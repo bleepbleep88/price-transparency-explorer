@@ -16,6 +16,7 @@ import { insightKeys, useProviderScorecard } from '@/features/insights/composabl
 import { searchLocation } from '@/features/insights/lib/insightLinks'
 import { mergeInsightQuery, parseScorecardQuery, sortBy, sortParam, type InsightPatch } from '@/features/insights/lib/insightParams'
 import { OVERALL_EXPLAINER, overallSummary, serviceName } from '@/features/insights/lib/insightText'
+import { filterScorecardGroups } from '@/features/insights/lib/scorecardFilter'
 import { FACILITY_CHARGE_MARK, groupLine, position, unitSuffix } from '@/features/insights/lib/plainWords'
 
 const route = useRoute()
@@ -79,7 +80,8 @@ const headers = [
   { title: 'Where it sits', key: 'band', sortable: false },
   { title: 'Search', key: 'actions', sortable: false, align: 'end' as const },
 ]
-const filterKeys = ['code', 'codeName', 'categoryLabel', 'productLabel', 'settingLabel']
+// The table's own search only reads its column values, so the rows are filtered here, on what each row shows.
+const shownGroups = computed(() => filterScorecardGroups(result.value?.groups ?? [], params.value.q))
 const bandColor: Record<string, string | undefined> = { low: 'low', typical: undefined, high: 'high' }
 
 /** A facility charge with no procedure named is listed, but not compared unless facility charges are included. */
@@ -212,10 +214,8 @@ function placed(group: ScorecardGroup) {
             />
             <v-data-table
               :headers="headers"
-              :items="result.groups"
+              :items="shownGroups"
               item-value="groupKey"
-              :search="params.q ?? ''"
-              :filter-keys="filterKeys"
               :sort-by="sortBy(params.sort)"
               :page="params.page"
               :items-per-page="smAndDown ? 10 : 25"
