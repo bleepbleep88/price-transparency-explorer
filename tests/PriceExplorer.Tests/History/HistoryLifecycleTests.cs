@@ -68,6 +68,24 @@ public sealed class HistoryLifecycleTests
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task A_product_whose_file_failed_to_load_is_left_out_of_changes_and_says_so()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = Factory(http => http.Fail(EssentialUrl(September), HttpStatusCode.NotFound));
+        using var client = factory.CreateClient();
+        await factory.WaitForIngestionAsync(ct);
+
+        var result = await client.GetFromJsonAsync<JsonElement>("/api/v1/changes", ct);
+        var products = result.GetProperty("products").EnumerateArray().ToDictionary(product => product.GetProperty("productKey").GetString()!);
+
+        products[Essential].GetProperty("compared").GetBoolean().Should().BeFalse();
+        products[Essential].GetProperty("notComparedBecause").GetString().Should().Be("Left out: the 2026-09-28 file couldn't be loaded.");
+        products[Ambetter].GetProperty("compared").GetBoolean().Should().BeTrue();
+        result.GetProperty("rows").GetProperty("items").EnumerateArray()
+            .Should().OnlyContain(row => row.GetProperty("productKey").GetString() == Ambetter);
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task With_one_snapshot_there_is_nothing_to_compare_and_each_trend_has_one_point()
     {
         var ct = TestContext.Current.CancellationToken;

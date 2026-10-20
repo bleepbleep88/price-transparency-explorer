@@ -131,6 +131,7 @@ describe('LensHistoryLine', () => {
 
   it("tells plans what changed for the code since the last file, and links to those changes", async () => {
     changes.mockResolvedValue({
+      current: true,
       counts: { changed: 113, increased: 56, decreased: 57, new: 683, newListedElsewhere: 229, dropped: 618, droppedListedElsewhere: 231, unchanged: 2136 },
     } as ChangesResult)
 
@@ -142,8 +143,23 @@ describe('LensHistoryLine', () => {
     expect(line.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?code=99213')
   })
 
+  it("doesn't show counts from saved statistics that are out of date as current", async () => {
+    changes.mockResolvedValue({
+      current: false,
+      counts: { changed: 5, increased: 5, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 9 },
+    } as ChangesResult)
+
+    await mountLine('plans', result([group(OFFICE, 114)]))
+
+    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('The changes since the Aug 31 file are being updated.')
+    expect(wrapper!.text()).not.toContain('5 rates changed')
+  })
+
   it('compares an older snapshot with the file before it, and the oldest with nothing', async () => {
-    changes.mockResolvedValue({ counts: { changed: 0, increased: 0, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 9 } } as ChangesResult)
+    changes.mockResolvedValue({
+      current: true,
+      counts: { changed: 0, increased: 0, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 9 },
+    } as ChangesResult)
 
     await mountLine('plans', result([group(OFFICE, 114)]), { snapshot: '2' })
     expect(changes).toHaveBeenCalledWith(expect.objectContaining({ snapshot: 2 }), expect.anything())

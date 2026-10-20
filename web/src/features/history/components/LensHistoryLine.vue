@@ -57,9 +57,13 @@ const changes = useChanges(
   }),
   () => props.lens === 'plans' && previous.value != null,
 )
-const changesText = computed(() =>
-  changes.data.value && previous.value ? changesSinceText(changes.data.value.counts, monthDay(previous.value.indexDate), code.value) : null,
-)
+// Counts from saved statistics that are out of date (or not built yet) aren't shown as current.
+const changesText = computed(() => {
+  const data = changes.data.value
+  if (!data || !previous.value) return null
+  const since = monthDay(previous.value.indexDate)
+  return data.current ? changesSinceText(data.counts, since, code.value) : `The changes since the ${since} file are being updated.`
+})
 const line = computed(() => yours.value ?? typical.value)
 const changesLink = computed(() => ({
   name: 'changes',

@@ -134,15 +134,20 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
                 var older = rows.FirstOrDefault(row => row.SnapshotId == from.SnapshotId);
                 var newer = rows.FirstOrDefault(row => row.SnapshotId == to.SnapshotId);
                 var label = (newer ?? older)!.ProductLabel;
-                var reason = older is null ? $"Not in the {Name(from)} snapshot."
-                    : newer is null ? $"Not in the {Name(to)} snapshot."
-                    : PartialReason(from, completeness.GetValueOrDefault((from.SnapshotId, rows.Key)))
-                      ?? PartialReason(to, completeness.GetValueOrDefault((to.SnapshotId, rows.Key)));
+                var reason = MissingReason(from, older) ?? MissingReason(to, newer)
+                    ?? PartialReason(from, completeness.GetValueOrDefault((from.SnapshotId, rows.Key)))
+                    ?? PartialReason(to, completeness.GetValueOrDefault((to.SnapshotId, rows.Key)));
                 return new ProductEntry(rows.Key, label, reason);
             })
             .OrderBy(entry => entry.ProductLabel, StringComparer.Ordinal)
             .ToList();
     }
+
+    /// <summary>Why a product one snapshot lacks is left out: the index doesn't list it, or its file couldn't be loaded.</summary>
+    private static string? MissingReason(ResolvedSnapshot snapshot, ProductRow? row) =>
+        row is null ? $"Not in the {Name(snapshot)} snapshot."
+        : !row.Saved ? $"Left out: the {Name(snapshot)} file couldn't be loaded."
+        : null;
 
     /// <summary>Why a partial file is left out, naming the measure that fell short; null when the file is complete.</summary>
     internal static string? PartialReason(ResolvedSnapshot snapshot, ProductCompleteness? completeness)
@@ -189,7 +194,7 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
         public ChangesProduct ToDto() => new(ProductKey, ProductLabel, Compared, NotComparedBecause);
     }
 
-    private sealed record ProductRow(int SnapshotId, string ProductKey, string ProductLabel);
+    private sealed record ProductRow(int SnapshotId, string ProductKey, string ProductLabel, bool Saved);
 
     private sealed record CodeNameRow(string CodeType, string Code, string? Name, string? Description, int FromSnapshot);
 

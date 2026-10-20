@@ -83,8 +83,16 @@ const summary = computed(() =>
 )
 const listedElsewhere = computed(() => (result.value ? listedElsewhereSummary(result.value.counts) : null))
 const notCompared = computed(() => result.value?.products.filter((product) => !product.compared) ?? [])
+// Changes come from statistics saved after loading: none yet means nothing to show; an old build may be out of date.
+const notBuilt = computed(() =>
+  result.value ? [result.value.from, result.value.to].filter((snapshot) => !snapshot.statisticsBuiltAt).map((s) => shortDate(s.indexDate)) : [],
+)
 const outOfDate = computed(() =>
-  result.value ? [result.value.from, result.value.to].filter((snapshot) => !snapshot.statisticsCurrent).map((s) => shortDate(s.indexDate)) : [],
+  result.value
+    ? [result.value.from, result.value.to]
+        .filter((snapshot) => snapshot.statisticsBuiltAt && !snapshot.statisticsCurrent)
+        .map((s) => shortDate(s.indexDate))
+    : [],
 )
 
 function onTableOptions(options: { page: number; pageSize: number; sort: ChangeSort }) {
@@ -200,6 +208,10 @@ function onTableOptions(options: { page: number; pageSize: number; sort: ChangeS
         </template>
       </v-alert>
       <v-skeleton-loader v-else-if="changes.isPending.value" type="paragraph, table" />
+
+      <v-alert v-else-if="result && notBuilt.length" type="info" variant="tonal" data-testid="changes-not-built">
+        Changes show once the statistics for {{ notBuilt.join(' and ') }} are saved, when loading finishes.
+      </v-alert>
 
       <template v-else-if="result">
         <v-alert v-if="outOfDate.length" type="warning" variant="tonal" data-testid="changes-out-of-date">
