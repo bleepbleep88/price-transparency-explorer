@@ -11,7 +11,7 @@ Name, specialty, and practice location for every NPI that appears in the loaded 
 | `npi`, `entity_type`, `name`, `credential`, `city`, `state`, `zip5`, `deactivated`, `nppes_last_updated` | CMS NPPES monthly file (`NPPES_Data_Dissemination_<Month>_<Year>_V2.zip`) |
 | `taxonomy_code` | The provider's primary taxonomy in NPPES |
 | `specialty`, `specialty_group` | NUCC Health Care Provider Taxonomy code set (display name and grouping) |
-| `county_fips`, `county`, `borough` | Census 2020 ZCTA-to-county relationship file (the county holding most of the ZIP's land area; NYC counties named as boroughs) |
+| `county_fips`, `county`, `borough` | Census 2020 ZCTA-to-county relationship file (the county holding most of the ZIP's land area; NYC counties named as boroughs). A ZIP the file lacks (a PO box or a building's own ZIP), or one in another state than the address, gives way to the county that 90% or more of the same city's NPIs share. Practices outside the US get none. |
 
 Street addresses and phone numbers are left out on purpose. `provider_directory.source.json` records the exact source URLs, when it was built, and how many NPIs matched.
 
