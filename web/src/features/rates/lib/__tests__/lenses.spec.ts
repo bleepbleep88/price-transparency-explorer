@@ -152,8 +152,8 @@ describe('providers lens', () => {
     expect(line).toMatchObject({ provider: 'Heel Sole Podiatry PC', providerKey: '995084138', rate: 80.72 })
     expect(line!.text).toBe('Your rate $80.72 is at the 68th percentile, 1.57× the median.')
     expect(yourRateLines(byName([office], 'heel'))[0]!.text).toBe('Rate $80.72 is at the 68th percentile, 1.57× the median.')
-    expect(highlightHeading(byNpi([office]))).toBe('Where your provider sits')
-    expect(highlightHeading(byName([office], 'heel'))).toBe('Where providers whose name contains "heel" sit')
+    expect(highlightHeading(byNpi([office]))).toBe('How your provider compares')
+    expect(highlightHeading(byName([office], 'heel'))).toBe('How providers whose name contains "heel" compare')
   })
 
   it('calls the median the most common rate only when the quartiles prove it', () => {

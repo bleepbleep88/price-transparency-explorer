@@ -14,11 +14,11 @@ test('knee arthroscopy (29881) is explained as a facility-only rate', async ({ p
 
   const surgeryCenter = page.getByTestId('group-card').filter({ hasText: 'Ambulatory surgery center' }).first()
   await expect(surgeryCenter).toContainText('Facility fee')
-  await expect(surgeryCenter).toContainText('Revenue code 0490')
+  await expect(surgeryCenter).toContainText('Filed under revenue code 0490')
   await expect(page.getByTestId('provider-row').first()).toBeVisible()
 })
 
-test('an EIN from the 99213 results narrows the table to that provider and shows where it sits', async ({ page }) => {
+test('an EIN from the 99213 results narrows the table to that provider and shows how it compares', async ({ page }) => {
   await page.goto('/?code=99213')
   const rows = page.getByTestId('provider-row')
   await expect(rows.first()).toBeVisible()
@@ -33,7 +33,7 @@ test('an EIN from the 99213 results narrows the table to that provider and shows
 
   await expect(page).toHaveURL(new RegExp(`[?&]ein=${ein}(&|$)`))
   await expect(page.getByTestId('active-filter').filter({ hasText: `EIN ${ein}` })).toBeVisible()
-  await expect(page.getByTestId('group-highlights').first()).toContainText('Where your provider sits')
+  await expect(page.getByTestId('group-highlights').first()).toContainText('How your provider compares')
   // Previous results stay on screen while the new ones load, so wait for the table to settle.
   await expect
     .poll(async () => [...new Set(await page.getByTestId('row-ein').allInnerTexts())])

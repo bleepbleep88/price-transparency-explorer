@@ -194,8 +194,8 @@ export function yourRateGroups(result: RateSearchResult): YourRateGroup[] {
 /** Heading over a card's highlights: "your" only when an NPI or EIN pins one provider. */
 export function highlightHeading(result: RateSearchResult): string {
   return pinsProvider(result) || !result.query.provider
-    ? 'Where your provider sits'
-    : `Where providers whose name contains "${result.query.provider}" sit`
+    ? 'How your provider compares'
+    : `How providers whose name contains "${result.query.provider}" compare`
 }
 
 // ---- Plans ----
