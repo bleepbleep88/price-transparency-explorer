@@ -36,12 +36,15 @@ const option = computed(() => {
     xAxis: {
       type: 'category',
       data: props.steps.map((step) => levelLabel(step)),
-      // Every level's label, on two lines so five fit on a phone: "Level 3" over "(99213)".
+      // Every level's label, on two lines so five fit on a phone: "Level 3" over "(99213)". The searched level is bold.
       axisLabel: {
         color: ink,
         interval: 0,
-        formatter: (value: string) => value.replace(' (', '\n('),
-        fontWeight: (value: string) => (value.includes(props.current) ? 'bold' : 'normal'),
+        formatter: (value: string) => {
+          const lines = value.split(' (').map((part, index) => (index === 0 ? part : `(${part}`))
+          return value.includes(props.current) ? lines.map((part) => `{current|${part}}`).join('\n') : lines.join('\n')
+        },
+        rich: { current: { color: ink, fontWeight: 'bold' } },
       },
       axisLine: { lineStyle: { color: ink, opacity: 0.4 } },
     },
@@ -72,7 +75,8 @@ const option = computed(() => {
       {
         name: 'Typical price',
         type: 'scatter',
-        symbolSize: 14,
+        // The searched level's point is bigger too.
+        symbolSize: (_value: number, params: { dataIndex: number }) => (props.steps[params.dataIndex]?.code === props.current ? 18 : 12),
         itemStyle: { color: colors.primary },
         label: { show: true, position: 'right', color: ink, formatter: ({ value }: { value: number }) => dollars(value) },
         data: props.steps.map((step) => step.typical ?? '-'),

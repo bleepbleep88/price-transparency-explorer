@@ -5,7 +5,7 @@ import { wholeNumber } from '@/lib/format'
 import { dollars } from '@/lib/plainNumbers'
 import type { RateSearchResult } from '../api/types'
 import { useLevelLadder } from '../composables/useRateQueries'
-import { comparableLines, defaultLine, ladderCaption, ladderSteps, levelLabel, lineLabel } from '../lib/levels'
+import { chooseLine, ladderCaption, ladderSteps, levelLabel, lineLabel } from '../lib/levels'
 import type { SearchParams } from '../lib/searchParams'
 
 // ECharts is big: only visit-level searches download it.
@@ -19,17 +19,25 @@ const ladder = useLevelLadder(
   () => (code.value?.levelFamily ? code.value.code : null),
   () => props.params.snapshot,
 )
-const lines = computed(() => comparableLines(ladder.data.value))
+// The search's plan, setting and fee type narrow the lines, and the picked card leads.
+const choice = computed(() =>
+  chooseLine(ladder.data.value, code.value?.code ?? '', {
+    product: props.params.product,
+    setting: props.params.setting,
+    feeType: props.params.feeType,
+    group: props.params.group,
+  }),
+)
+const lines = computed(() => choice.value.lines)
 
 // The reader's pick, until the search or its picked card changes.
 const picked = ref<string | null>(null)
 watch(
-  () => [code.value?.code, props.params.group],
+  () => [code.value?.code, props.params.group, props.params.product, props.params.setting, props.params.feeType],
   () => (picked.value = null),
 )
-const line = computed(
-  () => lines.value.find((candidate) => candidate.key === picked.value) ?? defaultLine(lines.value, code.value?.code ?? '', props.params.group),
-)
+const line = computed(() => lines.value.find((candidate) => candidate.key === picked.value) ?? choice.value.line)
+const note = computed(() => (picked.value ? null : choice.value.note))
 const steps = computed(() => (ladder.data.value && line.value ? ladderSteps(ladder.data.value, line.value) : []))
 const lineItems = computed(() => lines.value.map((candidate) => ({ title: lineLabel(candidate), value: candidate.key })))
 
@@ -58,7 +66,9 @@ const headers = [
         data-testid="level-line"
         @update:model-value="(key: string) => (picked = key)"
       />
-      <p v-else class="text-body-medium" data-testid="level-line-label">{{ lineLabel(line) }}</p>
+      <!-- On a phone the select cuts the label short; the setting and modifiers that tell lines apart come last. -->
+      <p v-if="lines.length <= 1 || smAndDown" class="text-body-medium" data-testid="level-line-label">{{ lineLabel(line) }}</p>
+      <p v-if="note" class="text-body-medium" data-testid="level-note">{{ note }}</p>
 
       <LevelLadderChart :steps="steps" :current="code!.code" />
 

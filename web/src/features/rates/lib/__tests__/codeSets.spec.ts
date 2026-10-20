@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { CodeInfo, DoseUnit, LevelLadder, LevelLine, RateGroup, RateSearchResult, RateStats } from '../../api/types'
-import { doseMath, dosePriceOptions, doseUnits } from '../dose'
-import { comparableLines, defaultLine, ladderCaption, ladderSteps, levelLabel, lineLabel } from '../levels'
+import { doseMath, dosePricing, doseUnits } from '../dose'
+import { chooseLine, comparableLines, ladderCaption, ladderSteps, levelLabel, lineLabel } from '../levels'
 import { pricingNotes } from '../pricing'
+import { parseDose } from '../searchParams'
 
 const BANNED = /percentile|median|quartile|×|p90|p10|spread multiple|index|comparison group/i
 
@@ -75,11 +76,32 @@ function result(groups: RateGroup[], info: CodeInfo | null = code()): RateSearch
 describe('dose math', () => {
   const propofol: DoseUnit = { amount: 10, unit: 'mg', text: '10 mg' }
   const botox: DoseUnit = { amount: 1, unit: 'unit', text: '1 unit' }
+  const botoxUnit = () => botox
 
-  it('rounds a dose up to whole HCPCS units', () => {
+  it('rounds a dose up to whole HCPCS units, at least 1', () => {
     expect(doseUnits(150, propofol)).toEqual({ exact: 15, units: 15, roundedUp: false })
     expect(doseUnits(125, propofol)).toEqual({ exact: 12.5, units: 13, roundedUp: true })
     expect(doseUnits(0.3, { amount: 0.1, unit: 'mg', text: '0.1 mg' })).toEqual({ exact: 3, units: 3, roundedUp: false })
+    expect(doseUnits(0.0000001, propofol)).toEqual({ exact: 0, units: 1, roundedUp: true })
+  })
+
+  it('says a dose under one unit is billed as one', () => {
+    expect(doseMath(0.5, propofol, 0.95)!.lines[0]).toBe("0.5 mg is less than one unit of 10 mg. Units are billed whole, so that's 1 unit.")
+    expect(doseMath(0.000001, propofol, 0.95)!.lines[1]).toBe('At the typical price of $0.95 a unit, 1 unit comes to $0.95.')
+  })
+
+  it('takes only plain decimals, with thousands commas', () => {
+    expect(parseDose('45')).toBe(45)
+    expect(parseDose(' 2.5 ')).toBe(2.5)
+    expect(parseDose('.5')).toBe(0.5)
+    expect(parseDose('2,400,000')).toBe(2400000)
+    for (const text of ['0x10', '1e3', 'Infinity', '-3', '0', '45 mg', '1,00', '1.0000001', '', '.']) expect(parseDose(text)).toBeNull()
+  })
+
+  it('refuses more than 100,000 units for one dose', () => {
+    const penicillin: DoseUnit = { amount: 100000, unit: 'unit', text: '100,000 units' }
+    expect(doseMath(2400000, penicillin, 12)!.units).toBe(24)
+    expect(doseMath(100001, botoxUnit(), 5)).toBeNull()
   })
 
   it('states the math in plain words, from the prices as shown', () => {
@@ -107,8 +129,10 @@ describe('dose math', () => {
     expect(doseMath(1, botox, 5.52)!.lines[1]).toBe('At the typical price of $5.52 a unit, 1 unit comes to $5.52.')
   })
 
-  it('shows tiny unit prices to four places instead of $0', () => {
-    expect(doseMath(1000, { amount: 1, unit: 'ml', text: 'per ml' }, 0.0035)!.lines[1]).toBe('At the typical price of $0.0035 a unit, 1,000 units come to $3.50.')
+  it('does not total a typical price that shows as $0: it says it is under a cent a unit', () => {
+    const math = doseMath(1000, { amount: 1, unit: 'ml', text: '1 ml' }, 0, { low: 0, high: 0.01 })!
+    expect(math.cost).toBeNull()
+    expect(math.lines).toEqual(['1,000 ml divided by 1 ml is 1,000 units.', 'The typical price is under a cent a unit, too small to total for this dose.'])
   })
 
   it('has nothing to say for a dose that is not a positive number', () => {
@@ -116,19 +140,36 @@ describe('dose math', () => {
     expect(doseMath(Number.NaN, propofol, 1)).toBeNull()
   })
 
-  it("prices from cards billed per unit under the drug's own code, without modifiers first", () => {
-    const options = dosePriceOptions(
+  const discarded = [{ code: 'JW', label: 'Drug amount discarded' }]
+
+  it("prices a given dose from cards billed per unit under the drug's own code, in dollars, never discarded drug", () => {
+    const { options, reason } = dosePricing(
       result([
-        group({ key: 'jw', modifiers: [{ code: 'JW', label: 'Drug amount discarded' }], providerCount: 40 }),
+        group({ key: 'jw', modifiers: discarded, providerCount: 40 }),
+        group({ key: 'jz', modifiers: [{ code: 'JZ', label: 'No drug discarded' }], providerCount: 30 }),
         group({ key: 'office', providerCount: 12 }),
         group({ key: 'small', providerCount: 3, stats: stats(0.1) }),
         group({ key: 'facility', perUnit: false, unit: 'per facility charge', billedAs: [{ billingCodeType: 'RC', billingCode: '0636', label: 'Revenue code 0636' }] }),
+        group({ key: 'percent', negotiatedType: 'percentage', providerCount: 20 }),
         group({ key: 'basic', providerCount: 6 }),
       ]),
     )
-    expect(options.map((option) => option.groupKey)).toEqual(['office', 'basic', 'jw'])
+    expect(options.map((option) => option.groupKey)).toEqual(['office', 'basic'])
     expect(options[0]!.most).toEqual({ low: 0.07, high: 0.12 })
     expect(options[1]!.most).toBeNull()
+    expect(reason).toBeNull()
+  })
+
+  it('says why it can price no dose: only discarded drug has a typical price, or too few providers', () => {
+    expect(dosePricing(result([group({ modifiers: discarded, providerCount: 7 }), group({ key: 'small', providerCount: 2 })]))).toEqual({
+      options: [],
+      reason: "This plan lists a price with 5 or more providers only for discarded drug (modifier JW), so we can't price a dose.",
+    })
+    expect(dosePricing(result([group({ providerCount: 3 }), group({ key: 'b', providerCount: 4 })])).reason).toBe(
+      'Too few providers to price a dose: each card has fewer than 5.',
+    )
+    // No per-unit price at all (only facility charges): nothing to say, the calculator stays away.
+    expect(dosePricing(result([group({ perUnit: false })]))).toEqual({ options: [], reason: null })
   })
 })
 
@@ -137,6 +178,7 @@ describe('how it is priced', () => {
     const notes = pricingNotes(result([group()]))
     expect(notes.map((note) => note.key)).toEqual(['drugs'])
     expect(notes[0]!.text).toContain('(for J2704, 10 mg)')
+    expect(pricingNotes(result([group()], code({ code: 'Q9967', doseUnit: { amount: 1, unit: 'ml', text: '1 ml' } })))[0]!.text).toContain('(for Q9967, 1 ml)')
   })
 
   it('adds facility rates under revenue codes, health centers, the imaging split and visit levels where they apply', () => {
@@ -207,11 +249,34 @@ describe('level ladder', () => {
   })
 
   it('shows the picked card’s line, else the fullest ladder with a typical price at the searched level', () => {
-    const lines = comparableLines(ladder)
-    expect(defaultLine(lines, '99213')!.key).toBe('office')
-    expect(defaultLine(lines, '99214')!.key).toBe('telehealth')
-    expect(defaultLine(lines, '99213', 'essential-plan|CPT|99212|professional|office|25|negotiated')!.key).toBe('office')
-    expect(defaultLine([], '99213')).toBeNull()
+    expect(chooseLine(ladder, '99213').line!.key).toBe('office')
+    expect(chooseLine(ladder, '99214').line!.key).toBe('telehealth')
+    expect(chooseLine(ladder, '99213', { group: 'essential-plan|CPT|99212|professional|office|25|negotiated' })).toMatchObject({ line: office, note: null })
+    expect(chooseLine(null, '99213')).toEqual({ lines: [], line: null, note: null })
+  })
+
+  it("follows the search's plan, setting and fee type, and offers only those lines", () => {
+    const ambetter = line('ambetter', office.levels, { productKey: 'ambetter', productLabel: 'Ambetter from Fidelis Care' })
+    const facility = line('facility', office.levels, { feeType: 'facility', modifiers: [] })
+    const wide: LevelLadder = { ...ladder, lines: [office, telehealth, ambetter, facility] }
+    expect(chooseLine(wide, '99213', { product: 'ambetter' }).lines.map((l) => l.key)).toEqual(['ambetter'])
+    expect(chooseLine(wide, '99213', { setting: 'telehealth-home' }).lines).toEqual([])
+    expect(chooseLine({ ...wide, lines: [office, { ...telehealth, settingKey: 'telehealth-home' }] }, '99213', { setting: 'telehealth-home' }).line!.key).toBe('telehealth')
+    expect(chooseLine(wide, '99213', { feeType: 'facility' }).line!.key).toBe('facility')
+  })
+
+  it("says so when the picked card's line can't be compared", () => {
+    const picked = chooseLine(ladder, '99213', { group: 'essential-plan|CPT|99213|professional|lonely|25|negotiated' })
+    expect(picked.line!.key).toBe('office')
+    expect(picked.note).toBe(
+      "The card you picked has a typical price at only one level; showing Essential Plan · Doctor's fee · Doctor's office · Separate service, same day (modifier 25).",
+    )
+  })
+
+  it('names the rate type when it is not a plain negotiated rate', () => {
+    expect(lineLabel({ ...office, negotiatedType: 'fee schedule' })).toBe(
+      "Essential Plan · Doctor's fee · Doctor's office · Separate service, same day (modifier 25) · rate type: fee schedule",
+    )
   })
 
   it('gives every level a step in plain words, even where the line has no prices', () => {

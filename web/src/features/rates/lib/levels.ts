@@ -29,26 +29,59 @@ export function comparableLines(ladder: LevelLadder | null | undefined): LevelLi
   return (ladder?.lines ?? []).filter((line) => line.levels.filter((step) => typicalPrice(summaryOf(step)) != null).length >= 2)
 }
 
-/** "Essential Plan · Doctor's fee · Doctor's office · Separate service, same day (modifier 25)" */
+/**
+ * "Essential Plan · Doctor's fee · Doctor's office · Separate service, same day (modifier 25)", with the rate type when
+ * it isn't a plain negotiated rate ("· rate type: fee schedule"), so two lines never read the same.
+ */
 export function lineLabel(line: LevelLine): string {
   const modifiers = line.modifiers.length ? ` · ${modifierText(line.modifiers)}` : ''
-  return `${line.productLabel} · ${feeLabel(line.feeType)} · ${line.settingLabel}${modifiers}`
+  const rateType = line.negotiatedType === 'negotiated' ? '' : ` · rate type: ${line.negotiatedType}`
+  return `${line.productLabel} · ${feeLabel(line.feeType)} · ${line.settingLabel}${modifiers}${rateType}`
+}
+
+/** What the search narrows to: the ladder shows only lines for the same plan, setting and fee type, and the picked card's. */
+export interface LadderFilters {
+  product?: string
+  setting?: string
+  feeType?: string
+  group?: string
+}
+
+export interface LadderChoice {
+  /** The comparable lines for the search's plan, setting and fee type: what the picker offers. */
+  lines: LevelLine[]
+  line: LevelLine | null
+  /** Set when the picked card's line can't be compared and another is shown instead. */
+  note: string | null
+}
+
+function typicalLevels(line: LevelLine): number {
+  return line.levels.filter((step) => typicalPrice(summaryOf(step)) != null).length
 }
 
 /**
- * The line to show first: the one holding the picked card, else the fullest ladder (the API lists lines with the most
- * levels priced first) that has a typical price at the searched level, else the first line. Null when no line compares
- * two levels.
+ * The lines the search allows and the one to show first: the picked card's when it compares two levels or more, else
+ * the fullest ladder (the API lists lines with the most levels priced first) with a typical price at the searched level,
+ * else the first. When the picked card's line can't be compared, the note says so and names the line shown.
  */
-export function defaultLine(lines: readonly LevelLine[], code: string, pickedGroup?: string | null): LevelLine | null {
-  if (pickedGroup) {
-    const picked = lines.find((line) => line.levels.some((step) => step.groupKey === pickedGroup))
-    if (picked) return picked
-  }
+export function chooseLine(ladder: LevelLadder | null | undefined, code: string, filters: LadderFilters = {}): LadderChoice {
+  const lines = comparableLines(ladder).filter(
+    (line) =>
+      (!filters.product || line.productKey === filters.product) &&
+      (!filters.setting || line.settingKey === filters.setting) &&
+      (!filters.feeType || line.feeType === filters.feeType),
+  )
   const pricedAt = (line: LevelLine) => line.levels.some((step) => step.code === code && typicalPrice(summaryOf(step)) != null)
-  return lines.find(pricedAt) ?? lines[0] ?? null
-}
+  const fallback = lines.find(pricedAt) ?? lines[0] ?? null
 
+  const pickedLine = filters.group ? (ladder?.lines ?? []).find((line) => line.levels.some((step) => step.groupKey === filters.group)) : undefined
+  if (!pickedLine) return { lines, line: fallback, note: null }
+  if (lines.includes(pickedLine)) return { lines, line: pickedLine, note: null }
+  if (!fallback) return { lines, line: null, note: null }
+  const priced = typicalLevels(pickedLine)
+  const why = priced === 1 ? 'has a typical price at only one level' : 'has too few providers for a typical price at any level'
+  return { lines, line: fallback, note: `The card you picked ${why}; showing ${lineLabel(fallback)}.` }
+}
 
 /** One step per level of the family, lowest first, in plain words. */
 export function ladderSteps(ladder: LevelLadder, line: LevelLine): LadderStep[] {
