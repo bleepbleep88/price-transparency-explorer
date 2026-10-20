@@ -57,7 +57,22 @@ function syncFromParams(params: SearchParams) {
   localErrors.value = {}
   filtersOpen.value = params.product || params.setting || params.feeType || params.provider ? [0] : filtersOpen.value
 }
-watch(() => props.params, syncFromParams, { immediate: true })
+// Only a different search re-syncs the form. Each field is its own source, so lens, cases, paging, sorting and
+// group picks (which also change the URL) leave unsearched edits and a collapsed filter panel alone.
+watch(
+  [
+    () => props.params.code,
+    () => props.params.codeType,
+    () => props.params.npi,
+    () => props.params.ein,
+    () => props.params.provider,
+    () => props.params.product,
+    () => props.params.setting,
+    () => props.params.feeType,
+  ],
+  () => syncFromParams(props.params),
+  { immediate: true },
+)
 
 const codeSuggestions = useCodeSuggestions(codeSearch, () => props.params.snapshot)
 const providerSuggestions = useProviderSuggestions(providerSearch, () => props.params.snapshot)

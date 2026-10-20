@@ -78,6 +78,13 @@ describe('lens and cases', () => {
     expect(query).not.toHaveProperty('cases')
   })
 
+  it('drops the case count for a different code, and keeps it otherwise', () => {
+    expect(mergeQuery({ code: '45378', lens: 'employers', cases: '1200' }, { code: '66984', page: null })).toEqual({ code: '66984', lens: 'employers' })
+    expect(mergeQuery({ code: '45378', cases: '1200' }, { code: '45378', npi: '1396747861' })).toMatchObject({ cases: '1200' })
+    expect(mergeQuery({ code: '45378', cases: '1200' }, { lens: 'plans' })).toMatchObject({ cases: '1200' })
+    expect(mergeQuery({ code: '45378', cases: '1200' }, { code: '66984', cases: 10 })).toMatchObject({ code: '66984', cases: '10' })
+  })
+
   it('keeps the lens when a new search replaces the code', () => {
     const next = mergeQuery({ code: '45378', lens: 'plans', npi: '1396747861' }, { code: '99213', npi: null, page: null })
     expect(next).toEqual({ code: '99213', lens: 'plans' })

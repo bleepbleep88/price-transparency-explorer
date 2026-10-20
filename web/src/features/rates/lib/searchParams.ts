@@ -34,7 +34,7 @@ export interface SearchParams {
   snapshot?: number
   /** Interpretation only: never sent to the API, and it survives new searches. */
   lens?: Lens
-  /** Employers lens: cases a year, to turn the per-case gap into a yearly figure. */
+  /** Employers lens: cases a year for the searched code; a search for a different code drops it. */
   cases?: number
 }
 
@@ -83,6 +83,9 @@ export function mergeQuery(current: LocationQuery, patch: QueryPatch): LocationQ
     if (value === null || value === '') delete next[key]
     else next[key] = String(value)
   }
+  // Cases a year belong to one service: a different code starts without them (unless the patch sets them).
+  const code = typeof patch.code === 'string' ? patch.code.trim() : ''
+  if (code && code.toUpperCase() !== (first(current.code) ?? '').toUpperCase() && !('cases' in patch)) delete next.cases
   if (next.sort === 'rate') delete next.sort
   if (next.page === '1') delete next.page
   if (next.pageSize === String(DEFAULT_PAGE_SIZE)) delete next.pageSize
