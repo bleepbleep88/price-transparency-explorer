@@ -3,11 +3,11 @@ import { keepPreviousData, useQuery } from '@tanstack/vue-query'
 import { refDebounced } from '@vueuse/core'
 import { ratesApi } from '../api/ratesApi'
 import { datasetKeys, rateKeys } from '../lib/queryKeys'
-import type { SearchParams } from '../lib/searchParams'
+import { toApiQuery, type SearchParams } from '../lib/searchParams'
 
 export function useRateSearch(params: MaybeRefOrGetter<SearchParams>, enabled: MaybeRefOrGetter<boolean>) {
   return useQuery({
-    queryKey: computed(() => rateKeys.search(toValue(params))),
+    queryKey: computed(() => rateKeys.search(toApiQuery(toValue(params)))),
     queryFn: ({ signal }) => ratesApi.search(toValue(params), signal),
     enabled: computed(() => toValue(enabled)),
     // Keep showing the previous results (dimmed) while the next page or filter loads.

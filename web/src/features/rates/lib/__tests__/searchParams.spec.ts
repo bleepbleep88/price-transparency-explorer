@@ -62,6 +62,28 @@ describe('mergeQuery', () => {
   })
 })
 
+describe('lens and cases', () => {
+  it('reads a known lens and a case count, and drops anything else', () => {
+    expect(parseRouteQuery({ code: '45378', lens: 'employers', cases: '1200' })).toMatchObject({ lens: 'employers', cases: 1200 })
+    expect(parseRouteQuery({ code: '45378', lens: 'life-sciences' }).lens).toBe('life-sciences')
+    const bad = parseRouteQuery({ code: '45378', lens: 'payers', cases: '-3' })
+    expect(bad.lens).toBeUndefined()
+    expect(bad.cases).toBeUndefined()
+    expect(parseRouteQuery({ code: '45378', cases: '2000000' }).cases).toBeUndefined()
+  })
+
+  it('never sends the lens or the case count to the API', () => {
+    const query = toApiQuery(parseRouteQuery({ code: '45378', lens: 'plans', cases: '10' }))
+    expect(query).not.toHaveProperty('lens')
+    expect(query).not.toHaveProperty('cases')
+  })
+
+  it('keeps the lens when a new search replaces the code', () => {
+    const next = mergeQuery({ code: '45378', lens: 'plans', npi: '1396747861' }, { code: '99213', npi: null, page: null })
+    expect(next).toEqual({ code: '99213', lens: 'plans' })
+  })
+})
+
 describe('toApiQuery', () => {
   it('sends only what the API understands', () => {
     const query = toApiQuery(parseRouteQuery({ code: '45378', page: '2' }))

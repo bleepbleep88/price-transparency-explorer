@@ -11,6 +11,13 @@ export const DEFAULT_PAGE_SIZE = 25
 export const FEE_TYPES = ['facility', 'professional'] as const
 export type FeeType = (typeof FEE_TYPES)[number]
 
+/** Audience lenses: one neutral explorer, plus an interpretation for whoever is reading. */
+export const LENSES = ['providers', 'plans', 'employers', 'innovators', 'life-sciences'] as const
+export const lensSchema = z.enum(LENSES)
+export type Lens = z.infer<typeof lensSchema>
+/** Upper bound for the employers lens's cases-a-year input. */
+export const MAX_CASES = 1_000_000
+
 export interface SearchParams {
   code: string
   codeType?: string
@@ -25,6 +32,10 @@ export interface SearchParams {
   page: number
   pageSize: number
   snapshot?: number
+  /** Interpretation only: never sent to the API, and it survives new searches. */
+  lens?: Lens
+  /** Employers lens: cases a year, to turn the per-case gap into a yearly figure. */
+  cases?: number
 }
 
 /** Keys a link or chip can change. null removes the parameter. */
@@ -59,6 +70,8 @@ export function parseRouteQuery(query: LocationQuery): SearchParams {
     page: positiveInteger(first(query.page)) ?? 1,
     pageSize: positiveInteger(first(query.pageSize), 100) ?? DEFAULT_PAGE_SIZE,
     snapshot: positiveInteger(first(query.snapshot)),
+    lens: lensSchema.safeParse(first(query.lens)).data,
+    cases: positiveInteger(first(query.cases), MAX_CASES),
   }
 }
 
@@ -76,6 +89,7 @@ export function mergeQuery(current: LocationQuery, patch: QueryPatch): LocationQ
   return next
 }
 
+/** Only what the API understands; lens and cases are interpretation and never reach it. */
 export function toApiQuery(params: SearchParams): Record<string, QueryValue> {
   return {
     code: params.code,

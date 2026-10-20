@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQuery } from 'vue-router'
 import { formValuesFrom, mergeQuery, parseRouteQuery, validateSearchForm, type QueryPatch } from '../lib/searchParams'
 
 /** The search lives in the URL. Reading parses route.query; every change is a router push (so Back works). */
@@ -20,9 +20,16 @@ export function useSearchRoute() {
     return router.push({ name: 'search', query: mergeQuery(route.query, next) })
   }
 
-  function startOver(code?: string) {
-    return router.push({ name: 'search', query: code ? { code } : {} })
+  /** Same as update, without a new history entry (for typing, e.g. the cases-a-year input). */
+  function replace(patch: QueryPatch) {
+    return router.replace({ name: 'search', query: mergeQuery(route.query, patch) })
   }
 
-  return { params, hasCode, urlErrors, canSearch, update, startOver }
+  /** A fresh search: everything goes except the lens, unless the patch sets one (Start-here cards do). */
+  function startOver(code?: string, patch: QueryPatch = {}) {
+    const keep: LocationQuery = params.value.lens ? { lens: params.value.lens } : {}
+    return router.push({ name: 'search', query: mergeQuery(keep, { code, ...patch }) })
+  }
+
+  return { params, hasCode, urlErrors, canSearch, update, replace, startOver }
 }

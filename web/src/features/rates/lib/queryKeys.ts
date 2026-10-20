@@ -1,9 +1,10 @@
-import type { SearchParams } from './searchParams'
+import type { QueryValue } from '@/lib/apiClient'
 
 // Everything about rates nests under one prefix, so invalidating it refreshes every rate view at once.
 export const rateKeys = {
   all: ['rates'] as const,
-  search: (params: SearchParams) => [...rateKeys.all, 'search', params] as const,
+  // Keyed by the API query, so switching lens or typing a case count never refetches.
+  search: (apiQuery: Record<string, QueryValue>) => [...rateKeys.all, 'search', apiQuery] as const,
   source: (rateId: number, provider: string | null) => [...rateKeys.all, 'source', rateId, provider] as const,
   npis: (rateIds: readonly number[], provider: string | null, page: number) => [...rateKeys.all, 'npis', rateIds, provider, page] as const,
   codes: (q: string, snapshot: number | undefined) => [...rateKeys.all, 'codes', q, snapshot] as const,
