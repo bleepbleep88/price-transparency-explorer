@@ -78,7 +78,7 @@ describe('SourcesView', () => {
     expect(files[0]!.text()).toContain('Sep 2, 2026')
     expect(files[0]!.text()).toContain('"0x8DF0AB1A6895333"')
     expect(files[1]!.text()).toContain('Out-of-network allowed amounts · 508 KB')
-    expect(files[1]!.text()).toContain('1,033 payments in the file became 605 unique payments after removing exact copies.')
+    expect(files[1]!.text()).toContain('1,033 amounts in the file became 605 different amounts after removing exact copies.')
     expect(files[1]!.text()).toContain('6 EINs published as 8 digits, given back their leading zero.')
 
     const links = files.map((file) => file.findAll('a').find((a) => a.text().includes('Open the file'))?.attributes('href'))

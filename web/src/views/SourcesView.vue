@@ -22,7 +22,7 @@ const stillLoading = computed(() => status.value != null && status.value.phase !
   <v-container class="py-6" max-width="1280">
     <h1 class="text-headline-medium mb-1">Sources and data quality</h1>
     <p class="text-body-medium text-medium-emphasis mb-4">
-      Every file the plan's index lists: where it came from, what was loaded, how it was cleaned and what was set aside.
+      Every file in the plan's list of files: where it came from, what was loaded, how it was cleaned and what was set aside.
       Every rate on the search page traces back to one of these files.
     </p>
 
@@ -49,7 +49,7 @@ const stillLoading = computed(() => status.value != null && status.value.phase !
       <v-empty-state
         v-if="!sources.data.value.length && !stillLoading"
         headline="Nothing loaded yet"
-        text="No index file could be read. The data status in the top bar says why."
+        text="The plan's list of files couldn't be read. The data status in the top bar says why."
       />
 
       <section
@@ -65,14 +65,14 @@ const stillLoading = computed(() => status.value != null && status.value.phase !
           <v-chip v-if="snapshot.isLatest" variant="outlined">Shown by default</v-chip>
         </div>
         <p class="text-body-medium text-medium-emphasis">
-          Index from {{ snapshot.reportingEntityName ?? 'the plan' }}<template v-if="snapshot.reportingEntityType">
-            ({{ snapshot.reportingEntityType }})</template>, schema {{ snapshot.schemaVersion ?? 'not stated' }}. The index
+          List of files from {{ snapshot.reportingEntityName ?? 'the plan' }}<template v-if="snapshot.reportingEntityType">
+            ({{ snapshot.reportingEntityType }})</template>, schema {{ snapshot.schemaVersion ?? 'not stated' }}. The list
           says it was last updated {{ shortDate(snapshot.indexLastUpdatedOn) }}.
         </p>
         <p v-if="snapshot.error" class="text-body-small text-warning">{{ snapshot.error }}</p>
         <div class="d-flex flex-wrap align-center ga-2">
           <v-btn :href="snapshot.indexUrl" target="_blank" rel="noopener" variant="text" size="small" class="px-0" :append-icon="mdiOpenInNew">
-            Index file
+            List of files
           </v-btn>
           <code v-if="snapshot.indexSha256" class="text-body-small text-break">SHA-256 {{ snapshot.indexSha256 }}</code>
         </div>

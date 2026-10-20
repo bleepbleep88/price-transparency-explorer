@@ -7,7 +7,7 @@ describe('source readings', () => {
     expect(kindLabel('in_network')).toBe('In-network rates')
     expect(kindLabel('allowed_amount')).toBe('Out-of-network allowed amounts')
     expect(publishedLine(sourceFile())).toBe('179,948 prices in the file became 7,727 unique rates after removing exact copies.')
-    expect(publishedLine(ALLOWED_FILE)).toBe('1,033 payments in the file became 605 unique payments after removing exact copies.')
+    expect(publishedLine(ALLOWED_FILE)).toBe('1,033 amounts in the file became 605 different amounts after removing exact copies.')
     expect(publishedLine(sourceFile({ counts: null }))).toBeNull()
   })
 
@@ -17,7 +17,7 @@ describe('source readings', () => {
       '1,867 facility rates name the procedure in the notes field; that code is the one searched.',
       '326 tax IDs use a prefix the IRS never issues, so they are masked.',
       '1 NPI fails the check digit: kept and flagged.',
-      '5 provider groups list npi [0]: a contract with the whole tax ID.',
+      '5 provider groups list no individual NPIs: a contract with the whole tax ID.',
     ])
   })
 

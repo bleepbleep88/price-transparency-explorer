@@ -65,7 +65,7 @@ const timing = computed(() => timingLine(props.file))
         <v-table density="compact">
           <tbody>
             <tr>
-              <td>Index (snapshot) date</td>
+              <td>Date of the plan's list of files</td>
               <td>{{ shortDate(file.dates.indexDate) }}</td>
             </tr>
             <tr>

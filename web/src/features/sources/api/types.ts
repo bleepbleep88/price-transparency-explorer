@@ -17,7 +17,7 @@ export interface SourceFileCounts {
   items: number | null
   /** Prices (rate files) or payments (allowed-amount files) as published. */
   published: number | null
-  /** Unique rates or unique payments, once exact duplicates collapse. */
+  /** Unique rates, or different allowed amounts, once exact duplicates collapse. */
   unique: number | null
   duplicatesRemoved: number | null
   rejected: number | null

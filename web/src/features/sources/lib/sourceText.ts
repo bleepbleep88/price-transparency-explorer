@@ -11,7 +11,7 @@ export function kindLabel(kind: SourceKind): string {
 
 /** What a published row is called in each kind of file. */
 function rowWords(kind: SourceKind): { published: string; unique: string } {
-  return kind === 'allowed_amount' ? { published: 'payment', unique: 'unique payment' } : { published: 'price', unique: 'unique rate' }
+  return kind === 'allowed_amount' ? { published: 'amount', unique: 'different amount' } : { published: 'price', unique: 'unique rate' }
 }
 
 /** "179,948 prices in the file became 7,727 unique rates after removing exact copies." */
@@ -42,7 +42,7 @@ export function cleaningLines(file: SourceFile): string[] {
   if (counts.invalidNpis)
     lines.push(`${plural(counts.invalidNpis, 'NPI')} ${verb(counts.invalidNpis, 'fails', 'fail')} the check digit: kept and flagged.`)
   if (counts.wholeTaxIdGroups)
-    lines.push(`${plural(counts.wholeTaxIdGroups, 'provider group')} ${verb(counts.wholeTaxIdGroups, 'lists', 'list')} npi [0]: a contract with the whole tax ID.`)
+    lines.push(`${plural(counts.wholeTaxIdGroups, 'provider group')} ${verb(counts.wholeTaxIdGroups, 'lists', 'list')} no individual NPIs: a contract with the whole tax ID.`)
   if (counts.danglingReferences)
     lines.push(`${plural(counts.danglingReferences, 'provider reference')} ${verb(counts.danglingReferences, 'is', 'are')} used by rates but never defined in the file.`)
   return lines
