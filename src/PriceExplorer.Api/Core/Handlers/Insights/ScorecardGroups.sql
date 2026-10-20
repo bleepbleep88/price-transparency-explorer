@@ -20,7 +20,6 @@ SELECT
     v.value           AS Value,
     v.low             AS Low,
     v.high            AS High,
-    v.first_rate_id   AS FirstRateId,
     v.business_name   AS BusinessName,
     v.ein             AS Ein,
     v.ein_display     AS EinDisplay,

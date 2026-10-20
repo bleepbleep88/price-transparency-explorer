@@ -4,37 +4,29 @@ using Dapper;
 using DuckDB.NET.Data;
 using PriceExplorer.Api.Core.Data;
 using PriceExplorer.Api.Core.Handlers.Rates;
-using PriceExplorer.Api.Core.Ingestion;
 using PriceExplorer.Api.Core.Models.Insights;
 using PriceExplorer.Api.Core.Models.Rates;
 using PriceExplorer.Api.Core.Reference;
 
 namespace PriceExplorer.Api.Core.Handlers.Insights;
 
-/// <summary>
-/// Which saved statistics an insight reads and whether they're current: built, built from the rate files saved now by
-/// this build of the app with no rate expired since, and no load or rebuild under way.
-/// </summary>
-internal sealed class StatisticsBasisReader(IngestionStatus status, SnapshotStatisticsBuilder statistics)
-{
-    public async Task<StatisticsBasis> ReadAsync(
-        DuckDBConnection connection, ResolvedSnapshot snapshot, DbTransaction transaction, CancellationToken cancellationToken)
-    {
-        var builtAt = await connection.ExecuteScalarAsync<DateTime?>(
-            "SELECT built_at FROM stats_builds WHERE snapshot_id = $snapshotId", new { snapshotId = snapshot.SnapshotId }, transaction);
-        var settled = status.Current.Phase is IngestionPhase.Ready or IngestionPhase.Failed;
-        var stale = (await statistics.FindStaleAsync(cancellationToken)).Any(stale => stale.SnapshotId == snapshot.SnapshotId);
-
-        return new StatisticsBasis(
-            new SnapshotRef(snapshot.SnapshotId, snapshot.IndexDate, snapshot.IsLatest),
-            UtcTimestamps.From(builtAt),
-            builtAt is not null && settled && !stale);
-    }
-}
-
-/// <summary>What the insight handlers share: code names, group labels and links to the search behind each number.</summary>
+/// <summary>What the insight handlers share: freshness, code names, group labels and links to the search behind each number.</summary>
 internal static class InsightSupport
 {
+    /// <summary>
+    /// Which saved statistics an insight reads, and whether they're current by the statistics' own rule
+    /// (<see cref="SavedStatistics"/>: built from the rate files saved now, by this build, with no rate expired since).
+    /// Read in the handler's transaction, so the flag and the rows describe the same moment.
+    /// </summary>
+    public static async Task<StatisticsBasis> BasisAsync(DuckDBConnection connection, ResolvedSnapshot snapshot, DbTransaction transaction)
+    {
+        var state = (await SavedStatistics.StateAsync(connection, snapshot.SnapshotId, transaction)).SingleOrDefault();
+        return new StatisticsBasis(
+            new SnapshotRef(snapshot.SnapshotId, snapshot.IndexDate, snapshot.IsLatest),
+            UtcTimestamps.From(state?.BuiltAt),
+            state?.Current ?? false);
+    }
+
     /// <summary>
     /// Each code's name as the plan's files publish it (the search's own lookup, CodeDescriptions.sql): the short name,
     /// else the description; missing when the files have neither.

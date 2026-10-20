@@ -14,7 +14,7 @@ namespace PriceExplorer.Api.Core.Handlers.Insights;
 /// Ranks the saved comparison groups with full statistics by the gap to the lower quartile or by spread. Reads
 /// group_stats only, so every number is the one the group's search card shows.
 /// </summary>
-internal sealed class GetGapLeaderboardHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog, StatisticsBasisReader basis)
+internal sealed class GetGapLeaderboardHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog)
     : IRequestHandler<GetGapLeaderboardQuery, GapLeaderboard>
 {
     public const string NoClaimCounts =
@@ -29,7 +29,7 @@ internal sealed class GetGapLeaderboardHandler(DuckDbConnectionFactory connectio
         await using var connection = await connections.OpenAsync(cancellationToken);
         var snapshot = await SnapshotResolver.ResolveAsync(connection, request.Snapshot);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        var statistics = await basis.ReadAsync(connection, snapshot, transaction, cancellationToken);
+        var statistics = await InsightSupport.BasisAsync(connection, snapshot, transaction);
 
         var groups = (await connection.QueryAsync<GapGroupRow>(
                 SqlFile.For<GetGapLeaderboardHandler>("GapLeaderboard.sql"),

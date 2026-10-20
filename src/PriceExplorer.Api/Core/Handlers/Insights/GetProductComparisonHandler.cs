@@ -16,7 +16,7 @@ namespace PriceExplorer.Api.Core.Handlers.Insights;
 /// Pairs each provider's saved value in a comparison group under one product with its value in the same group under
 /// another (provider_values), and sums up the ratio product ÷ versus: overall, by band, by category, pair by pair.
 /// </summary>
-internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog, StatisticsBasisReader basis)
+internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog)
     : IRequestHandler<GetProductComparisonQuery, ProductComparison>
 {
     public async Task<ProductComparison> Handle(GetProductComparisonQuery request, CancellationToken cancellationToken)
@@ -31,7 +31,7 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
         var products = (await connection.QueryAsync<ProductRef>(
             SqlFile.For<GetProductComparisonHandler>("SnapshotProducts.sql"), new { snapshotId = snapshot.SnapshotId }, transaction)).ToList();
         var (product, versus) = Choose(products, InsightSupport.Clean(request.Product), InsightSupport.Clean(request.Versus));
-        var statistics = await basis.ReadAsync(connection, snapshot, transaction, cancellationToken);
+        var statistics = await InsightSupport.BasisAsync(connection, snapshot, transaction);
 
         var rows = await connection.QueryAsync<PairRow>(
             SqlFile.For<GetProductComparisonHandler>("ProductPairs.sql"),

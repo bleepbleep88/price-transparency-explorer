@@ -16,7 +16,7 @@ namespace PriceExplorer.Api.Core.Handlers.Insights;
 /// × median with <see cref="RateStatistics.Ratio"/>, band with <see cref="RateStatistics.Band"/>. Saved values are the
 /// search's own (the statistics build runs search's code), so each group reads exactly as a search with this EIN shows it.
 /// </summary>
-internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog, StatisticsBasisReader basis)
+internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog)
     : IRequestHandler<GetProviderScorecardQuery, ProviderScorecard>
 {
     /// <summary>How many groups the highest and lowest lists show.</summary>
@@ -34,7 +34,7 @@ internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connec
                 new { snapshotId = snapshot.SnapshotId, provider = ProviderKeys.NormalizeKey(request.Provider) },
                 transaction)
             ?? throw new NotFoundException("No provider with this tax ID has rates in this snapshot.", "provider_not_found");
-        var statistics = await basis.ReadAsync(connection, snapshot, transaction, cancellationToken);
+        var statistics = await InsightSupport.BasisAsync(connection, snapshot, transaction);
 
         var args = new { snapshotId = snapshot.SnapshotId, provider = providerKey };
         var rows = (await connection.QueryAsync<ScorecardGroupRow>(
@@ -117,7 +117,6 @@ internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connec
             Percentile: basic ? RateStatistics.PercentRank(peerValues!, row.Value, row.Value) : null,
             VsMedian: RateStatistics.Ratio(row.Value, row.Median),
             Band: basic && row is { P25: { } p25, Median: { } median, P75: { } p75 } ? RateStatistics.Band(row.Value, p25, median, p75) : null,
-            FirstRateId: row.FirstRateId,
             Search: InsightSupport.SearchLink(snapshot, row.CodeType, row.Code, row.GroupKey, providerKey));
     }
 
@@ -156,7 +155,7 @@ internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connec
     private sealed record ScorecardGroupRow(
         string GroupKey, string ProductKey, string ProductLabel, string CodeType, string Code, string FeeType, string SettingKey,
         string Modifiers, string NegotiatedType, string Unit, bool PerUnit, int ProviderCount, string StatsLevel, decimal? P25,
-        decimal? Median, decimal? P75, decimal Value, decimal Low, decimal High, long FirstRateId, string BusinessName, string? Ein,
+        decimal? Median, decimal? P75, decimal Value, decimal Low, decimal High, string BusinessName, string? Ein,
         string EinDisplay, bool EinMasked);
 
     private sealed record PeerValue(string GroupKey, decimal Value);

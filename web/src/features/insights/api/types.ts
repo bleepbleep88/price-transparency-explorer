@@ -97,7 +97,6 @@ export interface ScorecardGroup {
   percentile: number | null
   vsMedian: number | null
   band: Band | null
-  firstRateId: number
   search: SearchLink
 }
 

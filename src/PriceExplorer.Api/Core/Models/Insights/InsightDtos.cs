@@ -152,7 +152,6 @@ public sealed record ScorecardGroup(
     int? Percentile,
     decimal? VsMedian,
     string? Band,
-    long FirstRateId,
     IReadOnlyDictionary<string, string> Search);
 
 /// <summary>

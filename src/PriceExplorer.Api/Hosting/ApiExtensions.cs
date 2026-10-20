@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi;
 using PriceExplorer.Api.Core.Models.Rates;
 using PriceExplorer.Api.Core.Behaviors;
-using PriceExplorer.Api.Core.Handlers.Insights;
 using PriceExplorer.Api.Core.Reference;
 using Scalar.AspNetCore;
 using Serilog;
@@ -102,7 +101,6 @@ internal static class ApiExtensions
         });
         services.AddValidatorsFromAssemblyContaining<Program>(includeInternalTypes: true);
         services.AddSingleton<ReferenceCatalog>();
-        services.AddSingleton<StatisticsBasisReader>();
 
         services.AddHealthChecks();
 

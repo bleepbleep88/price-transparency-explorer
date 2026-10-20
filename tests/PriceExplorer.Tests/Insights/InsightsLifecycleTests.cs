@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Dapper;
+using Microsoft.Extensions.DependencyInjection;
+using PriceExplorer.Api.Core.Data;
 using PriceExplorer.Tests.Support;
 
 namespace PriceExplorer.Tests.Insights;
@@ -41,6 +44,29 @@ public sealed class InsightsLifecycleTests
         using var compare = await client.GetAsync("/api/v1/insights/compare", ct);
         compare.StatusCode.Should().Be(HttpStatusCode.BadRequest, "one product is saved so far");
         (await compare.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("code").GetString().Should().Be("pick_products");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task Statistics_built_from_other_rate_files_still_answer_but_say_they_are_out_of_date()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = new ExplorerApiFactory();
+        using var client = factory.CreateClient();
+        await factory.WaitForIngestionAsync(ct);
+        var before = await client.GetFromJsonAsync<JsonElement>("/api/v1/insights/compare", ct);
+
+        // As if a rate file was saved again since the build: the statistics' own rule now calls them out of date.
+        await using (var connection = await factory.Services.GetRequiredService<DuckDbConnectionFactory>().OpenAsync(ct))
+        {
+            await connection.ExecuteAsync("UPDATE stats_builds SET rate_files = 'saved again'");
+        }
+
+        var after = await client.GetFromJsonAsync<JsonElement>("/api/v1/insights/compare", ct);
+
+        before.GetProperty("statistics").GetProperty("isCurrent").GetBoolean().Should().BeTrue();
+        after.GetProperty("statistics").GetProperty("isCurrent").GetBoolean().Should().BeFalse();
+        after.GetProperty("statistics").GetProperty("builtAt").GetString().Should().Be(before.GetProperty("statistics").GetProperty("builtAt").GetString());
+        after.GetProperty("summary").GetRawText().Should().Be(before.GetProperty("summary").GetRawText(), "the saved numbers still answer meanwhile");
     }
 
     [Fact(Timeout = 60_000)]

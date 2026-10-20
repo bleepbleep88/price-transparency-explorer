@@ -49,7 +49,6 @@ function scorecardGroup(overrides: Partial<ScorecardGroup> = {}): ScorecardGroup
     percentile: 86,
     vsMedian: 14.72,
     band: 'high',
-    firstRateId: 7,
     search: { code: '0460', codeType: 'RC', group: 'essential-plan|RC|0460|facility|hospital-outpatient||negotiated', ein: '131740126' },
     ...overrides,
   }
