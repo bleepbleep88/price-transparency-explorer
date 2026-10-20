@@ -159,7 +159,9 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
 
         result.GetProperty("rows").GetProperty("total").GetInt32().Should().Be(0);
         var hint = Hint(result, "group_not_in_results");
-        hint.GetProperty("message").GetString().Should().StartWith("The group you picked has no prices for NPI 1174873780");
+        hint.GetProperty("message").GetString().Should().StartWith("The card you picked has no prices for NPI 1174873780")
+            .And.Contain("other card", "the screen shows each group as a card");
+        hint.GetProperty("links")[0].GetProperty("label").GetString().Should().Be("Show all cards");
         hint.GetProperty("links")[0].GetProperty("query").GetProperty("group").ValueKind.Should().Be(JsonValueKind.Null);
     }
 

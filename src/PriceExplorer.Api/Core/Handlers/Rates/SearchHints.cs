@@ -54,10 +54,11 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             // Groups show, but the selected comparison group isn't one of them (a stale link, or another provider's group).
             if (search.Group is { } group && assembled.Groups.All(shown => shown.Key != group))
             {
+                // The UI shows each group as a card, so the hint says "card" too.
                 hints.Add(Hint("group_not_in_results", "info",
-                    $"The group you picked has no prices {(search.ProviderFilterActive ? $"for {FilterLabel()} " : "")}" +
-                    $"under these filters. {Plural(assembled.Groups.Count, "other group")} {(assembled.Groups.Count == 1 ? "does" : "do")}.",
-                    [Link("Show all groups", ("group", null))]));
+                    $"The card you picked has no prices {(search.ProviderFilterActive ? $"for {FilterLabel()} " : "")}" +
+                    $"under these filters. {Plural(assembled.Groups.Count, "other card")} {(assembled.Groups.Count == 1 ? "does" : "do")}.",
+                    [Link("Show all cards", ("group", null))]));
             }
 
             return hints;

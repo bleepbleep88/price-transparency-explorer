@@ -256,6 +256,15 @@ public sealed class RateSearchAssemblerTests
     }
 
     [Fact]
+    public void A_visit_level_card_says_to_compare_level_to_level_and_leaves_billing_frequency_to_the_page_footer()
+    {
+        var notes = Assemble([Fact(code: "99214", billingClass: "professional", pos: "11")]).Groups.Single().Notes;
+
+        notes.Should().Contain("Office visit, established patient: compare level to level only.");
+        notes.Should().NotContain(note => note.Contains("how often", StringComparison.OrdinalIgnoreCase), "the footer says it once per page");
+    }
+
+    [Fact]
     public void Two_fee_schedules_splitting_the_providers_evenly_are_both_named()
     {
         var facts = Enumerable.Range(1, 6).Select(i => Fact(provider: $"30000000{i}", rate: i <= 3 ? 10m : 12m)).ToList();

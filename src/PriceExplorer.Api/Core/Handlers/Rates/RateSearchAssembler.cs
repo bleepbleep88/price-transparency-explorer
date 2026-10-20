@@ -371,7 +371,8 @@ internal static class RateSearchAssembler
 
         if (ServiceCategories.LevelFamily(group.CodeType, group.Code) is { } family)
         {
-            notes.Add($"{family}: compare level to level only. How often each level gets billed isn't in these files.");
+            // How often a level gets billed is said once, in the page footer.
+            notes.Add($"{family}: compare level to level only.");
         }
 
         if (group.NegotiatedType != "negotiated")
