@@ -26,6 +26,15 @@ internal sealed record SearchContext(
 
     public bool ProviderFilterActive => IdFilter || NameTyped is not null;
 
+    /// <summary>
+    /// A code type with its own numbering (a DRG, an APC): these files only hold CPT, HCPCS and revenue codes, so equal
+    /// digits are a coincidence. MS-DRG 0470 is a hospital stay; revenue code 0470 is audiology.
+    /// </summary>
+    public bool ForeignCodeType => CodeType is not (null or BillingCodes.Cpt or BillingCodes.Hcpcs or BillingCodes.RevenueCode);
+
+    /// <summary>The NPI as typed: all 10 digits, leading zeros kept.</summary>
+    public string? NpiText => Npi?.ToString("D10", System.Globalization.CultureInfo.InvariantCulture);
+
     public static SearchContext From(SearchRatesQuery request)
     {
         var (code, codeType) = CodeInput.Parse(request.Code, request.CodeType);

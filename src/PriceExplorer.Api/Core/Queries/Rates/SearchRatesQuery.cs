@@ -34,7 +34,7 @@ public sealed record SearchRatesQuery(
     int Page = 1,
     int PageSize = 25) : IRequest<RateSearchResult>, IRequiresData;
 
-public sealed class SearchRatesQueryValidator : AbstractValidator<SearchRatesQuery>
+public sealed partial class SearchRatesQueryValidator : AbstractValidator<SearchRatesQuery>
 {
     public static readonly string[] Sorts = ["rate", "-rate", "provider", "-provider", "vsMedian", "-vsMedian"];
 
@@ -85,15 +85,36 @@ public sealed class SearchRatesQueryValidator : AbstractValidator<SearchRatesQue
             .WithMessage("Fee type is either 'facility' or 'professional'.");
 
         RuleFor(query => query.Provider)
-            .Must(name => name!.Trim().Length is >= 2 and <= 100)
+            .Must(name => name!.Trim().Length >= 2)
             .When(query => !string.IsNullOrWhiteSpace(query.Provider))
             .WithMessage("Type at least 2 characters of the provider's name.");
+
+        RuleFor(query => query.Provider)
+            .Must(name => name!.Trim().Length <= 100)
+            .When(query => !string.IsNullOrWhiteSpace(query.Provider))
+            .WithMessage("A provider name is at most 100 characters.");
 
         // A separate rule so whitespace-only values with control characters (" \0 ") are caught too.
         RuleFor(query => query.Provider)
             .Must(name => !InputRules.HasControlCharacters(name!))
             .When(query => query.Provider is not null)
             .WithMessage("The provider name can't contain control characters.");
+
+        // Product keys are slugs from the snapshot ("essential-plan"); group keys come from search results.
+        RuleFor(query => query.Product)
+            .Must(product => ProductKey().IsMatch(product!.Trim()))
+            .When(query => !string.IsNullOrWhiteSpace(query.Product))
+            .WithMessage("A product is a product key from the snapshot, for example essential-plan.");
+
+        RuleFor(query => query.Group)
+            .Must(group => group!.Length <= 300 && !InputRules.HasControlCharacters(group) && group.Split('|').Length == 7)
+            .When(query => !string.IsNullOrWhiteSpace(query.Group))
+            .WithMessage("A group is a comparison group key from search results.");
+
+        RuleFor(query => query.Product)
+            .Must(product => !InputRules.HasControlCharacters(product!))
+            .When(query => query.Product is not null)
+            .WithMessage("The product can't contain control characters.");
 
         RuleFor(query => query.Sort)
             .Must(sort => Sorts.Contains(sort))
@@ -105,4 +126,7 @@ public sealed class SearchRatesQueryValidator : AbstractValidator<SearchRatesQue
         RuleFor(query => query.Page).InclusiveBetween(1, MaxPage).WithMessage($"Page is between 1 and {MaxPage:N0}.");
         RuleFor(query => query.PageSize).InclusiveBetween(1, 100).WithMessage("Page size is between 1 and 100.");
     }
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[a-z0-9][a-z0-9-]{0,127}$")]
+    private static partial System.Text.RegularExpressions.Regex ProductKey();
 }

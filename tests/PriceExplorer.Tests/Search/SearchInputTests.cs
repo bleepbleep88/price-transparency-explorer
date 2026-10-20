@@ -190,6 +190,13 @@ public sealed class SearchInputTests
     }
 
     [Fact]
+    public void A_half_cent_quantile_rounds_up_even_where_floating_point_lands_just_below()
+    {
+        // 3.79 + 0.1 × 12.25 = 5.015 exactly; DuckDB's quantile_cont gets 5.0149 because it interpolates in floating point.
+        RateStatistics.Quantile([1.52m, 1.52m, 1.52m, 1.52m, 1.52m, 1.52m, 1.52m, 3.41m, 3.79m, 16.04m], 0.9).Should().Be(5.02m);
+    }
+
+    [Fact]
     public void Quantiles_use_linear_interpolation()
     {
         decimal[] sorted = [100m, 200m, 300m, 400m];

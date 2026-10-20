@@ -193,7 +193,36 @@ public sealed class RateSearchAssemblerTests
         row.OtherNames.Should().Equal("Bellevue Hospital Center");
         row.Rate.Should().Be(755.98m);
         result.Groups.Single().Highlights.Single().DisplayName.Should().Be("Jacobi Medical Center");
-        Assemble(facts).Rows.Items.Single().BusinessName.Should().Be("Bellevue Hospital Center", "without a filter the first name leads");
+        Assemble(facts).Rows.Items.Single().BusinessName.Should().Be("Bellevue Hospital Center", "unfiltered, the row shows Bellevue's $400 rate");
+    }
+
+    [Fact]
+    public void A_rows_name_is_the_facility_paid_the_rate_it_shows()
+    {
+        // One tax ID, two hospitals: the row's value is the rate listing more NPIs, Queens Hospital's.
+        var facts = new[]
+        {
+            Fact(provider: "132655001", rate: 755.98m, rateId: 1, npis: 1, names: "Bellevue Hospital Center"),
+            Fact(provider: "132655001", rate: 608.75m, rateId: 2, npis: 40, names: "Queens Hospital Center"),
+        };
+
+        var row = Assemble(facts).Rows.Items.Single();
+
+        row.Rate.Should().Be(608.75m);
+        row.FirstRateId.Should().Be(2);
+        row.BusinessName.Should().Be("Queens Hospital Center", "the name next to a rate is the facility paid it, as the source drawer shows");
+        row.OtherNames.Should().Equal("Bellevue Hospital Center");
+    }
+
+    [Fact]
+    public void Two_fee_schedules_splitting_the_providers_evenly_are_both_named()
+    {
+        var facts = Enumerable.Range(1, 6).Select(i => Fact(provider: $"30000000{i}", rate: i <= 3 ? 10m : 12m)).ToList();
+
+        var notes = Assemble(facts).Groups.Single().Notes;
+
+        notes.Should().Contain("The 6 providers are split evenly between $10.00 and $12.00 (3 each): most likely two standard fee " +
+            "schedules rather than individually negotiated rates.");
     }
 
     [Fact]

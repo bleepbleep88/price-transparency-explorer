@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.OpenApi;
+using PriceExplorer.Api.Core.Models.Rates;
 using PriceExplorer.Api.Core.Behaviors;
 using PriceExplorer.Api.Core.Reference;
 using Scalar.AspNetCore;
@@ -34,6 +36,7 @@ internal static class ApiExtensions
                 StatusCodes.Status500InternalServerError => "server_error",
                 var status => $"http_{status}",
             }));
+        services.AddSingleton<IProblemDetailsWriter, JsonProblemDetailsWriter>();
         services.AddExceptionHandler<ExplorerExceptionHandler>();
 
         // Binding errors (e.g. page=abc) get the same shape as validator errors: camelCase keys + code.
@@ -56,7 +59,31 @@ internal static class ApiExtensions
             };
             return new BadRequestObjectResult(problem) { ContentTypes = { "application/problem+json" } };
         });
-        services.AddOpenApi();
+        services.AddOpenApi(options =>
+        {
+            // MVC binds query names case-insensitively; document them in camelCase, the names hint links use.
+            options.AddOperationTransformer((operation, _, _) =>
+            {
+                foreach (var parameter in (operation.Parameters ?? []).OfType<OpenApiParameter>().Where(p => p.In == ParameterLocation.Query))
+                {
+                    parameter.Name = JsonNamingPolicy.CamelCase.ConvertName(parameter.Name!);
+                }
+
+                return Task.CompletedTask;
+            });
+
+            // A hint link's null value removes that filter, so the values are nullable.
+            options.AddSchemaTransformer((schema, context, _) =>
+            {
+                if (context.JsonTypeInfo.Type == typeof(HintLink) && schema.Properties?.TryGetValue("query", out var query) == true
+                    && query is OpenApiSchema map)
+                {
+                    map.AdditionalProperties = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null };
+                }
+
+                return Task.CompletedTask;
+            });
+        });
 
         // Order matters: bad input is a 400 even while data is still loading.
         services.AddMediatR(cfg =>

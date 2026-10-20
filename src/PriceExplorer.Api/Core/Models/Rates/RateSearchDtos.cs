@@ -110,7 +110,10 @@ public sealed record RateRowsPage(int Total, int Page, int PageSize, IReadOnlyLi
 /// <param name="Ein">Full EIN, or null when masked (IRS never issues the prefix; it may be a Social Security number).</param>
 /// <param name="EinLevel">At least one rate behind the row comes from a contract with the whole tax ID (the file lists
 /// npi [0] for it). <paramref name="NpiCount"/> counts only the NPIs the file lists.</param>
-/// <param name="BusinessName">The provider's name; with a provider filter, the name on the provider groups that matched.</param>
+/// <param name="BusinessName">
+/// The name on the provider group(s) behind <c>FirstRateId</c>, the facility paid <c>Rate</c> (among the groups that
+/// matched when a provider filter is on). <c>OtherNames</c> lists the tax ID's other names.
+/// </param>
 /// <param name="Rate">The provider's rate. With several rates, their NPI-weighted median: always one it is really paid.</param>
 /// <param name="Band">"low" (at or below the 25th percentile and under the median), "high" (at or above the 75th and over
 /// the median), or "typical". Null for small groups.</param>
@@ -144,7 +147,7 @@ public sealed record RateRow(
 /// <param name="Severity">"info" or "warning".</param>
 public sealed record SearchHint(string Kind, string Severity, string Message, IReadOnlyList<HintLink> Links);
 
-/// <summary>A suggested follow-up search, as query parameters to apply.</summary>
+/// <summary>A suggested follow-up search, as query parameters to apply to the current search; a null value removes that parameter.</summary>
 public sealed record HintLink(string Label, IReadOnlyDictionary<string, string?> Query);
 
 /// <summary>How much clean-up sits behind these results.</summary>

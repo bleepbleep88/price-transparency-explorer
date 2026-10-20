@@ -3,6 +3,7 @@ using System.Globalization;
 using Dapper;
 using DuckDB.NET.Data;
 using PriceExplorer.Api.Core.Data;
+using PriceExplorer.Api.Core.Domain;
 
 namespace PriceExplorer.Api.Core.Ingestion;
 
@@ -10,7 +11,10 @@ namespace PriceExplorer.Api.Core.Ingestion;
 internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections, TimeProvider time, ILogger<DuckDbIngestionWriter> logger)
 {
     /// <summary>Bump when Schema.sql changes: all tables are rebuilt from the download cache.</summary>
-    public const int SchemaVersion = 2;
+    public const int SchemaVersion = 3;
+
+    /// <summary>The meta key holding the per-install secret behind masked provider keys (see <see cref="ProviderKeys"/>).</summary>
+    private const string ProviderKeySecret = "provider_key_secret";
 
     /// <summary>Bump when normalization rules change: every file is re-parsed even if its bytes didn't change.</summary>
     public const int ParserVersion = 1;
@@ -33,7 +37,12 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
             ? await connection.ExecuteScalarAsync<string?>("SELECT value FROM meta WHERE key = 'schema_version'")
             : null;
 
-        if (version == SchemaVersion.ToString(CultureInfo.InvariantCulture))
+        // The secret outlives table rebuilds, so masked provider keys (and links that carry them) stay the same.
+        var secret = hasMeta
+            ? await connection.ExecuteScalarAsync<string?>("SELECT value FROM meta WHERE key = $key", new { key = ProviderKeySecret })
+            : null;
+
+        if (version == SchemaVersion.ToString(CultureInfo.InvariantCulture) && secret is not null)
         {
             return;
         }
@@ -51,8 +60,14 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
 
         await connection.ExecuteAsync(SqlFile.For<DuckDbConnectionFactory>("Schema.sql"), transaction: transaction);
         await connection.ExecuteAsync(
-            "INSERT INTO meta (key, value) VALUES ('schema_version', $version)",
-            new { version = SchemaVersion.ToString(CultureInfo.InvariantCulture) }, transaction);
+            "INSERT INTO meta (key, value) VALUES ('schema_version', $version), ($key, $secret)",
+            new
+            {
+                version = SchemaVersion.ToString(CultureInfo.InvariantCulture),
+                key = ProviderKeySecret,
+                secret = secret ?? Convert.ToBase64String(ProviderKeys.NewSecret()),
+            },
+            transaction);
         await transaction.CommitAsync(cancellationToken);
     }
 
@@ -173,8 +188,12 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
         await using var connection = await connections.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
+        var secret = Convert.FromBase64String(await connection.ExecuteScalarAsync<string>(
+            "SELECT value FROM meta WHERE key = $key", new { key = ProviderKeySecret }, transaction)
+            ?? throw new InvalidOperationException("The database has no provider key secret; EnsureSchemaAsync runs first."));
+
         await DeleteFileRowsAsync(connection, fileId, transaction);
-        AppendProviderGroups(connection, fileId, builder);
+        AppendProviderGroups(connection, fileId, builder, secret);
         AppendRates(connection, fileId, builder);
         AppendDescriptions(connection, fileId, builder);
         AppendRejects(connection, fileId, builder);
@@ -285,7 +304,7 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
         await connection.ExecuteAsync("DELETE FROM ingestion_rejects WHERE file_id = $fileId", args, transaction);
     }
 
-    private static void AppendProviderGroups(DuckDBConnection connection, int fileId, InNetworkFileBuilder builder)
+    private static void AppendProviderGroups(DuckDBConnection connection, int fileId, InNetworkFileBuilder builder, byte[] secret)
     {
         using (var appender = connection.CreateAppender("provider_groups"))
         {
@@ -303,6 +322,7 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
                     .AppendValue(group.EinLevel)
                     .AppendValue(group.EinUnverified)
                     .AppendText(group.NetworkNames)
+                    .AppendText(ProviderKeys.For(group.TinType, group.TinValue, group.Ein, group.EinUnverified, secret))
                     .EndRow();
             }
         }

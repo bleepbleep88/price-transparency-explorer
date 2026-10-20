@@ -4,6 +4,29 @@ namespace PriceExplorer.Tests.Domain;
 
 public sealed class ProviderIdsTests
 {
+    [Fact]
+    public void A_masked_key_needs_the_install_secret()
+    {
+        var secret = Enumerable.Repeat((byte)7, 32).ToArray();
+        var otherInstall = Enumerable.Repeat((byte)8, 32).ToArray();
+
+        var key = ProviderKeys.MaskedKey("071234567", secret);
+
+        key.Should().MatchRegex("^u[0-9a-f]{12}$").And.Be(ProviderKeys.MaskedKey("071234567", secret));
+        key.Should().NotBe(ProviderKeys.MaskedKey("071234567", otherInstall));
+        ProviderKeys.For("ein", "07-1234567", "071234567", einUnverified: true, secret).Should().Be(key);
+        ProviderKeys.For("ein", "11-3471596", "113471596", einUnverified: false, secret).Should().Be("113471596");
+        ProviderKeys.For("npi", "1396747861", null, einUnverified: false, secret).Should().Be("npi:1396747861");
+    }
+
+    [Theory]
+    [InlineData(1396747861L, true)]
+    [InlineData(2999999999L, true)]
+    [InlineData(123456789L, false)]
+    [InlineData(3000000000L, false)]
+    public void Standard_npis_are_ten_digits_starting_with_1_or_2(long npi, bool expected) =>
+        Npi.HasStandardPrefix(npi).Should().Be(expected);
+
     [Theory]
     [InlineData(1396747861L, true)]   // from the Fidelis file
     [InlineData(1234567893L, true)]   // CMS check-digit example

@@ -42,12 +42,15 @@ internal sealed class ExplorerExceptionHandler(
         }
 
         httpContext.Response.StatusCode = problem.Status ?? StatusCodes.Status500InternalServerError;
-        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+        // JsonProblemDetailsWriter writes even when the Accept header rules JSON out, so this always handles the exception:
+        // the exception middleware then neither writes a generic response nor logs it a second time.
+        await problemDetailsService.WriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
             ProblemDetails = problem,
             Exception = exception,
         });
+        return true;
     }
 
     private static ValidationProblemDetails ToValidationProblem(ValidationException exception)

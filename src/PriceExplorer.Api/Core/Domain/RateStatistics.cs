@@ -3,8 +3,11 @@ using System.Text.RegularExpressions;
 namespace PriceExplorer.Api.Core.Domain;
 
 /// <summary>
-/// Percentiles over one value per provider. Linear interpolation, same as DuckDB quantile_cont and numpy's default.
-/// Results are rounded to cents half away from zero, like DuckDB round() and Excel ROUND, so a check in SQL matches.
+/// Percentiles over one value per provider. Linear interpolation, same as DuckDB quantile_cont and numpy's default,
+/// computed exactly in decimal, then rounded to cents half away from zero like DuckDB round() and Excel ROUND.
+/// A SQL check with round(quantile_cont(rate, q), 2) can come out one cent lower when the exact value is a half cent:
+/// DuckDB interpolates DECIMAL in floating point (CPT 90791 FQHC p90: 264.30 + 0.7 × 7.15 = 269.305 rounds to 269.31
+/// here; DuckDB gets 269.3049 and 269.30). Interpolating in DECIMAL in SQL matches every value.
 /// </summary>
 internal static class RateStatistics
 {

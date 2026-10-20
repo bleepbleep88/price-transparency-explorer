@@ -11,7 +11,7 @@ internal static class Npi
     /// </summary>
     public static bool IsValid(long npi)
     {
-        if (npi is < 1_000_000_000L or > 2_999_999_999L)
+        if (!HasStandardPrefix(npi))
         {
             return false;
         }
@@ -40,7 +40,13 @@ internal static class Npi
         return (10 - (sum % 10)) % 10 == checkDigit;
     }
 
-    /// <summary>Parses user input ("1396747861", "1396-747-861"). Returns null unless exactly 10 digits remain.</summary>
+    /// <summary>10 digits starting with 1 or 2, as every issued NPI is.</summary>
+    public static bool HasStandardPrefix(long npi) => npi is >= 1_000_000_000L and <= 2_999_999_999L;
+
+    /// <summary>
+    /// Parses user input ("1396747861", "1396-747-861"). Returns null unless exactly 10 digits remain. A leading zero is
+    /// kept as typed when shown back (see SearchContext.NpiText): one file publishes the 9-digit NPI 124507857.
+    /// </summary>
     public static long? Parse(string? input)
     {
         var digits = Digits(input);

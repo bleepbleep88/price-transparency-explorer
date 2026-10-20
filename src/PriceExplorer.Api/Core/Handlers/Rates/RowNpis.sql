@@ -8,10 +8,7 @@ row_groups AS (
     FROM page p
     JOIN rate_provider_refs rr ON rr.rate_id = p.rate_id
     JOIN provider_groups pg ON pg.file_id = rr.file_id AND pg.provider_ref_id = rr.provider_ref_id
-    WHERE p.provider_key = CASE
-        WHEN pg.ein IS NULL THEN pg.tin_type || ':' || coalesce(pg.tin_value, '')
-        WHEN pg.ein_unverified THEN 'u' || substr(sha256(pg.ein), 1, 12)
-        ELSE pg.ein END
+    WHERE pg.provider_key = p.provider_key
 )
 SELECT CAST(g.row_index AS BIGINT) AS RowIndex, count(DISTINCT gn.npi) AS Npis
 FROM row_groups g

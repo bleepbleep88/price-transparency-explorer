@@ -23,18 +23,13 @@ matched AS (
 linked AS (
     SELECT
         m.rate_id,
-        CASE
-            WHEN pg.ein IS NULL THEN pg.tin_type || ':' || coalesce(pg.tin_value, '')
-            WHEN pg.ein_unverified THEN 'u' || substr(sha256(pg.ein), 1, 12)
-            ELSE pg.ein
-        END AS provider_key,
+        pg.provider_key,
         pg.ein, pg.ein_unverified, pg.ein_level, pg.business_name, pg.npi_count,
         ($npi::BIGINT IS NULL OR EXISTS (
             SELECT 1 FROM group_npis gn
             WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
               AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT)) AS npi_match,
-        ($ein::VARCHAR IS NULL OR pg.ein = $ein::VARCHAR
-            OR (pg.ein_unverified AND 'u' || substr(sha256(pg.ein), 1, 12) = $ein::VARCHAR)) AS ein_match,
+        ($ein::VARCHAR IS NULL OR pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR) AS ein_match,
         ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR)) AS name_match
     FROM matched m
     JOIN rate_provider_refs rr ON rr.rate_id = m.rate_id

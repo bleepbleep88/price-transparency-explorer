@@ -92,7 +92,8 @@ CREATE TABLE IF NOT EXISTS provider_groups (
     npi_count       INTEGER NOT NULL,
     ein_level       BOOLEAN NOT NULL, -- npi: [0]: the contract covers the whole TIN
     ein_unverified  BOOLEAN NOT NULL, -- IRS never issues this prefix
-    network_names   VARCHAR
+    network_names   VARCHAR,
+    provider_key    VARCHAR NOT NULL  -- how results identify the provider: EIN, 'u' + HMAC key when unverified, or type:value (ProviderKeys.For)
 );
 
 CREATE TABLE IF NOT EXISTS group_npis (

@@ -63,12 +63,10 @@ internal static class RateSearchAssembler
         var accumulators = new Dictionary<string, GroupAccumulator>(StringComparer.Ordinal);
         foreach (var fact in facts)
         {
-            var setting = catalog.SettingForPlace(fact.Pos);
-            var feeType = FeeTypeOf(fact.BillingClass);
-            var key = string.Join('|', fact.ProductKey, fact.CodeType, fact.Code, feeType, setting.Key, fact.Modifiers, fact.NegotiatedType);
+            var key = GroupKeyOf(fact, catalog);
             if (!accumulators.TryGetValue(key, out var accumulator))
             {
-                accumulator = new GroupAccumulator(key, fact, feeType, setting);
+                accumulator = new GroupAccumulator(key, fact, FeeTypeOf(fact.BillingClass), catalog.SettingForPlace(fact.Pos));
                 accumulators[key] = accumulator;
             }
 
@@ -107,6 +105,11 @@ internal static class RateSearchAssembler
             QualityOf(visible.Select(pair => pair.Accumulator).ToList()),
             built.Select(pair => pair.Group).ToList());
     }
+
+    /// <summary>The comparison group a fact belongs to: product, code, fee type, setting, modifiers and rate type.</summary>
+    public static string GroupKeyOf(RateFactRow fact, ReferenceCatalog catalog) =>
+        string.Join('|', fact.ProductKey, fact.CodeType, fact.Code, FeeTypeOf(fact.BillingClass), catalog.SettingForPlace(fact.Pos).Key,
+            fact.Modifiers, fact.NegotiatedType);
 
     public static string FeeTypeOf(string billingClass) => billingClass switch
     {
@@ -151,7 +154,7 @@ internal static class RateSearchAssembler
                 .Take(5)
                 .Select(pair => new ProviderPosition(
                     pair.Provider.Key,
-                    pair.Provider.MatchedDisplayName,
+                    pair.Provider.NameFor(pair.View, filtered: true),
                     pair.View.Value,
                     basic ? RateStatistics.PercentRank(values, pair.View.Value, pair.Provider.Value) : null,
                     RateStatistics.Ratio(pair.View.Value, median),
@@ -204,10 +207,10 @@ internal static class RateSearchAssembler
                 continue;
             }
 
-            // With a provider filter the row shows only the matched rates: an NPI's own rate, not its tax ID's blend, and
-            // the name of the facility that matched, not another one under the same tax ID.
+            // With a provider filter the row shows only the matched rates: an NPI's own rate, not its tax ID's blend. The
+            // name is the facility actually paid the rate shown (a tax ID can run several), so the row and its source agree.
             var view = providerFilterActive ? provider.MatchedRates : provider.AllRates;
-            var name = providerFilterActive ? provider.MatchedDisplayName : provider.DisplayName;
+            var name = provider.NameFor(view, providerFilterActive);
             string? band = null;
             if (basic && group.Stats is { P25: { } p25, Median: { } median, P75: { } p75 })
             {
@@ -285,14 +288,21 @@ internal static class RateSearchAssembler
     {
         var notes = new List<string>();
 
-        // When most providers are paid the identical amount, it's a standard fee schedule, not a negotiated spread.
+        // When at least half the providers are paid one identical amount, it's a standard fee schedule, not a negotiated spread.
         if (values.Count >= RateStatistics.MinimumForBasicStats)
         {
-            var mode = values.GroupBy(value => value).OrderByDescending(same => same.Count()).First();
-            if (mode.Count() * 2 >= values.Count)
+            var counts = values.GroupBy(value => value).Select(same => (Amount: same.Key, Count: same.Count())).ToList();
+            var top = counts.Max(amount => amount.Count);
+            if (top * 2 >= values.Count)
             {
-                notes.Add($"{mode.Count()} of {values.Count} providers are paid exactly {RateSearchFormat.Money(mode.Key)}: " +
-                    "most likely a standard fee schedule rather than individually negotiated rates.");
+                // Two amounts can each hold exactly half: name both.
+                var modes = counts.Where(amount => amount.Count == top).Select(amount => amount.Amount).Order().ToList();
+                notes.Add(modes.Count == 1
+                    ? $"{top} of {values.Count} providers are paid exactly {RateSearchFormat.Money(modes[0])}: " +
+                      "most likely a standard fee schedule rather than individually negotiated rates."
+                    : $"The {values.Count} providers are split evenly between {RateSearchFormat.Money(modes[0])} and " +
+                      $"{RateSearchFormat.Money(modes[1])} ({top} each): most likely two standard fee schedules rather than " +
+                      "individually negotiated rates.");
             }
         }
 
@@ -318,7 +328,7 @@ internal static class RateSearchAssembler
         if (facilityRows.Count > 0)
         {
             var codes = string.Join(", ", facilityRows.Select(b => $"{b.Code} ({catalog.RevenueCodeLabel(b.Code)})"));
-            notes.Add($"The plan files these facility rates under revenue code {codes}, naming {group.CodeType} {group.Code} in the notes field.");
+            notes.Add($"The plan files these facility rates under revenue code{(facilityRows.Count == 1 ? "" : "s")} {codes}, naming {group.CodeType} {group.Code} in the notes field.");
         }
 
         if (category.PerUnit)
@@ -387,6 +397,8 @@ internal static class RateSearchAssembler
     {
         private readonly SortedSet<string> _names = new(StringComparer.Ordinal);
         private readonly SortedSet<string> _matchedNames = new(StringComparer.Ordinal);
+        private readonly Dictionary<long, SortedSet<string>> _namesByRate = [];
+        private readonly Dictionary<long, SortedSet<string>> _matchedNamesByRate = [];
         private readonly Dictionary<long, RateEntry> _rates = [];
         private RateView? _all;
         private RateView? _matched;
@@ -412,6 +424,15 @@ internal static class RateSearchAssembler
         /// lists each under its own name; the matched facility's name belongs next to the matched rate.
         /// </summary>
         public string MatchedDisplayName => _matchedNames.Count > 0 ? _matchedNames.Min! : DisplayName;
+
+        /// <summary>
+        /// The name on this provider's group(s) behind the rate a row shows (<see cref="RateView.SourceRateId"/>, the one
+        /// the source drawer opens), among the groups that matched when a provider filter is on.
+        /// </summary>
+        public string NameFor(RateView view, bool filtered) =>
+            filtered && _matchedNamesByRate.TryGetValue(view.SourceRateId, out var matched) && matched.Count > 0 ? matched.Min!
+            : _namesByRate.TryGetValue(view.SourceRateId, out var names) && names.Count > 0 ? names.Min!
+            : filtered ? MatchedDisplayName : DisplayName;
 
         public IReadOnlyList<string> NamesOtherThan(string name) => _names.Where(other => other != name).ToList();
 
@@ -453,6 +474,7 @@ internal static class RateSearchAssembler
             foreach (var name in SplitNames(fact.BusinessNames))
             {
                 _names.Add(name);
+                NamesOf(_namesByRate, fact.RateId).Add(name);
             }
 
             if (fact.FilterMatch)
@@ -460,8 +482,20 @@ internal static class RateSearchAssembler
                 foreach (var name in SplitNames(fact.MatchedBusinessNames))
                 {
                     _matchedNames.Add(name);
+                    NamesOf(_matchedNamesByRate, fact.RateId).Add(name);
                 }
             }
+        }
+
+        private static SortedSet<string> NamesOf(Dictionary<long, SortedSet<string>> byRate, long rateId)
+        {
+            if (!byRate.TryGetValue(rateId, out var names))
+            {
+                names = new SortedSet<string>(StringComparer.Ordinal);
+                byRate[rateId] = names;
+            }
+
+            return names;
         }
 
         private static string[] SplitNames(string? names) =>

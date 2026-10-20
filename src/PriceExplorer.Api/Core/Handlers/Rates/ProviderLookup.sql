@@ -1,6 +1,7 @@
 -- Where an NPI and/or EIN appears in this snapshot, used to explain an empty provider-filtered search:
 --   GroupCount / Eins / BusinessNames: the provider groups it is listed in (names and EINs in a fixed order).
---   CodeCount / TopCodes: the OTHER codes (not the searched ones, under any code type) it has rates for.
+--   CodeCount / TopCodes: the OTHER codes (not the searched ones, under any code type) it has rates for, including
+--   procedure codes behind facility rates filed under a searched revenue code.
 --   WholeTinKeys / WholeTinNames: tax IDs it is listed under that also hold a contract for the searched code with the
 --   whole tax ID (npi [0], NPIs not listed), which may cover this NPI.
 WITH target_files AS (
@@ -16,8 +17,7 @@ groups AS (
               SELECT 1 FROM group_npis gn
               WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
                 AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
-      AND ($ein::VARCHAR IS NULL OR pg.ein = $ein::VARCHAR
-           OR (pg.ein_unverified AND 'u' || substr(sha256(pg.ein), 1, 12) = $ein::VARCHAR))
+      AND ($ein::VARCHAR IS NULL OR pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR)
 ),
 codes AS (
     SELECT r.code_type, r.code, count(*) AS rates
@@ -25,13 +25,12 @@ codes AS (
     JOIN rate_provider_refs rr ON rr.file_id = g.file_id AND rr.provider_ref_id = g.provider_ref_id
     JOIN rates r ON r.rate_id = rr.rate_id
     WHERE r.code NOT IN $codes
-      AND NOT (r.billing_code_type = 'RC' AND r.billing_code IN $codes)
       AND (r.expiration_date IS NULL OR r.expiration_date >= current_date)
     GROUP BY r.code_type, r.code
 ),
 whole_tin AS (
     SELECT DISTINCT
-        CASE WHEN pg.ein_unverified THEN 'u' || substr(sha256(pg.ein), 1, 12) ELSE pg.ein END AS provider_key,
+        pg.provider_key,
         pg.business_name
     FROM provider_groups pg
     JOIN target_files tf ON tf.file_id = pg.file_id

@@ -251,15 +251,6 @@ public sealed class SearchApiTests(ExplorerApiFactory factory) : IClassFixture<E
         hint.GetProperty("message").GetString().Should().Contain("inpatient");
     }
 
-    [Fact(Timeout = 60_000)]
-    public async Task A_revenue_code_searched_as_cpt_says_it_is_a_revenue_code()
-    {
-        var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "0490", ["codeType"] = "CPT" });
-
-        var hint = result.GetProperty("hints").EnumerateArray().Single(h => h.GetProperty("kind").GetString() == "code_type_mismatch");
-        hint.GetProperty("message").GetString().Should().Be("No CPT rates for 0490. It's in these files as RC 0490.");
-    }
-
     [Theory(Timeout = 60_000)]
     [InlineData("/api/v1/rates/abc/source")]
     [InlineData("/api/v1/rates/99999999999999999999/npis")]

@@ -92,8 +92,12 @@ public sealed class SuggestProvidersQueryValidator : AbstractValidator<SuggestPr
     public SuggestProvidersQueryValidator()
     {
         RuleFor(query => query.Q)
-            .Must(q => q is not null && q.Trim().Length is >= 2 and <= 100 && !InputRules.HasControlCharacters(q))
+            .Must(q => q is not null && q.Trim().Length >= 2 && !InputRules.HasControlCharacters(q))
             .WithMessage("Type at least 2 characters of the provider's name or EIN.");
+        RuleFor(query => query.Q)
+            .Must(q => q!.Trim().Length <= 100)
+            .When(query => query.Q is not null)
+            .WithMessage("Search text is at most 100 characters.");
         RuleFor(query => query.Limit).InclusiveBetween(1, 50).WithMessage("Limit is between 1 and 50.");
         RuleFor(query => query.Snapshot).GreaterThan(0).When(query => query.Snapshot is not null).WithMessage("Snapshot id must be a positive number.");
     }

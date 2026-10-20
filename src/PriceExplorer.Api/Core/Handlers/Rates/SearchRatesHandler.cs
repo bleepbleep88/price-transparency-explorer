@@ -14,7 +14,7 @@ namespace PriceExplorer.Api.Core.Handlers.Rates;
 /// Runs a rate search: one query for the facts (SearchRates.sql), pure grouping and statistics (RateSearchAssembler),
 /// exact NPI counts for the page (RowNpis.sql), the code's description, and hints for empty or surprising results.
 /// </summary>
-public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog)
+public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog, ILogger<SearchRatesHandler> logger)
     : IRequestHandler<SearchRatesQuery, RateSearchResult>
 {
     public async Task<RateSearchResult> Handle(SearchRatesQuery request, CancellationToken cancellationToken)
@@ -25,23 +25,15 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
         await using var connection = await connections.OpenAsync(cancellationToken);
         var snapshot = await SnapshotResolver.ResolveAsync(connection, request.Snapshot);
 
-        var facts = (await connection.QueryAsync<RateFactRow>(
-            SqlFile.For<SearchRatesHandler>("SearchRates.sql"),
-            new { snapshotId = snapshot.SnapshotId, codes = search.Candidates, npi = search.Npi, ein = search.Ein, provider = search.Name })).ToList();
-
-        var assembled = RateSearchAssembler.Assemble(
-            facts,
-            new AssemblyOptions(
-                search.Product, search.Setting, search.FeeType, search.CodeType, search.Group,
-                search.ProviderFilterActive, sort, request.Page, request.PageSize),
-            catalog);
+        var (facts, assembled) = await RunAsync(connection, snapshot, search, sort, request.Page, request.PageSize, catalog);
         var rows = await CountRowNpisAsync(connection, assembled.Rows);
 
-        var codeInfo = await DescribeCodeAsync(connection, snapshot, facts);
+        var codeInfo = await DescribeCodeAsync(connection, snapshot, facts, assembled.Groups);
         var hints = await new SearchHints(connection, snapshot, catalog, search).ForAsync(facts, assembled, codeInfo);
+        hints = await new HintLinkChecker(connections, snapshot, catalog, logger).KeepLinksThatFindRatesAsync(request, hints, cancellationToken);
 
         var echo = new RateSearchEcho(
-            search.Code, search.Candidates, search.CodeType, search.Npi?.ToString(CultureInfo.InvariantCulture), search.Ein,
+            search.Code, search.Candidates, search.CodeType, search.NpiText, search.Ein,
             search.Product, search.Setting, search.FeeType, search.NameTyped, search.Group, sort, request.Page, request.PageSize);
 
         return new RateSearchResult(
@@ -52,6 +44,30 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
             rows,
             hints,
             assembled.Quality);
+    }
+
+    /// <summary>The facts for a search (SearchRates.sql) and their groups and rows; hint links are checked the same way.</summary>
+    internal static async Task<(List<RateFactRow> Facts, AssembledSearch Assembled)> RunAsync(
+        DuckDBConnection connection, ResolvedSnapshot snapshot, SearchContext search, string sort, int page, int pageSize,
+        ReferenceCatalog catalog)
+    {
+        var facts = (await connection.QueryAsync<RateFactRow>(
+            SqlFile.For<SearchRatesHandler>("SearchRates.sql"),
+            new { snapshotId = snapshot.SnapshotId, codes = search.Candidates, npi = search.Npi, ein = search.Ein, provider = search.Name })).ToList();
+
+        // DRG 0470 never means revenue code 0470: a foreign code type only matches rates of that type (none in these files).
+        if (search.ForeignCodeType)
+        {
+            facts = facts.Where(fact => fact.CodeType == search.CodeType).ToList();
+        }
+
+        var assembled = RateSearchAssembler.Assemble(
+            facts,
+            new AssemblyOptions(
+                search.Product, search.Setting, search.FeeType, search.CodeType, search.Group,
+                search.ProviderFilterActive, sort, page, pageSize),
+            catalog);
+        return (facts, assembled);
     }
 
     /// <summary>Exact distinct-NPI counts for the rows on this page (the assembler only sees per-rate counts).</summary>
@@ -82,12 +98,16 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
         };
     }
 
-    private async Task<CodeInfo?> DescribeCodeAsync(DuckDBConnection connection, ResolvedSnapshot snapshot, List<RateFactRow> facts)
+    private async Task<CodeInfo?> DescribeCodeAsync(
+        DuckDBConnection connection, ResolvedSnapshot snapshot, List<RateFactRow> facts, IReadOnlyList<RateGroup> shown)
     {
-        // The code with the most providers wins when a short number matched several kinds of code.
+        // When a short number matched several kinds of code, describe one that's shown under the current filters, then
+        // the one with the most providers.
+        var shownKinds = shown.Select(group => (group.CodeType, group.Code)).ToHashSet();
         var primary = facts
             .GroupBy(fact => (fact.CodeType, fact.Code))
-            .OrderByDescending(group => group.Select(fact => fact.ProviderKey).Distinct().Count())
+            .OrderByDescending(group => shownKinds.Contains(group.Key))
+            .ThenByDescending(group => group.Select(fact => fact.ProviderKey).Distinct().Count())
             .ThenBy(group => group.Key.CodeType, StringComparer.Ordinal)
             .Select(group => group.Key)
             .FirstOrDefault();

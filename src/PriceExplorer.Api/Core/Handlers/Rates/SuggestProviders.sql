@@ -7,11 +7,7 @@ WITH target_files AS (
 ),
 matches AS (
     SELECT
-        CASE
-            WHEN pg.ein IS NULL THEN pg.tin_type || ':' || coalesce(pg.tin_value, '')
-            WHEN pg.ein_unverified THEN 'u' || substr(sha256(pg.ein), 1, 12)
-            ELSE pg.ein
-        END AS provider_key,
+        pg.provider_key,
         pg.ein, pg.ein_unverified, pg.business_name, pg.file_id, pg.provider_ref_id
     FROM provider_groups pg
     JOIN target_files tf ON tf.file_id = pg.file_id

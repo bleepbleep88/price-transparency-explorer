@@ -18,6 +18,7 @@ public sealed class SnapshotsController(ISender sender) : ControllerBase
     /// <summary>Plans covered by a snapshot, grouped by product. Plans in one product share the same rates.</summary>
     [HttpGet("{snapshotId:int}/plans")]
     [ProducesResponseType<SnapshotPlans>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public Task<SnapshotPlans> Plans(int snapshotId, CancellationToken cancellationToken) =>
         sender.Send(new ListPlansQuery(snapshotId), cancellationToken);
