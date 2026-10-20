@@ -224,6 +224,16 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task A_name_that_matches_nobody_says_so_and_offers_to_clear_it()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "45378", ["provider"] = "zzqx" });
+
+        var hint = Hint(result, "provider_name_no_match");
+        hint.GetProperty("message").GetString().Should().Be("No provider whose name contains \"zzqx\" has a rate for CPT 45378.");
+        hint.GetProperty("links")[0].GetProperty("label").GetString().Should().Be("Clear the name filter");
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task A_product_without_rates_for_the_code_is_named_by_its_label()
     {
         var result = await SearchAsync(TestContext.Current.CancellationToken, new() { ["code"] = "29881", ["product"] = "essential-plan" });

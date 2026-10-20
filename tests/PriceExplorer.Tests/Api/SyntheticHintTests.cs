@@ -100,6 +100,18 @@ public sealed class SyntheticHintTests(SyntheticHintTests.Factory factory) : ICl
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task A_wrong_code_type_link_keeps_the_ein_when_only_the_ein_has_that_code()
+    {
+        var result = await SearchAsync(TestContext.Current.CancellationToken, "code=0450&codeType=CPT&npi=1386622339&ein=113471596");
+
+        var link = result.GetProperty("hints").EnumerateArray().Single(h => h.GetProperty("kind").GetString() == "code_type_mismatch")
+            .GetProperty("links").EnumerateArray().Single();
+        link.GetProperty("label").GetString().Should().Be("Search RC 0450 for EIN 11-3471596");
+        link.GetProperty("query").GetProperty("npi").ValueKind.Should().Be(JsonValueKind.Null);
+        link.GetProperty("query").TryGetProperty("ein", out _).Should().BeFalse("the link keeps the EIN");
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task An_npi_under_a_verified_and_a_masked_tax_id_names_each_with_its_own_tax_id()
     {
         var result = await SearchAsync(TestContext.Current.CancellationToken, $"code=0490&npi={MinkowitzNpi}");

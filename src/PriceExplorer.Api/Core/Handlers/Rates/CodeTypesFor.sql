@@ -6,7 +6,7 @@
 --   and name in the same group, as in SearchRates.sql); always true without provider filters.
 --   InProduct: one of those searchable rates is in the selected product (always true without one).
 --   ForProviderInProduct: both at once, on the same rate.
---   ForId / ForNpi: like ForProvider, for the NPI and EIN without the name, and for the NPI alone.
+--   ForId / ForNpi / ForEin: like ForProvider, for the NPI and EIN without the name, the NPI alone, and the EIN alone.
 WITH target_files AS (
     SELECT file_id, product_key
     FROM source_files
@@ -69,7 +69,12 @@ SELECT
         SELECT 1
         FROM rate_provider_refs rr
         JOIN group_npis gn ON gn.file_id = rr.file_id AND gn.provider_ref_id = rr.provider_ref_id
-        WHERE rr.rate_id = k.rate_id AND gn.npi = $npi::BIGINT)) AS ForNpi
+        WHERE rr.rate_id = k.rate_id AND gn.npi = $npi::BIGINT)) AS ForNpi,
+    bool_or(k.searchable AND $ein::VARCHAR IS NOT NULL AND EXISTS (
+        SELECT 1
+        FROM rate_provider_refs rr
+        JOIN provider_groups pg ON pg.file_id = rr.file_id AND pg.provider_ref_id = rr.provider_ref_id
+        WHERE rr.rate_id = k.rate_id AND (pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR))) AS ForEin
 FROM kinds k
 GROUP BY k.code_type, k.code
 ORDER BY CodeType, Code
