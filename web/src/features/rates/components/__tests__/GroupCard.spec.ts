@@ -40,6 +40,7 @@ function makeGroup(overrides: Partial<RateGroup> = {}): RateGroup {
     },
     lowerQuartileGap: 123.87,
     listedRates: [],
+    matchedProviders: 0,
     highlights: [],
     notes: ['The plan files these facility rates under revenue code 0490 (Ambulatory surgery).'],
     ...overrides,
@@ -114,7 +115,7 @@ describe('GroupCard', () => {
   it("shows where the searched provider sits and emits the group key", async () => {
     const group = makeGroup({
       highlights: [
-        { providerKey: '113466729', displayName: 'Example Surgery Center', rate: 627.5, percentile: 75, vsMedian: 1.09, aboveP25: 173.06 },
+        { providerKey: '113466729', displayName: 'Example Surgery Center', rate: 627.5, percentile: 75, vsMedian: 1.09, aboveP25: 173.06, rateLow: 627.5, rateHigh: 627.5 },
       ],
     })
     const wrapper = mountCard(group)
@@ -132,7 +133,7 @@ describe('GroupCard', () => {
 
   it('names the filter instead of "your provider" for a name search', () => {
     const group = makeGroup({
-      highlights: [{ providerKey: 'a', displayName: 'Hudson Valley Gastroenterology PC', rate: 627.5, percentile: 75, vsMedian: 1.09, aboveP25: 173.06 }],
+      highlights: [{ providerKey: 'a', displayName: 'Hudson Valley Gastroenterology PC', rate: 627.5, percentile: 75, vsMedian: 1.09, aboveP25: 173.06, rateLow: 627.5, rateHigh: 627.5 }],
     })
     const heading = 'Where providers whose name contains "gastro" sit'
     const highlights = mountCard(group, false, heading).get('[data-testid="group-highlights"]')

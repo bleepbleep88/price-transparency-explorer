@@ -138,7 +138,6 @@ export interface YourRateLine {
 export function yourRateLines(result: RateSearchResult): YourRateLine[] {
   const yours = pinsProvider(result)
   const subject = yours ? 'Your rate' : 'Rate'
-  const rows = new Map(result.rows.items.map((row) => [`${row.groupKey}|${row.providerKey}`, row]))
   return result.groups.flatMap((group) =>
     group.highlights.map((position) => {
       let text: string
@@ -152,10 +151,9 @@ export function yourRateLines(result: RateSearchResult): YourRateLine[] {
       } else {
         text = `${subject} ${money(position.rate)}.`
       }
-      // Several rates in one group: the table row (when it's on this page) has the range.
-      const row = rows.get(`${group.key}|${position.providerKey}`)
-      if (row?.multipleRates) {
-        text = `${text.slice(0, -1)} (${yours ? 'your rates here' : 'its rates'} range from ${money(row.rateLow)} to ${money(row.rateHigh)}).`
+      // Several rates in one group: say the range, so one rate doesn't read as the only one.
+      if (position.rateHigh !== position.rateLow) {
+        text = `${text.slice(0, -1)} (${yours ? 'your rates here' : 'its rates'} range from ${money(position.rateLow)} to ${money(position.rateHigh)}).`
       }
       return {
         groupKey: group.key,
@@ -167,6 +165,30 @@ export function yourRateLines(result: RateSearchResult): YourRateLine[] {
       }
     }),
   )
+}
+
+export interface YourRateGroup {
+  groupKey: string
+  group: string
+  lines: YourRateLine[]
+  /** Set when the API listed only the first matches: "Showing 5 of 12 matching providers; the table lists them all." */
+  capNote: string | null
+}
+
+/** The lines grouped by comparison group, each group saying when it shows only some of its matches. */
+export function yourRateGroups(result: RateSearchResult): YourRateGroup[] {
+  const lines = yourRateLines(result)
+  return result.groups
+    .filter((group) => group.highlights.length)
+    .map((group) => ({
+      groupKey: group.key,
+      group: groupName(group),
+      lines: lines.filter((line) => line.groupKey === group.key),
+      capNote:
+        group.matchedProviders > group.highlights.length
+          ? `Showing ${group.highlights.length} of ${group.matchedProviders} matching providers; the table lists them all.`
+          : null,
+    }))
 }
 
 /** Heading over a card's highlights: "your" only when an NPI or EIN pins one provider. */

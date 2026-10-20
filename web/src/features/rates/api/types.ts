@@ -114,6 +114,9 @@ export interface ProviderPosition {
   percentile: number | null
   vsMedian: number | null
   aboveP25: number | null
+  /** The provider's own range among its matched rates (equal to rate for a single rate). */
+  rateLow: number
+  rateHigh: number
 }
 
 export interface PlaceRef {
@@ -158,6 +161,8 @@ export interface RateGroup {
   /** Median minus the 25th percentile (full stats only): how far a typical rate sits above the lower quartile. */
   lowerQuartileGap: number | null
   listedRates: number[]
+  /** Providers matching the NPI/EIN/name filter in this group (0 without one); highlights list the first 5. */
+  matchedProviders: number
   highlights: ProviderPosition[]
   notes: string[]
 }

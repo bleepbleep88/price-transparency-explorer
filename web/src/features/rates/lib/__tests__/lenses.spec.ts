@@ -19,6 +19,7 @@ import {
   unitPriceText,
   widestSpread,
   yearlyLead,
+  yourRateGroups,
   yourRateLines,
 } from '../lenses'
 import { LENSES, parseRouteQuery } from '../searchParams'
@@ -48,6 +49,7 @@ function makeGroup(overrides: Partial<RateGroup> = {}): RateGroup {
     stats: { min: 512.4, p10: 958.31, p25: 1361.3, median: 2762.15, p75: 4200, p90: 5921.67, max: 9091.97, spreadMultiple: 17.74, p90ToP10: 6.18 },
     lowerQuartileGap: 1400.85,
     listedRates: [],
+    matchedProviders: 0,
     highlights: [],
     notes: [],
     ...overrides,
@@ -128,10 +130,10 @@ describe('providers lens', () => {
     feeTypeLabel: 'Professional (clinician) fee',
     settingLabel: "Doctor's office",
     providerCount: 124,
-    highlights: [{ providerKey: '995084138', displayName: 'Heel Sole Podiatry PC', rate: 80.72, percentile: 68, vsMedian: 1.57, aboveP25: 29.27 }],
+    highlights: [{ providerKey: '995084138', displayName: 'Heel Sole Podiatry PC', rate: 80.72, percentile: 68, vsMedian: 1.57, aboveP25: 29.27, rateLow: 80.72, rateHigh: 80.72 }],
   })
-  const byNpi = (groups: RateGroup[], rows: RateSearchResult['rows']['items'] = []) => {
-    const result = makeResult(groups, { rows: { total: rows.length, page: 1, pageSize: 25, items: rows } })
+  const byNpi = (groups: RateGroup[]) => {
+    const result = makeResult(groups)
     return { ...result, query: { ...result.query, npi: '1801474036' } }
   }
   const byName = (groups: RateGroup[], provider: string) => {
@@ -158,44 +160,32 @@ describe('providers lens', () => {
     const feeSchedule = makeGroup({
       key: 'fee-schedule',
       stats: { min: 143.75, p10: 167.09, p25: 167.09, median: 167.09, p75: 167.09, p90: 167.09, max: 185.4, spreadMultiple: 1.29, p90ToP10: 1 },
-      highlights: [{ providerKey: 'a', displayName: 'Downtown Gastroenterology Assoc', rate: 167.09, percentile: 50, vsMedian: 1, aboveP25: 0 }],
+      highlights: [{ providerKey: 'a', displayName: 'Downtown Gastroenterology Assoc', rate: 167.09, percentile: 50, vsMedian: 1, aboveP25: 0, rateLow: 167.09, rateHigh: 167.09 }],
     })
     expect(yourRateLines(byNpi([feeSchedule]))[0]!.text).toBe('Your rate $167.09 is at the 50th percentile, 1.00× the median (the most common rate).')
     const spread = { ...feeSchedule, stats: { ...feeSchedule.stats, p25: 150, p75: 180 } }
     expect(yourRateLines(byNpi([spread]))[0]!.text).not.toContain('most common')
   })
 
-  it('adds the range when the provider has several rates in the group', () => {
-    const row = {
-      groupKey: office.key,
-      providerKey: '995084138',
-      ein: '99-5084138',
-      einDisplay: '99-5084138',
-      einMasked: false,
-      einLevel: false,
-      businessName: 'Heel Sole Podiatry PC',
-      otherNames: [],
-      rate: 80.72,
-      rateLow: 57.05,
-      rateHigh: 94.5,
-      multipleRates: true,
-      vsMedian: 1.57,
-      percentile: 68,
-      band: 'typical' as const,
-      npiCount: 1,
-      occurrences: 2,
-      rateCount: 2,
-      firstRateId: 1,
-      rateIds: [1, 2],
-      matched: true,
-    }
-    expect(yourRateLines(byNpi([office], [row]))[0]!.text).toBe(
+  it("adds the provider's own range when it has several rates in the group, even off the table's page", () => {
+    const several = { ...office, highlights: [{ ...office.highlights[0]!, rateLow: 57.05, rateHigh: 94.5 }] }
+    expect(yourRateLines(byNpi([several]))[0]!.text).toBe(
       'Your rate $80.72 is at the 68th percentile, 1.57× the median (your rates here range from $57.05 to $94.50).',
     )
+    expect(yourRateLines(byName([several], 'heel'))[0]!.text).toContain('(its rates range from $57.05 to $94.50)')
+  })
+
+  it('groups the lines and says when a group shows only its first matches', () => {
+    const capped = { ...office, matchedProviders: 12, highlights: Array.from({ length: 5 }, (_, i) => ({ ...office.highlights[0]!, providerKey: `p${i}` })) }
+    const complete = { ...office, key: 'complete', matchedProviders: 1 }
+    const [first, second] = yourRateGroups(byName([capped, complete], 'podiatry'))
+    expect(first).toMatchObject({ groupKey: office.key, capNote: 'Showing 5 of 12 matching providers; the table lists them all.' })
+    expect(first!.lines).toHaveLength(5)
+    expect(second).toMatchObject({ groupKey: 'complete', capNote: null })
   })
 
   it('does not invent a percentile for a group too small to have one', () => {
-    const small = { ...singleEr, highlights: [{ providerKey: 'x', displayName: 'Lone Hospital', rate: 4803.34, percentile: null, vsMedian: null, aboveP25: null }] }
+    const small = { ...singleEr, highlights: [{ providerKey: 'x', displayName: 'Lone Hospital', rate: 4803.34, percentile: null, vsMedian: null, aboveP25: null, rateLow: 4803.34, rateHigh: 4803.34 }] }
     expect(yourRateLines(byNpi([small]))[0]!.text).toBe('Your rate $4,803.34. With 1 provider in this group there is no percentile.')
   })
 })

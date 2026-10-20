@@ -30,6 +30,7 @@ function group(overrides: Partial<RateGroup> = {}): RateGroup {
     stats: { min: 226.51, p10: 371.78, p25: 454.45, median: 578.31, p75: 627.5, p90: 663.64, max: 1154.16, spreadMultiple: 5.1, p90ToP10: 1.79 },
     lowerQuartileGap: 123.86,
     listedRates: [],
+    matchedProviders: 0,
     highlights: [],
     notes: [],
     ...overrides,
@@ -95,7 +96,7 @@ describe('LensPanel', () => {
 
   it('providers: says where your rate sits, or asks for an NPI', async () => {
     const office = group({
-      highlights: [{ providerKey: '995084138', displayName: 'Heel Sole Podiatry PC', rate: 80.72, percentile: 68, vsMedian: 1.57, aboveP25: 29.27 }],
+      highlights: [{ providerKey: '995084138', displayName: 'Heel Sole Podiatry PC', rate: 80.72, percentile: 68, vsMedian: 1.57, aboveP25: 29.27, rateLow: 80.72, rateHigh: 80.72 }],
     })
     const withNpi = mountPanel(result([office], { npi: '1801474036' }), { lens: 'providers', npi: '1801474036' })
     expect(withNpi.get('[data-testid="your-rate-line"]').text()).toContain('Your rate $80.72 is at the 68th percentile, 1.57× the median.')
@@ -107,7 +108,7 @@ describe('LensPanel', () => {
 
   it('providers: a name search names the filter and counts the groups left, not the lines', () => {
     const matches = (prefix: string) =>
-      Array.from({ length: 4 }, (_, i) => ({ providerKey: `${prefix}${i}`, displayName: `Gastro Practice ${prefix}${i}`, rate: 300 + i, percentile: 40 + i, vsMedian: 1.1, aboveP25: 10 }))
+      Array.from({ length: 4 }, (_, i) => ({ providerKey: `${prefix}${i}`, displayName: `Gastro Practice ${prefix}${i}`, rate: 300 + i, percentile: 40 + i, vsMedian: 1.1, aboveP25: 10, rateLow: 300 + i, rateHigh: 300 + i }))
     const groups = ['a', 'b', 'c'].map((key) => group({ key, highlights: matches(key) }))
     const wrapper = mountPanel(result(groups, { provider: 'gastro' }), { lens: 'providers', provider: 'gastro' })
     expect(wrapper.text()).toContain('Providers whose name contains "gastro":')
@@ -115,6 +116,22 @@ describe('LensPanel', () => {
     expect(wrapper.text()).not.toContain('Your rate')
     expect(wrapper.findAll('[data-testid="your-rate-line"]')).toHaveLength(8)
     expect(wrapper.get('[data-testid="more-groups"]').text()).toBe('1 more group in the cards below.')
+  })
+
+  it('providers: says when a group lists only its first matches', () => {
+    const highlights = Array.from({ length: 5 }, (_, i) => ({
+      providerKey: `p${i}`,
+      displayName: `Medical Practice ${i}`,
+      rate: 100 + i,
+      percentile: 30 + i,
+      vsMedian: 0.9,
+      aboveP25: 5,
+      rateLow: 100 + i,
+      rateHigh: 100 + i,
+    }))
+    const wrapper = mountPanel(result([group({ matchedProviders: 12, highlights })], { provider: 'medical' }), { lens: 'providers', provider: 'medical' })
+    expect(wrapper.findAll('[data-testid="your-rate-line"]')).toHaveLength(5)
+    expect(wrapper.get('[data-testid="highlight-cap"]').text()).toBe('Showing 5 of 12 matching providers; the table lists them all.')
   })
 
   it('plans: widest spread first, and one click shows the highest rates in that group', async () => {
