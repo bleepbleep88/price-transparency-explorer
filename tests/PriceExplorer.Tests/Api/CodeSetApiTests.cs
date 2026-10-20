@@ -157,6 +157,37 @@ public sealed class CodeSetApiTests(CodeSetApiTests.Factory factory) : IClassFix
         steps[1].GetProperty("stats").GetProperty("median").GetDecimal().Should().Be(85m);
     }
 
+    [Fact(Timeout = 60_000)]
+    public async Task Without_the_code_set_files_codes_keep_the_plans_names_and_the_code_range_categories()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var folder = Directory.CreateTempSubdirectory("pte-codes-").FullName;
+        var damaged = Path.Combine(folder, "rbcs.csv.gz");
+        await System.IO.File.WriteAllBytesAsync(damaged, [0x1F, 0x8B, 0x08, 0x00, 0xDE, 0xAD, 0xBE, 0xEF], ct);
+        try
+        {
+            await using var bare = ExplorerApiFactory.With(settings: new Dictionary<string, string?>
+            {
+                ["Reference:HcpcsNamesPath"] = Path.Combine(folder, "missing.csv.gz"),
+                ["Reference:RbcsPath"] = damaged,
+            });
+            using var client = bare.CreateClient();
+            await bare.WaitForIngestionAsync(ct);
+
+            var code = (await client.GetFromJsonAsync<JsonElement>("/api/v1/rates?code=45378", ct)).GetProperty("code");
+            var tree = await client.GetFromJsonAsync<JsonElement>("/api/v1/categories", ct);
+
+            code.GetProperty("classification").GetProperty("source").GetString().Should().Be("code_ranges");
+            code.GetProperty("classification").GetProperty("key").GetString().Should().Be("surgery");
+            code.GetProperty("descriptionSource").GetString().Should().Be("payer_file");
+            tree.GetProperty("categories").EnumerateArray().Should().OnlyContain(node => node.GetProperty("source").GetString() == "code_ranges");
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     private async Task<JsonElement> GetAsync(string url, CancellationToken ct)
     {
         using var client = factory.CreateClient();
