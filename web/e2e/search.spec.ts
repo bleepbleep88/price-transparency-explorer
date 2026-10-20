@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 // Both flows run against the real API and data. See playwright.config.ts for E2E_BASE_URL.
 
@@ -68,12 +68,18 @@ test('a Manhattan location filter on 45378 keeps only providers that practice th
   await expect(page.getByTestId('directory-source')).toContainText('national provider registry (NPPES, October 2026)')
 })
 
-for (const { typed, how } of [
-  { typed: 'Brooklyn', how: 'click' },
-  { typed: 'Brookl', how: 'enter' },
-  { typed: 'Kings', how: 'enter' },
+// Both ways to finish: click Search (the field loses focus and keeps the typed place), or press Enter in the field.
+const finishBy = {
+  'then Search': (page: Page) => page.getByRole('button', { name: 'Search', exact: true }).click(),
+  'then Enter': (page: Page) => page.getByRole('combobox', { name: 'Location' }).press('Enter'),
+}
+
+for (const { typed, finish } of [
+  { typed: 'Brooklyn', finish: 'then Search' },
+  { typed: 'Brookl', finish: 'then Enter' },
+  { typed: 'Kings', finish: 'then Enter' },
 ] as const) {
-  test(`a location typed as "${typed}" (${how === 'click' ? 'then Search' : 'then Enter'}) searches Brooklyn`, async ({ page }) => {
+  test(`a location typed as "${typed}" (${finish}) searches Brooklyn`, async ({ page }) => {
     await page.goto('/?code=45378')
     await expect(page.getByTestId('provider-row').first()).toBeVisible()
 
@@ -83,8 +89,7 @@ for (const { typed, how } of [
     await location.pressSequentially(typed)
     // "Kings" is Brooklyn's county: the option shows that name too.
     await expect(page.getByRole('option', { name: /^Brooklyn/ })).toBeVisible()
-    if (how === 'click') await page.getByRole('button', { name: 'Search', exact: true }).click()
-    else await location.press('Enter')
+    await finishBy[finish](page)
 
     await expect(page).toHaveURL(/[?&]county=Brooklyn(&|$)/)
     await expect(page.getByTestId('active-filter').filter({ hasText: 'Location: Brooklyn' })).toBeVisible()
