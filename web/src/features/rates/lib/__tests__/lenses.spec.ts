@@ -19,10 +19,14 @@ import {
   unitPriceText,
   widestSpread,
   yearlyLead,
+  yearlyText,
+  EMPLOYER_CAVEATS,
   yourRateGroups,
   yourRateLines,
 } from '../lenses'
 import { LENSES, parseRouteQuery } from '../searchParams'
+
+const BANNED = /percentile|median|quartile|×|p90|p10|spread multiple|index|comparison group/i
 
 // Shaped like the real 2026-08-31 responses the examples point at.
 function makeGroup(overrides: Partial<RateGroup> = {}): RateGroup {
@@ -114,12 +118,20 @@ describe('lens options and start cards', () => {
     expect(codes).toEqual(expect.arrayContaining(['45378', '29881', '99214', '812', 'J0585']))
   })
 
-  it('names a group by product, fee type, setting and modifiers, never a bare modifier number', () => {
+  it('says what each lens answers without a statistics word', () => {
+    const texts = [...LENS_OPTIONS.map((option) => option.answers), ...START_HERE.flatMap((card) => card.examples.map((example) => example.label))]
+    for (const text of texts) expect(text).not.toMatch(BANNED)
+  })
+
+  it('names a group by product, fee, setting and modifiers, never a bare modifier number', () => {
     expect(groupName(makeGroup({ modifiers: [{ code: 'TC', label: 'Technical component' }] }))).toBe(
       'Ambetter from Fidelis Care · Facility fee · Hospital outpatient department · Technical component (modifier TC)',
     )
     expect(modifierText([{ code: 'Q1', label: 'Modifier Q1' }, { code: '33', label: 'Preventive service' }])).toBe(
       'modifier Q1, Preventive service (modifier 33)',
+    )
+    expect(groupName(makeGroup({ feeType: 'professional', feeTypeLabel: 'Professional (clinician) fee' }))).toBe(
+      "Ambetter from Fidelis Care · Doctor's fee · Hospital outpatient department",
     )
   })
 })
@@ -127,9 +139,12 @@ describe('lens options and start cards', () => {
 describe('providers lens', () => {
   const office = makeGroup({
     key: 'ambetter|CPT|99213|professional|office|25|negotiated',
+    feeType: 'professional',
     feeTypeLabel: 'Professional (clinician) fee',
     settingLabel: "Doctor's office",
     providerCount: 124,
+    stats: { min: 25.17, p10: 41.2, p25: 51.45, median: 51.45, p75: 77.5, p90: 95.3, max: 180.4, spreadMultiple: 7.17, p90ToP10: 2.31 },
+    lowerQuartileGap: 0,
     highlights: [{ providerKey: '995084138', displayName: 'Heel Sole Podiatry PC', rate: 80.72, percentile: 68, vsMedian: 1.57, aboveP25: 29.27, rateLow: 80.72, rateHigh: 80.72 }],
   })
   const byNpi = (groups: RateGroup[]) => {
@@ -147,32 +162,34 @@ describe('providers lens', () => {
     expect(hasProviderFilter(byName([office], 'heel'))).toBe(true)
   })
 
-  it('says "your rate" when an NPI or EIN pins one provider, and just "rate" for a name search', () => {
+  it('says "your price" when an NPI or EIN pins one provider, and just "price" for a name search', () => {
     const [line] = yourRateLines(byNpi([office]))
     expect(line).toMatchObject({ provider: 'Heel Sole Podiatry PC', providerKey: '995084138', rate: 80.72 })
-    expect(line!.text).toBe('Your rate $80.72 is at the 68th percentile, 1.57× the median.')
-    expect(yourRateLines(byName([office], 'heel'))[0]!.text).toBe('Rate $80.72 is at the 68th percentile, 1.57× the median.')
+    expect(line!.text).toBe('Your price $80.72: higher than most, $29.27 more than typical. Typical price: $51.45.')
+    expect(yourRateLines(byName([office], 'heel'))[0]!.text).toBe(
+      'Price $80.72: higher than most, $29.27 more than typical. Typical price: $51.45.',
+    )
     expect(highlightHeading(byNpi([office]))).toBe('How your provider compares')
     expect(highlightHeading(byName([office], 'heel'))).toBe('How providers whose name contains "heel" compare')
   })
 
-  it('calls the median the most common rate only when the quartiles prove it', () => {
+  it('calls the typical price the most common one only when the quarter marks prove it', () => {
     const feeSchedule = makeGroup({
       key: 'fee-schedule',
       stats: { min: 143.75, p10: 167.09, p25: 167.09, median: 167.09, p75: 167.09, p90: 167.09, max: 185.4, spreadMultiple: 1.29, p90ToP10: 1 },
       highlights: [{ providerKey: 'a', displayName: 'Downtown Gastroenterology Assoc', rate: 167.09, percentile: 50, vsMedian: 1, aboveP25: 0, rateLow: 167.09, rateHigh: 167.09 }],
     })
-    expect(yourRateLines(byNpi([feeSchedule]))[0]!.text).toBe('Your rate $167.09 is at the 50th percentile, 1.00× the median (the most common rate).')
+    expect(yourRateLines(byNpi([feeSchedule]))[0]!.text).toBe('Your price $167.09: about typical, and the most common price. Typical price: $167.')
     const spread = { ...feeSchedule, stats: { ...feeSchedule.stats, p25: 150, p75: 180 } }
     expect(yourRateLines(byNpi([spread]))[0]!.text).not.toContain('most common')
   })
 
-  it("adds the provider's own range when it has several rates in the group, even off the table's page", () => {
+  it("adds the provider's own range when it has several prices in the group, even off the table's page", () => {
     const several = { ...office, highlights: [{ ...office.highlights[0]!, rateLow: 57.05, rateHigh: 94.5 }] }
     expect(yourRateLines(byNpi([several]))[0]!.text).toBe(
-      'Your rate $80.72 is at the 68th percentile, 1.57× the median (your rates here range from $57.05 to $94.50).',
+      'Your price $80.72: higher than most, $29.27 more than typical. Typical price: $51.45. Your prices here run from $57.05 to $94.50.',
     )
-    expect(yourRateLines(byName([several], 'heel'))[0]!.text).toContain('(its rates range from $57.05 to $94.50)')
+    expect(yourRateLines(byName([several], 'heel'))[0]!.text).toContain('Its prices here run from $57.05 to $94.50.')
   })
 
   it('groups the lines and says when a group shows only its first matches', () => {
@@ -184,49 +201,60 @@ describe('providers lens', () => {
     expect(second).toMatchObject({ groupKey: 'complete', capNote: null })
   })
 
-  it('does not invent a percentile for a group too small to have one', () => {
+  it('says there is too little to compare under 5 providers, instead of inventing a position', () => {
     const small = { ...singleEr, highlights: [{ providerKey: 'x', displayName: 'Lone Hospital', rate: 4803.34, percentile: null, vsMedian: null, aboveP25: null, rateLow: 4803.34, rateHigh: 4803.34 }] }
-    expect(yourRateLines(byNpi([small]))[0]!.text).toBe('Your rate $4,803.34. With 1 provider in this group there is no percentile.')
+    expect(yourRateLines(byNpi([small]))[0]!.text).toBe('Your price $4,803.34. Only 1 provider: too few to compare.')
+  })
+
+  it('never uses a statistics word', () => {
+    const lowGroup = { ...office, highlights: [{ ...office.highlights[0]!, rate: 30.1 }] }
+    for (const line of yourRateLines(byNpi([office, lowGroup]))) expect(line.text).not.toMatch(BANNED)
   })
 })
 
 describe('plans lens', () => {
   const lines = spreadLines(makeResult([makeGroup(), essentialBasic, singleEr]))
 
-  it('measures spread for every group with statistics', () => {
-    expect(lines.map((line) => line.providers)).toEqual([10, 8])
-    expect(lines[0]!.highestToMedian).toBeCloseTo(9091.97 / 2762.15)
+  it('measures how much prices vary only where there are 10+ providers', () => {
+    expect(lines.map((line) => line.providers)).toEqual([10])
+    expect(lines[0]!.ratio).toBeCloseTo(5921.67 / 958.31)
     expect(spreadText(lines[0]!)).toBe(
-      'The 90th percentile is 6.18× the 10th; the highest rate is 3.29× the median; the gap to the lower quartile is $1,400.85.',
+      'Even leaving out the extremes, the high end is about 6.2 times the low end. $1,401 less per case at a lower-priced provider.',
     )
-    expect(spreadText(lines[1]!)).toBe('The highest rate is 1.60× the median.')
+    expect(spreadText(lines[0]!)).not.toMatch(BANNED)
   })
 
-  it('ranks the widest spread first, listing only groups whose 90th percentile is above their 10th', () => {
-    const narrow = { ...lines[0]!, groupKey: 'narrow', p90ToP10: 1.43, providers: 100 }
-    const flat = { ...lines[0]!, groupKey: 'flat', p90ToP10: 1, highestToMedian: 1, providers: 51 }
-    expect(widestSpread([narrow, flat, lines[1]!, lines[0]!]).map((line) => line.groupKey)).toEqual([lines[0]!.groupKey, 'narrow'])
-    // Basic statistics have no 90th/10th percentile, so they aren't ranked.
-    expect(widestSpread([lines[1]!])).toEqual([])
+  it('puts where prices vary most first, leaving out cards where most providers get about the same price', () => {
+    const narrow = { ...lines[0]!, groupKey: 'narrow', ratio: 1.43, providers: 100 }
+    const flat = { ...lines[0]!, groupKey: 'flat', ratio: 1, providers: 51 }
+    const nearlyFlat = { ...lines[0]!, groupKey: 'nearly-flat', ratio: 1.04, providers: 60 }
+    expect(widestSpread([narrow, flat, nearlyFlat, lines[0]!]).map((line) => line.groupKey)).toEqual([lines[0]!.groupKey, 'narrow'])
+    expect(widestSpread([flat])).toEqual([])
   })
 })
 
 describe('employers lens', () => {
   const asc = makeGroup({ key: 'asc', settingLabel: 'Ambulatory surgery center', providerCount: 31, lowerQuartileGap: 123.86, stats: { ...makeGroup().stats, median: 578.31 } })
 
-  it('lists the typical cost and the gap per case, largest groups first', () => {
+  it('lists the typical price and how much less per case at a lower-priced provider, largest groups first', () => {
     const lines = costLines(makeResult([essentialBasic, asc, singleEr]))
-    expect(lines.map((line) => [line.providers, line.median, line.gap])).toEqual([
+    expect(lines.map((line) => [line.providers, line.typical, line.gap])).toEqual([
       [31, 578.31, 123.86],
       [8, 3595.92, null],
     ])
     expect(lines.every((line) => line.yearly === null)).toBe(true)
   })
 
-  it('turns cases a year into a yearly figure only where there is a gap', () => {
+  it("turns the reader's cases a year into a rounded yearly figure only where there is a gap", () => {
     const [first, second] = costLines(makeResult([asc, essentialBasic]), 1200)
     expect(first!.yearly).toBeCloseTo(123.86 * 1200)
+    expect(yearlyText(first!, 1200)).toBe('About $149,000 less a year for your 1,200 cases at lower-priced providers.')
     expect(second!.yearly).toBeNull()
+  })
+
+  it('says what a member pays and how often a service happens only in the footer, not here', () => {
+    expect(EMPLOYER_CAVEATS).toHaveLength(2)
+    for (const caveat of EMPLOYER_CAVEATS) expect(caveat).not.toMatch(/member pays|claim counts|how often/i)
   })
 
   it('never multiplies a per-unit price by cases: a case can use several units', () => {
@@ -285,6 +313,7 @@ describe('life sciences lens', () => {
     codeType: 'HCPCS',
     code: 'J0585',
     productLabel: 'Essential Plan',
+    feeType: 'professional',
     feeTypeLabel: 'Professional (clinician) fee',
     settingLabel: "Doctor's office",
     modifiers: [{ code: 'JW', label: 'Drug amount discarded' }],
@@ -301,6 +330,7 @@ describe('life sciences lens', () => {
     key: 'small',
     codeType: 'HCPCS',
     code: 'J0585',
+    feeType: 'professional',
     feeTypeLabel: 'Professional (clinician) fee',
     settingLabel: "Doctor's office",
     unit,
@@ -330,11 +360,11 @@ describe('life sciences lens', () => {
     expect(isDrugCode(null)).toBe(false)
   })
 
-  it('prices each site of care per unit: median, a single rate, or the listed range', () => {
+  it('prices each site of care per unit: the typical price from 5 providers, the prices themselves under 5', () => {
     const lines = unitPriceLines(makeResult([office, small]))
     expect(lines.map((line) => [line.site, unitPriceText(line)])).toEqual([
-      ["Doctor's office · Professional (clinician) fee", '$7.16 to $9.77'],
-      ["Doctor's office · Professional (clinician) fee · Drug amount discarded (modifier JW)", '$6.97 median'],
+      ["Doctor's office · Doctor's fee", '$7.16, $7.16, $8.46, $9.77'],
+      ["Doctor's office · Doctor's fee · Drug amount discarded (modifier JW)", 'Typical $6.97'],
     ])
   })
 

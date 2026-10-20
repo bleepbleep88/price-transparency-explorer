@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useDisplay } from 'vuetify'
-import { money, plural, wholeDollars, wholeNumber } from '@/lib/format'
+import { plural, wholeNumber } from '@/lib/format'
+import { dollars, lessPerCase, LIKE_FOR_LIKE } from '@/lib/plainNumbers'
 import type { RateSearchResult } from '../../api/types'
-import { costLines, EMPLOYER_CAVEATS, yearlyLead, type CostLine } from '../../lib/lenses'
+import { costLines, EMPLOYER_CAVEATS, yearlyLead, yearlyText, type CostLine } from '../../lib/lenses'
 import { MAX_CASES, type SearchParams } from '../../lib/searchParams'
 
 const props = defineProps<{ result: RateSearchResult; params: SearchParams }>()
@@ -19,14 +20,18 @@ const anyPerCase = computed(() => lines.value.some((line) => !line.perUnit))
 const lead = computed(() => yearlyLead(lines.value, props.params.group))
 
 const headers = [
-  { title: 'Comparison group', key: 'group', sortable: false },
+  { title: LIKE_FOR_LIKE, key: 'group', sortable: false },
   { title: 'Providers', key: 'providers', sortable: false, align: 'end' as const },
-  { title: 'Median', key: 'median', sortable: false, align: 'end' as const },
-  { title: 'Gap to the lower quartile', key: 'gap', sortable: false, align: 'end' as const },
+  { title: 'Typical price', key: 'typical', sortable: false, align: 'end' as const },
+  { title: 'At a lower-priced provider', key: 'gap', sortable: false, align: 'end' as const },
 ]
 
-function price(value: number, line: CostLine): string {
-  return `${money(value)}${line.perUnit ? ' per unit' : ''}`
+function typicalText(line: CostLine): string {
+  return `${dollars(line.typical)}${line.perUnit ? ' per unit' : ''}`
+}
+
+function gapText(line: CostLine): string {
+  return line.gap == null ? 'Needs 10+ providers' : lessPerCase(line.gap, line.perUnit)
 }
 
 function onCases(value: number | string | null) {
@@ -37,7 +42,7 @@ function onCases(value: number | string | null) {
 
 <template>
   <div class="d-flex flex-column ga-3" data-testid="lens-employers">
-    <p v-if="!lines.length" class="text-body-medium">No group here has enough providers for a median.</p>
+    <p v-if="!lines.length" class="text-body-medium">It takes 5 providers to say what's typical, and no card here has that many.</p>
     <template v-else>
       <v-data-table
         :headers="headers"
@@ -50,11 +55,11 @@ function onCases(value: number | string | null) {
         :row-props="() => ({ 'data-testid': 'cost-line' })"
       >
         <template #[`item.providers`]="{ item }">{{ wholeNumber(item.providers) }}</template>
-        <template #[`item.median`]="{ item }">{{ price(item.median, item) }}</template>
-        <template #[`item.gap`]="{ item }">{{ item.gap == null ? 'Needs 10+ providers' : price(item.gap, item) }}</template>
+        <template #[`item.typical`]="{ item }">{{ typicalText(item) }}</template>
+        <template #[`item.gap`]="{ item }">{{ gapText(item) }}</template>
       </v-data-table>
       <p v-if="lines.length > SHOWN" class="text-body-small text-medium-emphasis">
-        {{ plural(lines.length - SHOWN, 'smaller group') }} in the cards below.
+        {{ plural(lines.length - SHOWN, 'smaller card') }} below.
       </p>
       <p v-if="anyPerUnit" class="text-body-small text-medium-emphasis" data-testid="per-unit-note">
         Priced per unit; a case can use several units.
@@ -63,7 +68,7 @@ function onCases(value: number | string | null) {
       <div v-if="anyPerCase" class="d-flex align-center flex-wrap ga-3">
         <v-number-input
           :model-value="params.cases ?? null"
-          label="Cases a year"
+          label="Your cases a year"
           :min="1"
           :max="MAX_CASES"
           control-variant="hidden"
@@ -72,11 +77,11 @@ function onCases(value: number | string | null) {
           data-testid="cases-input"
           @update:model-value="onCases"
         />
-        <p v-if="lead" class="text-body-medium" data-testid="yearly-gap">
-          ≈ <strong>{{ wholeDollars(lead.yearly) }}</strong> a year for {{ lead.group }}: the gap per case × your
-          {{ wholeNumber(params.cases) }} cases, if they went to providers at the lower quartile instead of the median.
-        </p>
-        <p v-else-if="params.cases" class="text-body-medium">No group here has a gap to the lower quartile to multiply.</p>
+        <div v-if="lead && params.cases" data-testid="yearly-gap">
+          <p class="text-body-medium font-weight-medium">{{ yearlyText(lead, params.cases) }}</p>
+          <p class="text-body-small text-medium-emphasis">{{ lead.group }}</p>
+        </div>
+        <p v-else-if="params.cases" class="text-body-medium">No card here has lower-priced providers to compare with.</p>
       </div>
 
       <ul class="text-body-small text-medium-emphasis ps-4">

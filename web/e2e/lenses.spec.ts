@@ -24,7 +24,7 @@ test('a Start here card runs its search with the lens, and the lens explains the
   await expect(page).toHaveURL(/[?&]lens=employers(&|$)/)
   await page.getByTestId('cases-input').locator('input').fill('1200')
   await expect(page).toHaveURL(/[?&]cases=1200(&|$)/)
-  await expect(panel.getByTestId('yearly-gap')).toContainText(/≈ \$[\d,]+ a year for .+: the gap per case × your 1,200 cases/)
+  await expect(panel.getByTestId('yearly-gap')).toContainText(/About \$[\d,.]+ less a year for your 1,200 cases at lower-priced providers\./)
   expect(rateRequests).toBe(0)
 
   // A different code is a different service: the lens stays, the case count goes.

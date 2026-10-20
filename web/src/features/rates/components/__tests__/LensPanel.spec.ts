@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
-import { money, wholeDollars } from '@/lib/format'
 import type { CodeInfo, RateGroup, RateSearchResult } from '../../api/types'
 import { parseRouteQuery } from '../../lib/searchParams'
 import LensPanel from '../LensPanel.vue'
@@ -64,6 +63,8 @@ function result(groups: RateGroup[], query: Partial<RateSearchResult['query']> =
   }
 }
 
+const BANNED = /percentile|median|quartile|×|p90|p10|spread multiple|index|comparison group|≈/i
+
 function mountPanel(res: RateSearchResult, query: Record<string, string>) {
   const vuetify = createVuetify({ theme: { defaultTheme: 'light' } })
   return mount(LensPanel, { props: { result: res, params: parseRouteQuery({ code: '45378', ...query }) }, global: { plugins: [vuetify] } })
@@ -94,28 +95,30 @@ describe('LensPanel', () => {
     expect(wrapper.emitted('update')).toEqual([[{ lens: null, page: 1 }]])
   })
 
-  it('providers: says where your rate sits, or asks for an NPI', async () => {
+  it('providers: says how your price compares, or asks for an NPI', async () => {
     const office = group({
       highlights: [{ providerKey: '995084138', displayName: 'Heel Sole Podiatry PC', rate: 80.72, percentile: 68, vsMedian: 1.57, aboveP25: 29.27, rateLow: 80.72, rateHigh: 80.72 }],
     })
     const withNpi = mountPanel(result([office], { npi: '1801474036' }), { lens: 'providers', npi: '1801474036' })
-    expect(withNpi.get('[data-testid="your-rate-line"]').text()).toContain('Your rate $80.72 is at the 68th percentile, 1.57× the median.')
+    expect(withNpi.get('[data-testid="your-rate-line"]').text()).toContain(
+      'Your price $80.72: lower than most, $498 less than typical. Typical price: $578.',
+    )
 
     const without = mountPanel(result([group()]), { lens: 'providers' })
     await without.get('[data-testid="focus-npi"]').trigger('click')
     expect(without.emitted('focusNpi')).toHaveLength(1)
   })
 
-  it('providers: a name search names the filter and counts the groups left, not the lines', () => {
+  it('providers: a name search names the filter and counts the cards left, not the lines', () => {
     const matches = (prefix: string) =>
       Array.from({ length: 4 }, (_, i) => ({ providerKey: `${prefix}${i}`, displayName: `Gastro Practice ${prefix}${i}`, rate: 300 + i, percentile: 40 + i, vsMedian: 1.1, aboveP25: 10, rateLow: 300 + i, rateHigh: 300 + i }))
     const groups = ['a', 'b', 'c'].map((key) => group({ key, highlights: matches(key) }))
     const wrapper = mountPanel(result(groups, { provider: 'gastro' }), { lens: 'providers', provider: 'gastro' })
     expect(wrapper.text()).toContain('Providers whose name contains "gastro":')
     expect(wrapper.text()).not.toContain('your provider')
-    expect(wrapper.text()).not.toContain('Your rate')
+    expect(wrapper.text()).not.toContain('Your price')
     expect(wrapper.findAll('[data-testid="your-rate-line"]')).toHaveLength(8)
-    expect(wrapper.get('[data-testid="more-groups"]').text()).toBe('1 more group in the cards below.')
+    expect(wrapper.get('[data-testid="more-groups"]').text()).toBe('1 more card below.')
   })
 
   it('providers: says when a group lists only its first matches', () => {
@@ -134,33 +137,43 @@ describe('LensPanel', () => {
     expect(wrapper.get('[data-testid="highlight-cap"]').text()).toBe('Showing 5 of 12 matching providers; the table lists them all.')
   })
 
-  it('plans: widest spread first, and one click shows the highest rates in that group', async () => {
+  it('plans: where prices vary most first, and one click shows the highest prices for it', async () => {
     const wrapper = mountPanel(result([group()]), { lens: 'plans' })
-    expect(wrapper.get('[data-testid="spread-line"]').text()).toContain('the gap to the lower quartile is $123.86')
+    const line = wrapper.get('[data-testid="spread-line"]').text()
+    expect(line).toContain('31 providers · Typical price: $578')
+    expect(line).toContain('Even leaving out the extremes, the high end is about 1.8 times the low end. $124 less per case at a lower-priced provider.')
     await wrapper.get('[data-testid="show-highest"]').trigger('click')
     expect(wrapper.emitted('update')).toEqual([[{ group: 'ambetter|CPT|45378|facility|asc||negotiated', sort: '-rate', page: 1 }]])
   })
 
-  it("plans: says so when no group's rates spread", () => {
+  it('plans: says so when prices barely vary, or when no card has the 10 providers it takes', () => {
     const flat = group({ stats: { min: 7.94, p10: 7.94, p25: 7.94, median: 7.94, p75: 7.94, p90: 7.94, max: 7.94, spreadMultiple: 1, p90ToP10: 1 }, lowerQuartileGap: 0 })
     const wrapper = mountPanel(result([flat]), { lens: 'plans' })
-    expect(wrapper.text()).toContain("Rates don't spread here")
+    expect(wrapper.text()).toContain('Prices barely vary here: on each card, most providers get about the same price.')
     expect(wrapper.find('[data-testid="spread-line"]').exists()).toBe(false)
+
+    const small = group({ providerCount: 8, statsLevel: 'basic', stats: { ...group().stats, p10: null, p90: null }, lowerQuartileGap: null })
+    expect(mountPanel(result([small]), { lens: 'plans' }).text()).toContain('It takes 10 providers to say how much prices vary')
   })
 
-  it('employers: median and gap, and cases a year become a yearly figure for one named group', async () => {
+  it('employers: the typical price, how much less per case, and a yearly figure from your own case count', async () => {
     const wrapper = mountPanel(result([group()]), { lens: 'employers', cases: '1200' })
-    expect(wrapper.get('[data-testid="cost-line"]').text()).toContain(money(578.31))
+    const costLine = wrapper.get('[data-testid="cost-line"]').text()
+    expect(costLine).toContain('$578')
+    expect(costLine).toContain('$124 less per case')
     const yearly = wrapper.get('[data-testid="yearly-gap"]').text()
-    expect(yearly).toContain(`≈ ${wholeDollars(123.86 * 1200)} a year for Ambetter from Fidelis Care · Facility fee · Ambulatory surgery center`)
-    expect(yearly).toContain('the gap per case × your 1,200 cases, if they went to providers at the lower quartile instead of the median')
+    expect(yearly).toContain('About $149,000 less a year for your 1,200 cases at lower-priced providers.')
+    expect(yearly).toContain('Ambetter from Fidelis Care · Facility fee · Ambulatory surgery center')
     expect(wrapper.text()).toContain('These are individual-market plans (Ambetter, Essential Plan), not employer plans')
-    expect(wrapper.text()).not.toContain('≈ A year')
+    expect(wrapper.text()).not.toMatch(BANNED)
 
     // A bigger fee-schedule group with no gap doesn't make the sentence say "$0 a year".
     const feeSchedule = group({ key: 'fee-schedule', providerCount: 51, lowerQuartileGap: 0 })
     const mixed = mountPanel(result([feeSchedule, group()]), { lens: 'employers', cases: '1200' })
-    expect(mixed.get('[data-testid="yearly-gap"]').text()).toContain(wholeDollars(123.86 * 1200))
+    expect(mixed.get('[data-testid="yearly-gap"]').text()).toContain('About $149,000 less a year')
+
+    // No case count, no yearly figure.
+    expect(mountPanel(result([group()]), { lens: 'employers' }).find('[data-testid="yearly-gap"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="cases-input"] input').setValue('300')
     const events = wrapper.emitted('cases') ?? []
@@ -170,13 +183,16 @@ describe('LensPanel', () => {
   it('employers: the picked group leads the yearly sentence', () => {
     const essential = group({ key: 'essential-asc', productLabel: 'Essential Plan', providerCount: 27, lowerQuartileGap: 48 })
     const wrapper = mountPanel(result([group(), essential]), { lens: 'employers', cases: '12', group: 'essential-asc' })
-    expect(wrapper.get('[data-testid="yearly-gap"]').text()).toContain(`≈ ${wholeDollars(576)} a year for Essential Plan`)
+    const yearly = wrapper.get('[data-testid="yearly-gap"]').text()
+    expect(yearly).toContain('About $576 less a year for your 12 cases at lower-priced providers.')
+    expect(yearly).toContain('Essential Plan')
   })
 
   it('employers: per-unit prices say so and get no yearly figure', () => {
     const anesthesia = group({ key: 'anesthesia', perUnit: true, unit: 'per anesthesia unit', providerCount: 13, lowerQuartileGap: 0.04 })
     const wrapper = mountPanel(result([anesthesia]), { lens: 'employers', cases: '100' })
-    expect(wrapper.get('[data-testid="cost-line"]').text()).toContain(`${money(578.31)} per unit`)
+    expect(wrapper.get('[data-testid="cost-line"]').text()).toContain('$578 per unit')
+    expect(wrapper.get('[data-testid="cost-line"]').text()).toContain('$0.04 less per unit')
     expect(wrapper.get('[data-testid="per-unit-note"]').text()).toBe('Priced per unit; a case can use several units.')
     expect(wrapper.find('[data-testid="cases-input"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="yearly-gap"]').exists()).toBe(false)
@@ -186,7 +202,7 @@ describe('LensPanel', () => {
     const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
     const wrapper = mountPanel(result([group()]), { lens: 'innovators' })
-    expect(wrapper.text()).toContain('Across the comparison groups shown:')
+    expect(wrapper.text()).toContain('In these results:')
     expect(wrapper.text()).toContain('13,789 published rows became 77 unique rates.')
     const url = `${window.location.origin}/api/v1/rates?code=45378&sort=rate&page=1&pageSize=25`
     expect(wrapper.get('[data-testid="api-url"]').text()).toBe(url)
@@ -221,6 +237,7 @@ describe('LensPanel', () => {
       key: 'j1100-office',
       codeType: 'HCPCS',
       code: 'J1100',
+      feeType: 'professional',
       feeTypeLabel: 'Professional (clinician) fee',
       settingLabel: "Doctor's office",
       modifiers: [{ code: 'JA', label: 'Administered intravenously' }],
@@ -241,7 +258,9 @@ describe('LensPanel', () => {
     const wrapper = mountPanel(result([office, facilityCharge], { code: 'J1100' }, drug), { lens: 'life-sciences' })
     const rows = wrapper.findAll('[data-testid="unit-price-line"]')
     expect(rows).toHaveLength(1)
-    expect(rows[0]!.text()).toContain('$0.11 median')
+    expect(rows[0]!.text()).toContain("Doctor's office · Doctor's fee")
+    expect(rows[0]!.text()).toContain('Typical $0.11')
+    expect(wrapper.text()).not.toMatch(BANNED)
     expect(wrapper.text()).toContain('One unit, as the code defines it: Injection, dexamethasone sodium phosphate, 1 mg.')
     expect(wrapper.get('[data-testid="facility-charges-note"]').text()).toContain("aren't per-unit prices")
 

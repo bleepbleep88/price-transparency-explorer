@@ -22,7 +22,7 @@ const shownGroups = computed(() => {
   }
   return shown
 })
-// Counted in groups, not lines: a name can match several providers in one group.
+// Counted in cards, not lines: a name can match several providers on one card.
 const moreGroups = computed(() => groups.value.length - shownGroups.value.length)
 </script>
 
@@ -44,12 +44,11 @@ const moreGroups = computed(() => groups.value.length - shownGroups.value.length
         <p v-if="entry.capNote" class="text-body-small text-medium-emphasis" data-testid="highlight-cap">{{ entry.capNote }}</p>
       </div>
       <p v-if="moreGroups" class="text-body-small text-medium-emphasis" data-testid="more-groups">
-        {{ plural(moreGroups, 'more group') }} in the cards below.
+        {{ plural(moreGroups, 'more card') }} below.
       </p>
-      <p class="text-body-small text-medium-emphasis">The gap to the lower quartile on each card is negotiating context.</p>
     </template>
     <template v-else>
-      <p class="text-body-medium">Add your NPI or EIN to see where your rate sits among other providers for this service.</p>
+      <p class="text-body-medium">Add your NPI or EIN to see how your price compares with other providers for this service.</p>
       <v-btn class="align-self-start" variant="tonal" color="primary" data-testid="focus-npi" @click="emit('focusNpi')">
         Enter your NPI
       </v-btn>

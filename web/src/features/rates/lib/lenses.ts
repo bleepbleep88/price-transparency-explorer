@@ -1,10 +1,26 @@
 import { buildUrl } from '@/lib/apiClient'
-import { money, ordinal, plural, times, wholeNumber } from '@/lib/format'
+import { money, plural, wholeNumber } from '@/lib/format'
+import {
+  ABOUT_THE_SAME,
+  bandFor,
+  dollars,
+  feeLabel,
+  fewProvidersLine,
+  lowerFirst,
+  MIN_PROVIDERS_FOR_RANGE,
+  perCaseLine,
+  positionLine,
+  spreadLine,
+  typicalLine,
+  typicalPrice,
+  yearlyLine,
+  type PriceSummary,
+} from '@/lib/plainNumbers'
 import type { CodeInfo, ModifierRef, RateGroup, RateSearchResult, SearchQuality } from '../api/types'
 import { toApiQuery, type Lens, type SearchParams } from './searchParams'
 
 // Audience lenses read the current search response; they never fetch anything and never change the numbers.
-// Each sentence says only what the response supports.
+// Each sentence says only what the response supports, in the plain words of @/lib/plainNumbers.
 
 export interface LensOption {
   key: Lens
@@ -14,11 +30,11 @@ export interface LensOption {
 }
 
 export const LENS_OPTIONS: readonly LensOption[] = [
-  { key: 'providers', label: 'Providers', answers: 'Where your negotiated rate sits among other providers for the same service.' },
-  { key: 'plans', label: 'Plans', answers: 'How far rates spread for the same service, and where the outliers are.' },
-  { key: 'employers', label: 'Employers', answers: 'What a service typically costs (the median), and the gap to the lower quartile.' },
-  { key: 'innovators', label: 'Innovators', answers: 'How the raw files clean up, with every rate traceable to its source.' },
-  { key: 'life-sciences', label: 'Life sciences', answers: 'Drug prices per billing unit, side by side by site of care.' },
+  { key: 'providers', label: 'Providers', answers: 'How your price compares with other providers for the same service.' },
+  { key: 'plans', label: 'Plans', answers: 'How much prices vary for the same service.' },
+  { key: 'employers', label: 'Employers', answers: 'What a service typically costs, and how much less lower-priced providers get.' },
+  { key: 'innovators', label: 'Innovators', answers: "How the plan's raw files are cleaned up, with every price traced to its source." },
+  { key: 'life-sciences', label: 'Life sciences', answers: 'Drug prices per unit, side by side by site of care.' },
 ]
 
 export function lensOption(key: Lens): LensOption {
@@ -99,12 +115,12 @@ export function modifierText(modifiers: readonly ModifierRef[]): string {
 /** "Ambetter from Fidelis Care · Facility fee · Ambulatory surgery center · Technical component (modifier TC)" */
 export function groupName(group: RateGroup): string {
   const modifiers = group.modifiers.length ? ` · ${modifierText(group.modifiers)}` : ''
-  return `${group.productLabel} · ${group.feeTypeLabel} · ${group.settingLabel}${modifiers}`
+  return `${group.productLabel} · ${feeLabel(group.feeType)} · ${group.settingLabel}${modifiers}`
 }
 
-function sentence(parts: string[]): string {
-  const text = parts.join('; ')
-  return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`
+/** A group's numbers in the shape the plain-words helpers read. */
+export function priceSummary(group: RateGroup): PriceSummary {
+  return { ...group.stats, providers: group.providerCount }
 }
 
 // ---- Providers ----
@@ -119,7 +135,7 @@ export function pinsProvider(result: RateSearchResult): boolean {
   return Boolean(result.query.npi || result.query.ein)
 }
 
-/** At least half the group is paid exactly the median (25th and 75th percentiles equal it), so it is the most common rate. */
+/** At least half the group is paid exactly the typical price (the quarter marks equal it), so it is the most common price. */
 export function isMostCommonRate(group: RateGroup, rate: number): boolean {
   const { p25, median, p75 } = group.stats
   return median != null && rate === median && p25 === median && p75 === median
@@ -134,26 +150,25 @@ export interface YourRateLine {
   text: string
 }
 
-/** For each group the searched provider appears in: where its rate sits. */
+/** For each group the searched provider appears in: how its price compares, in words and dollars. */
 export function yourRateLines(result: RateSearchResult): YourRateLine[] {
   const yours = pinsProvider(result)
-  const subject = yours ? 'Your rate' : 'Rate'
+  const subject = yours ? 'Your price' : 'Price'
   return result.groups.flatMap((group) =>
     group.highlights.map((position) => {
+      const summary = priceSummary(group)
+      const typical = typicalPrice(summary)
       let text: string
-      if (group.statsLevel === 'list') {
-        text = `${subject} ${money(position.rate)}. With ${plural(group.providerCount, 'provider')} in this group there is no percentile.`
-      } else if (position.percentile != null && position.vsMedian != null) {
-        const common = isMostCommonRate(group, position.rate) ? ' (the most common rate)' : ''
-        text = `${subject} ${money(position.rate)} is at the ${ordinal(position.percentile)} percentile, ${times(position.vsMedian)} the median${common}.`
-      } else if (position.vsMedian != null) {
-        text = `${subject} ${money(position.rate)} is ${times(position.vsMedian)} the median.`
+      if (typical == null) {
+        text = `${subject} ${money(position.rate)}. ${fewProvidersLine(group.providerCount)}`
       } else {
-        text = `${subject} ${money(position.rate)}.`
+        const compared = positionLine(bandFor(position.rate, summary), position.rate, typical, ', ') ?? ''
+        const common = isMostCommonRate(group, position.rate) ? ', and the most common price' : ''
+        text = `${subject} ${money(position.rate)}: ${lowerFirst(compared)}${common}. ${typicalLine(summary)}.`
       }
-      // Several rates in one group: say the range, so one rate doesn't read as the only one.
+      // Several prices in one group: say the range, so one price doesn't read as the only one.
       if (position.rateHigh !== position.rateLow) {
-        text = `${text.slice(0, -1)} (${yours ? 'your rates here' : 'its rates'} range from ${money(position.rateLow)} to ${money(position.rateHigh)}).`
+        text = `${text} ${yours ? 'Your prices' : 'Its prices'} here run from ${money(position.rateLow)} to ${money(position.rateHigh)}.`
       }
       return {
         groupKey: group.key,
@@ -175,7 +190,7 @@ export interface YourRateGroup {
   capNote: string | null
 }
 
-/** The lines grouped by comparison group, each group saying when it shows only some of its matches. */
+/** The lines grouped by card (same service, setting and plan), each saying when it shows only some of its matches. */
 export function yourRateGroups(result: RateSearchResult): YourRateGroup[] {
   const lines = yourRateLines(result)
   return result.groups
@@ -204,41 +219,44 @@ export interface SpreadLine {
   groupKey: string
   group: string
   providers: number
-  median: number
-  /** Full statistics only (10+ providers). */
-  p90ToP10: number | null
-  highestToMedian: number
+  summary: PriceSummary
+  /** High end over low end, leaving out the top and bottom tenth. */
+  ratio: number
+  /** How much less the lower-priced quarter get than typical, per case (or per unit). */
   gap: number | null
+  perUnit: boolean
 }
 
+/** Groups with 10+ providers: the only ones where "how much prices vary" can be said. */
 export function spreadLines(result: RateSearchResult): SpreadLine[] {
-  return result.groups
-    .filter((group) => group.statsLevel !== 'list' && group.stats.median != null && group.stats.median > 0)
-    .map((group) => ({
-      groupKey: group.key,
-      group: groupName(group),
-      providers: group.providerCount,
-      median: group.stats.median!,
-      p90ToP10: group.stats.p90ToP10,
-      highestToMedian: group.stats.max / group.stats.median!,
-      gap: group.lowerQuartileGap,
-    }))
+  return result.groups.flatMap((group): SpreadLine[] => {
+    const { p10, p90 } = group.stats
+    if (group.providerCount < MIN_PROVIDERS_FOR_RANGE || p10 == null || p90 == null || p10 <= 0) return []
+    return [
+      {
+        groupKey: group.key,
+        group: groupName(group),
+        providers: group.providerCount,
+        summary: priceSummary(group),
+        ratio: p90 / p10,
+        gap: group.lowerQuartileGap,
+        perUnit: group.perUnit,
+      },
+    ]
+  })
 }
 
-/** Groups whose 90th percentile is above their 10th, widest first. A group where they're equal has no spread to show. */
+/** Where prices vary most, first. A group where most providers get about the same price has nothing to show. */
 export function widestSpread(lines: SpreadLine[], count = 3): SpreadLine[] {
   return lines
-    .filter((line) => line.p90ToP10 != null && line.p90ToP10 > 1)
-    .sort((a, b) => b.p90ToP10! - a.p90ToP10! || b.providers - a.providers)
+    .filter((line) => line.ratio - 1 >= ABOUT_THE_SAME)
+    .sort((a, b) => b.ratio - a.ratio || b.providers - a.providers)
     .slice(0, count)
 }
 
+/** "Even leaving out the extremes, the high end is about 1.8 times the low end. $124 less per case at a lower-priced provider." */
 export function spreadText(line: SpreadLine): string {
-  const parts: string[] = []
-  if (line.p90ToP10 != null) parts.push(`the 90th percentile is ${times(line.p90ToP10)} the 10th`)
-  parts.push(`the highest rate is ${times(line.highestToMedian)} the median`)
-  if (line.gap) parts.push(`the gap to the lower quartile is ${money(line.gap)}`)
-  return sentence(parts)
+  return [spreadLine(line.summary), perCaseLine(line.gap, line.perUnit)].filter(Boolean).join(' ')
 }
 
 // ---- Employers ----
@@ -247,26 +265,24 @@ export interface CostLine {
   groupKey: string
   group: string
   providers: number
-  median: number
-  /** Gap to the lower quartile (full statistics only): per case, or per unit when perUnit. */
+  /** The typical price (5+ providers). */
+  typical: number
+  /** How much less the lower-priced quarter get than typical (10+ providers): per case, or per unit when perUnit. */
   gap: number | null
   perUnit: boolean
-  /** gap × cases a year. Never for per-unit prices: a case can use several units. */
+  /** The gap times the reader's cases a year. Never for per-unit prices: a case can use several units. */
   yearly: number | null
 }
 
 export function costLines(result: RateSearchResult, cases?: number | null): CostLine[] {
   return result.groups
-    .filter((group) => group.stats.median != null)
-    .map((group) => ({
-      groupKey: group.key,
-      group: groupName(group),
-      providers: group.providerCount,
-      median: group.stats.median!,
-      gap: group.lowerQuartileGap,
-      perUnit: group.perUnit,
-      yearly: !group.perUnit && group.lowerQuartileGap != null && cases ? group.lowerQuartileGap * cases : null,
-    }))
+    .flatMap((group): CostLine[] => {
+      const typical = typicalPrice(priceSummary(group))
+      if (typical == null) return []
+      const gap = group.lowerQuartileGap
+      const yearly = !group.perUnit && gap != null && cases ? gap * cases : null
+      return [{ groupKey: group.key, group: groupName(group), providers: group.providerCount, typical, gap, perUnit: group.perUnit, yearly }]
+    })
     .sort((a, b) => b.providers - a.providers)
 }
 
@@ -281,16 +297,20 @@ export function yearlyLead(lines: CostLine[], pickedGroup?: string | null): Cost
   return lines.find(hasYearly) ?? null
 }
 
+/** "About $149,000 less a year for your 1,200 cases at lower-priced providers." */
+export function yearlyText(line: CostLine, cases: number): string {
+  return yearlyLine(line.gap, cases) ?? ''
+}
+
+// What a member pays and how often a service happens are said once per page, in the footer.
 export const EMPLOYER_CAVEATS: readonly string[] = [
   "These are individual-market plans (Ambetter, Essential Plan), not employer plans; an employer's own rates can differ.",
-  "A negotiated rate isn't what a member pays; the plan's cost sharing decides that.",
-  'The files have no claim counts, so the case count is yours.',
-  'Facility and professional fees are separate bills for the same visit.',
+  "Facility and doctor's fees are separate bills for the same visit.",
 ]
 
 // ---- Innovators ----
 
-/** The clean-up behind the statistics, in plain words; counts of zero are left out. */
+/** The clean-up behind the numbers, in plain words; counts of zero are left out. */
 export function qualityLines(quality: SearchQuality): string[] {
   const lines = [`${wholeNumber(quality.publishedRows)} published rows became ${plural(quality.uniqueRates, 'unique rate')}.`]
   if (quality.duplicatesCollapsed) lines.push(`${plural(quality.duplicatesCollapsed, 'exact duplicate')} collapsed.`)
@@ -323,17 +343,17 @@ export function hasFacilityCharges(result: RateSearchResult): boolean {
 export interface UnitPriceLine {
   groupKey: string
   product: string
-  /** Setting, fee type and modifiers: "Doctor's office · Professional (clinician) fee · Drug amount discarded (modifier JW)". */
+  /** Setting, fee and modifiers: "Doctor's office · Doctor's fee · Drug amount discarded (modifier JW)". */
   site: string
   providers: number
-  kind: 'median' | 'single' | 'range'
+  /** "typical" from 5 providers; under 5, the prices themselves. */
+  kind: 'typical' | 'list'
   price: number | null
-  low: number | null
-  high: number | null
+  rates: number[]
 }
 
 /**
- * Per-unit prices by site of care, ordered by setting then fee type so the same drug reads side by side.
+ * Per-unit prices by site of care, ordered by setting then fee so the same drug reads side by side.
  * Only groups priced per unit and billed under the code itself: revenue-code facility charges aren't unit prices.
  */
 export function unitPriceLines(result: RateSearchResult): UnitPriceLine[] {
@@ -344,24 +364,20 @@ export function unitPriceLines(result: RateSearchResult): UnitPriceLine[] {
       const base = {
         groupKey: group.key,
         product: group.productLabel,
-        site: `${group.settingLabel} · ${group.feeTypeLabel}${modifiers}`,
+        site: `${group.settingLabel} · ${feeLabel(group.feeType)}${modifiers}`,
         providers: group.providerCount,
       }
-      if (group.stats.median != null) {
-        return [{ ...base, kind: 'median', price: group.stats.median, low: group.stats.min, high: group.stats.max }]
-      }
-      const listed = group.listedRates
-      if (listed.length === 1) return [{ ...base, kind: 'single', price: listed[0]!, low: null, high: null }]
-      if (listed.length > 1) return [{ ...base, kind: 'range', price: null, low: Math.min(...listed), high: Math.max(...listed) }]
-      return []
+      const typical = typicalPrice(priceSummary(group))
+      if (typical != null) return [{ ...base, kind: 'typical', price: typical, rates: [] }]
+      const rates = [...group.listedRates].sort((a, b) => a - b)
+      return rates.length ? [{ ...base, kind: 'list', price: null, rates }] : []
     })
     .sort((a, b) => a.site.localeCompare(b.site) || a.product.localeCompare(b.product))
 }
 
+/** "Typical $0.11", or under 5 providers the prices themselves: "$0.21, $0.25". */
 export function unitPriceText(line: UnitPriceLine): string {
-  if (line.kind === 'median') return `${money(line.price)} median`
-  if (line.kind === 'single') return `${money(line.price)}, one rate`
-  return line.low === line.high ? money(line.low) : `${money(line.low)} to ${money(line.high)}`
+  return line.kind === 'typical' && line.price != null ? `Typical ${dollars(line.price)}` : line.rates.map((rate) => money(rate)).join(', ')
 }
 
 export const DRUG_EXAMPLES: readonly StartExample[] = START_HERE.find((card) => card.key === 'life-sciences')!.examples
