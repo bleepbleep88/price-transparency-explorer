@@ -96,12 +96,12 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
 
         if (differentUnits > 0)
         {
-            notes.Add($"{Count(differentUnits, "pair")} left out: the two products price {(differentUnits == 1 ? "it" : "them")} in different units.");
+            notes.Add($"{Count(differentUnits, "price")} left out: the two plans price {(differentUnits == 1 ? "it" : "them")} in different units.");
         }
 
         if (noVersusRate > 0)
         {
-            notes.Add($"{Count(noVersusRate, "pair")} left out: {versus.Label} lists a rate of $0.");
+            notes.Add($"{Count(noVersusRate, "price")} left out: {versus.Label} lists a rate of $0.");
         }
 
         return new ProductComparison(

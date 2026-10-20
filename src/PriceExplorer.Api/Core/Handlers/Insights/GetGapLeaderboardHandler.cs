@@ -124,7 +124,7 @@ internal sealed class GetGapLeaderboardHandler(DuckDbConnectionFactory connectio
         if (noDifference > 0)
         {
             notes.Add($"{(noDifference == 1 ? "1 group" : $"{noDifference:N0} groups")} where the lower-priced quarter of providers get the " +
-                "typical price (no gap to the lower quartile) " + (noDifference == 1 ? "is" : "are") + " not ranked: there's no difference to show.");
+                "typical price " + (noDifference == 1 ? "is" : "are") + " not ranked: there's no difference to show.");
         }
 
         return notes;

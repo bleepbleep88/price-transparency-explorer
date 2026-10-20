@@ -127,7 +127,7 @@ public sealed class ProductComparisonTests(InsightsApiFactory factory) : IClassF
 
         result.GetProperty("summary").GetProperty("pairs").GetInt32().Should().Be(0);
         result.GetProperty("notes").EnumerateArray().Select(note => note.GetString())
-            .Should().Equal("1 pair left out: the two products price it in different units.");
+            .Should().Equal("1 price left out: the two plans price it in different units.");
     }
 
     [Theory(Timeout = 60_000)]
