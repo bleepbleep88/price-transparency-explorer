@@ -245,14 +245,16 @@ export function yearlyLine(gap: number | null | undefined, cases: number | null 
 
 /**
  * How much prices vary, leaving out the top and bottom tenth: "Even leaving out the extremes, the high end is about 6
- * times the low end." 10+ providers only, and only when the ends differ by 5% or more (otherwise "Most providers get
- * $167." already says it).
+ * times the low end." Under twice, dollars from the figures as shown: "... the high end is $292 more than the low end."
+ * 10+ providers only, and only when the ends differ by 5% or more (otherwise "Most providers get $167." already says it).
  */
 export function spreadLine(summary: PriceSummary): string | null {
   const { p10, p90 } = summary
   if (summary.providers < MIN_PROVIDERS_FOR_RANGE || p10 == null || p90 == null || p10 <= 0) return null
   const ratio = p90 / p10
-  return ratio - 1 < ABOUT_THE_SAME ? null : `Even leaving out the extremes, the high end is ${aboutTimes(ratio)} the low end.`
+  if (ratio - 1 < ABOUT_THE_SAME) return null
+  const gap = ratio >= TIMES_FROM ? `${aboutTimes(ratio)} the low end` : `${differenceDollars(minus(shownDollars(p90), shownDollars(p10)))} more than the low end`
+  return `Even leaving out the extremes, the high end is ${gap}.`
 }
 
 /**

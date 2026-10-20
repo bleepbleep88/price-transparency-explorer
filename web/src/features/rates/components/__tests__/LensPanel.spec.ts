@@ -185,7 +185,7 @@ describe('LensPanel', () => {
     const wrapper = mountPanel(result([group()]), { lens: 'plans' })
     const line = wrapper.get('[data-testid="spread-line"]').text()
     expect(line).toContain('31 providers · Typical price: $578')
-    expect(line).toContain('Even leaving out the extremes, the high end is about 1.8 times the low end. $124 less per case at a lower-priced provider.')
+    expect(line).toContain('Even leaving out the extremes, the high end is $292 more than the low end. $124 less per case at a lower-priced provider.')
     await wrapper.get('[data-testid="show-highest"]').trigger('click')
     expect(wrapper.emitted('update')).toEqual([[{ group: 'ambetter|CPT|45378|facility|asc||negotiated', sort: '-rate', page: 1 }]])
   })
