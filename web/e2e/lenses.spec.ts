@@ -12,17 +12,35 @@ test('a Start here card runs its search with the lens, and the lens explains the
   await expect(panel.getByRole('heading', { name: 'What this means for you' })).toBeVisible()
   await expect(panel.getByTestId('cost-line').first()).toBeVisible()
 
-  // Cases a year turn the per-case gap into a yearly figure, without a new search.
+  // Switching lens and typing a case count only change the reading: no new search request.
+  let rateRequests = 0
+  page.on('request', (request) => {
+    rateRequests += Number(request.url().includes('/api/v1/rates?'))
+  })
+  await panel.getByRole('button', { name: 'Plans', exact: true }).click()
+  await expect(page).toHaveURL(/[?&]lens=plans(&|$)/)
+  await expect(panel.getByRole('button', { name: 'Plans', exact: true, pressed: true })).toBeVisible()
+  await panel.getByRole('button', { name: 'Employers', exact: true }).click()
+  await expect(page).toHaveURL(/[?&]lens=employers(&|$)/)
   await page.getByTestId('cases-input').locator('input').fill('1200')
   await expect(page).toHaveURL(/[?&]cases=1200(&|$)/)
   await expect(panel.getByTestId('yearly-gap')).toContainText(/≈ \$[\d,]+ a year for .+: the gap per case × your 1,200 cases/)
+  expect(rateRequests).toBe(0)
 
-  // The lens survives a new search.
+  // A different code is a different service: the lens stays, the case count goes.
   await page.getByRole('combobox', { name: 'Billing code' }).fill('66984')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page).toHaveURL(/[?&]code=66984(&|$)/)
   await expect(page).toHaveURL(/[?&]lens=employers(&|$)/)
+  await expect(page).not.toHaveURL(/[?&]cases=/)
   await expect(panel.getByTestId('lens-employers')).toBeVisible()
+  await expect(panel.getByTestId('yearly-gap')).toHaveCount(0)
+
+  // No rates, no reading: the hint explains, and the lens panel stays away.
+  await page.getByRole('combobox', { name: 'Billing code' }).fill('J9999')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(page.getByTestId('hint-code_not_found')).toBeVisible()
+  await expect(page.getByTestId('lens-panel')).toHaveCount(0)
 })
 
 test('the dark theme turns the whole ledger dark', async ({ page }) => {
