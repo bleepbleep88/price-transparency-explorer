@@ -21,6 +21,7 @@ internal static class IngestionExtensions
         services.AddSingleton<DuckDbConnectionFactory>();
         services.AddSingleton<IngestionStatus>();
         services.AddSingleton<DuckDbIngestionWriter>();
+        services.AddSingleton<SnapshotStatisticsBuilder>();
         services.AddSingleton<FileDownloader>();
         services.AddSingleton<TableOfContentsReader>();
         services.AddSingleton<IngestionCoordinator>();

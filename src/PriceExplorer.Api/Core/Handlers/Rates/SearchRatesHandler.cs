@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Globalization;
 using Dapper;
 using DuckDB.NET.Data;
@@ -52,9 +53,7 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
         DuckDBConnection connection, ResolvedSnapshot snapshot, SearchContext search, string sort, int page, int pageSize,
         ReferenceCatalog catalog)
     {
-        var facts = (await connection.QueryAsync<RateFactRow>(
-            SqlFile.For<SearchRatesHandler>("SearchRates.sql"),
-            new { snapshotId = snapshot.SnapshotId, codes = search.Candidates, npi = search.Npi, ein = search.Ein, provider = search.Name })).ToList();
+        var facts = await QueryFactsAsync(connection, snapshot.SnapshotId, search.Candidates, search.Npi, search.Ein, search.Name);
 
         // DRG 0470 never means revenue code 0470: a foreign code type only matches rates of that type (none in these files).
         if (search.ForeignCodeType)
@@ -74,6 +73,18 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
                 search.Product, search.Setting, search.FeeType, search.CodeType, search.Group,
                 search.ProviderFilterActive, sort, page, pageSize),
             catalog);
+
+    /// <summary>
+    /// One row per rate × place of service × provider for the codes (stored forms), with each provider filter's match
+    /// flags; null filters match everyone. The saved statistics are built from this same query.
+    /// </summary>
+    internal static async Task<List<RateFactRow>> QueryFactsAsync(
+        DuckDBConnection connection, int snapshotId, IReadOnlyList<string> codes, long? npi = null, string? ein = null,
+        string? provider = null, DbTransaction? transaction = null) =>
+        (await connection.QueryAsync<RateFactRow>(
+            SqlFile.For<SearchRatesHandler>("SearchRates.sql"),
+            new { snapshotId, codes, npi, ein, provider },
+            transaction)).ToList();
 
     /// <summary>Exact distinct-NPI counts for the rows on this page (the assembler only sees per-rate counts).</summary>
     private static async Task<RateRowsPage> CountRowNpisAsync(DuckDBConnection connection, RateRowsPage page)

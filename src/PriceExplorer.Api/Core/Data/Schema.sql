@@ -157,3 +157,79 @@ CREATE TABLE IF NOT EXISTS ingestion_rejects (
     count   BIGINT NOT NULL,
     example VARCHAR
 );
+
+-- Saved statistics: what GET /api/v1/rates shows with no provider filter, for every code of a snapshot, so history and
+-- insights can read them instead of searching each code. Built after loading by SnapshotStatisticsBuilder from the
+-- search's own code (SearchRates.sql + RateSearchAssembler), all of a snapshot in one transaction. Column order
+-- matches the builder's appenders.
+
+-- One row per comparison group: product × code type × code × fee type × setting × modifiers × rate type.
+CREATE TABLE IF NOT EXISTS group_stats (
+    snapshot_id        INTEGER NOT NULL,
+    group_key          VARCHAR NOT NULL,  -- the search's group key: the seven parts below joined with '|'
+    product_key        VARCHAR NOT NULL,
+    product_label      VARCHAR NOT NULL,
+    code_type          VARCHAR NOT NULL,
+    code               VARCHAR NOT NULL,
+    fee_type           VARCHAR NOT NULL,  -- facility | professional
+    setting_key        VARCHAR NOT NULL,  -- care setting (settings.tsv), from the place of service
+    modifiers          VARCHAR NOT NULL,  -- sorted, comma-separated; '' = none
+    negotiated_type    VARCHAR NOT NULL,
+    unit               VARCHAR NOT NULL,  -- what one rate pays for, as the search card says (per procedure, per facility charge, …)
+    per_unit           BOOLEAN NOT NULL,  -- rates are prices per unit (drugs, supplies)
+    provider_count     INTEGER NOT NULL,  -- tax IDs, each counted once at its value
+    rate_count         INTEGER NOT NULL,
+    stats_level        VARCHAR NOT NULL,  -- list (< 5 providers) | basic (5-9) | full (10+)
+    min                DECIMAL(18, 4) NOT NULL,
+    p10                DECIMAL(18, 4),    -- quantiles: linear interpolation, rounded to cents; p10/p90 full only,
+    p25                DECIMAL(18, 4),    -- p25/median/p75 basic and full
+    median             DECIMAL(18, 4),
+    p75                DECIMAL(18, 4),
+    p90                DECIMAL(18, 4),
+    max                DECIMAL(18, 4) NOT NULL,
+    spread_multiple    DECIMAL(18, 4),    -- max ÷ min, full only
+    p90_to_p10         DECIMAL(18, 4),    -- full only
+    lower_quartile_gap DECIMAL(18, 4)     -- median − p25, full only
+);
+
+-- One row per provider (tax ID) in each comparison group: its one value, which the group's statistics count.
+CREATE TABLE IF NOT EXISTS provider_values (
+    snapshot_id          INTEGER NOT NULL,
+    group_key            VARCHAR NOT NULL,
+    product_key          VARCHAR NOT NULL,
+    code_type            VARCHAR NOT NULL,
+    code                 VARCHAR NOT NULL,
+    fee_type             VARCHAR NOT NULL,
+    setting_key          VARCHAR NOT NULL,
+    modifiers            VARCHAR NOT NULL,
+    negotiated_type      VARCHAR NOT NULL,
+    provider_key         VARCHAR NOT NULL,         -- provider_groups.provider_key
+    ein                  VARCHAR,                  -- 9 digits; NULL when masked (never-issued prefix) or not an EIN, as search returns it
+    ein_display          VARCHAR NOT NULL,         -- 11-3471596, ••-•••4567 (masked), or the tax ID's type and value
+    ein_unverified       BOOLEAN NOT NULL,
+    ein_level            BOOLEAN NOT NULL,         -- at least one of its rates comes from a whole-tax-ID contract (npi [0])
+    business_name        VARCHAR NOT NULL,         -- the name on the provider group(s) behind first_rate_id
+    value                DECIMAL(18, 4) NOT NULL,  -- NPI-weighted (lower) median of its rates in the group: always a real rate
+    low                  DECIMAL(18, 4) NOT NULL,
+    high                 DECIMAL(18, 4) NOT NULL,
+    rate_count           INTEGER NOT NULL,
+    npi_weight           BIGINT NOT NULL,          -- the weight behind value: each rate's NPI count (at least 1), summed
+    first_rate_id        BIGINT NOT NULL,          -- the rate carrying value that lists the most NPIs (the row's source)
+    whole_tax_id_rate_id BIGINT                    -- a whole-tax-ID rate behind ein_level, when first_rate_id isn't one
+);
+
+-- One row per snapshot with saved statistics: what they were built from. They stay current (SavedStatistics.sql) until
+-- a rate file is saved again (its loaded_at changes), a republished index renames or regroups a file's product, the
+-- app's code changes, or a rate they include passes its expiration date (search stops showing it the next day). The
+-- next load rebuilds what isn't current; readers are told meanwhile. A restart with none of these keeps them.
+CREATE TABLE IF NOT EXISTS stats_builds (
+    snapshot_id    INTEGER NOT NULL,
+    rate_files     VARCHAR NOT NULL,  -- each saved rate file as file_id@loaded_at@product_key@product_label
+    code_version   VARCHAR NOT NULL,  -- the app build (module version id) whose search code built them
+    expires_on     DATE,              -- the earliest expiration date among the rates they include; NULL = none ends
+    built_at       TIMESTAMP NOT NULL,
+    build_ms       INTEGER NOT NULL,
+    code_count     INTEGER NOT NULL,
+    group_count    INTEGER NOT NULL,
+    value_count    INTEGER NOT NULL
+);

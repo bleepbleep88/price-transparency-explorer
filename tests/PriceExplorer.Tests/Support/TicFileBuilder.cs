@@ -20,9 +20,10 @@ internal static class TicFileBuilder
         string serviceCode = "[\"24\"]",
         string billingClass = "institutional",
         string? additionalInformation = null,
-        string modifiers = "") =>
+        string modifiers = "",
+        string expiration = "9999-12-31") =>
         $$"""
-        { "negotiated_type": "negotiated", "negotiated_rate": {{rate}}, "expiration_date": "9999-12-31",
+        { "negotiated_type": "negotiated", "negotiated_rate": {{rate}}, "expiration_date": "{{expiration}}",
           "service_code": {{serviceCode}}, "billing_class": "{{billingClass}}", "setting": "outpatient"
           {{(modifiers.Length > 0 ? $", \"billing_code_modifier\": {modifiers}" : "")}}
           {{(additionalInformation is null ? "" : $", \"additional_information\": \"{additionalInformation}\"")}} }

@@ -374,6 +374,90 @@ public sealed class RateSearchAssemblerTests
         quality.DuplicatesCollapsed.Should().Be(162);
     }
 
+    [Fact]
+    public void Summaries_hold_the_groups_and_rows_an_unfiltered_search_shows()
+    {
+        // Full statistics, a hospital system with two rates and names, a whole-tax-ID contract beside the rate shown, a
+        // masked tax ID, modifiers, two settings and fee types, a drug filed as a surgery center's case rate and a drug
+        // priced per unit at a health center.
+        var facts = Enumerable.Range(1, 11).Select(i => Fact(provider: $"5{i:D8}", rate: 100m + (7.5m * i))).ToList();
+        facts.Add(Fact(provider: "132655001", rate: 755.98m, rateId: 1, npis: 1, names: "Bellevue Hospital Center"));
+        facts.Add(Fact(provider: "132655001", rate: 608.75m, rateId: 2, npis: 40, names: "Queens Hospital Center"));
+        facts.Add(Fact(provider: "161078102", rate: 84m, rateId: 3, npis: 5, billingClass: "professional", pos: "11"));
+        facts.Add(Fact(provider: "161078102", rate: 90m, rateId: 4, npis: 0, wholeTaxId: true, billingClass: "professional", pos: "11"));
+        facts.Add(Fact(provider: "uabc123def456", ein: "071234567", einUnverified: true, billingClass: "professional", pos: "11"));
+        facts.Add(Fact(provider: "222222222", billingClass: "professional", pos: "11", modifiers: "26"));
+        facts.Add(Fact(code: "J0585", codeType: "HCPCS", billingCode: "0490", pos: "24"));
+        facts.Add(Fact(code: "J9190", codeType: "HCPCS", billingCode: "0529", pos: "50"));
+
+        var summaries = RateSearchAssembler.Summarize(facts, Catalog);
+        var search = Assemble(facts, pageSize: 100);
+
+        summaries.Select(group => (group.Key, group.ProductLabel, group.Unit, group.PerUnit, group.ProviderCount, group.RateCount, group.StatsLevel,
+                group.Stats, group.LowerQuartileGap))
+            .Should().BeEquivalentTo(search.Groups.Select(group => (group.Key, group.ProductLabel, group.Unit, group.PerUnit, group.ProviderCount,
+                group.RateCount, group.StatsLevel, group.Stats, group.LowerQuartileGap)));
+        summaries.SelectMany(group => group.Providers.Select(value => (group.Key, value.ProviderKey, value.Ein, value.EinDisplay, value.EinMasked,
+                value.EinLevel, value.BusinessName, value.Value, value.Low, value.High, value.RateCount, value.FirstRateId, value.WholeTaxIdRateId)))
+            .Should().BeEquivalentTo(search.Rows.Items.Select(row => (row.GroupKey, row.ProviderKey, row.Ein, row.EinDisplay, row.EinMasked,
+                row.EinLevel, row.BusinessName, row.Rate, row.RateLow, row.RateHigh, row.RateCount, row.FirstRateId, row.WholeTaxIdRateId)));
+        search.Rows.Total.Should().Be(17);
+        summaries.Select(group => group.Unit).Should().Contain(["per facility charge", "per HCPCS unit (see the code's description)"]);
+        summaries.SelectMany(group => group.Providers).Single(value => value.ProviderKey == "161078102").WholeTaxIdRateId.Should().Be(4);
+    }
+
+    [Fact]
+    public void A_saved_value_counts_all_the_providers_rates_whatever_a_filter_matched()
+    {
+        var facts = new[]
+        {
+            Fact(provider: "454115569", rate: 45m, rateId: 1, npis: 1, matched: true),
+            Fact(provider: "454115569", rate: 90m, rateId: 2, npis: 3, matched: false),
+        };
+
+        var value = RateSearchAssembler.Summarize(facts, Catalog).Single().Providers.Single();
+
+        value.Value.Should().Be(90m, "3 of the tax ID's 4 NPIs are paid $90");
+        (value.Low, value.High, value.RateCount, value.FirstRateId).Should().Be((45m, 90m, 2, 2L));
+    }
+
+    [Fact]
+    public void The_npi_weight_is_the_weight_behind_the_value_with_each_rate_counting_at_least_once()
+    {
+        var facts = new[]
+        {
+            Fact(provider: "161078102", rate: 84m, rateId: 1, npis: 0, wholeTaxId: true),
+            Fact(provider: "161078102", rate: 90m, rateId: 2, npis: 2),
+            Fact(provider: "161078102", rate: 95m, rateId: 3, npis: 5),
+        };
+
+        var value = RateSearchAssembler.Summarize(facts, Catalog).Single().Providers.Single();
+
+        value.NpiWeight.Should().Be(8, "1 for the whole-tax-ID rate (no NPIs listed) + 2 + 5");
+        value.Value.Should().Be(95m, "the running weight first reaches half of 8 at $95");
+        value.EinLevel.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Summaries_come_in_key_order_whatever_order_the_facts_arrive_in()
+    {
+        var facts = new[]
+        {
+            Fact(provider: "333333333", pos: "11", billingClass: "professional"),
+            Fact(provider: "222222222", pos: "11", billingClass: "professional", rate: 120m),
+            Fact(provider: "111111111"),
+            Fact(provider: "999999999", pos: "22"),
+        };
+
+        var forward = RateSearchAssembler.Summarize(facts, Catalog);
+        var backward = RateSearchAssembler.Summarize(facts.AsEnumerable().Reverse().ToList(), Catalog);
+
+        forward.Select(group => group.Key).Should().BeInAscendingOrder(StringComparer.Ordinal);
+        forward.Should().OnlyContain(group => group.Providers.Select(value => value.ProviderKey).SequenceEqual(
+            group.Providers.Select(value => value.ProviderKey).Order(StringComparer.Ordinal)));
+        backward.Should().BeEquivalentTo(forward, options => options.WithStrictOrdering());
+    }
+
     private static AssembledSearch Assemble(
         IEnumerable<RateFactRow> facts, bool providerFilterActive = false, string sort = "rate", int page = 1, int pageSize = 25,
         string? setting = null) =>

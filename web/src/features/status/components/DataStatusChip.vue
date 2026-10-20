@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { mdiAlertCircleOutline, mdiCheckCircleOutline, mdiCloudDownloadOutline, mdiLanConnect } from '@mdi/js'
+import { mdiAlertCircleOutline, mdiChartBoxOutline, mdiCheckCircleOutline, mdiCloudDownloadOutline, mdiLanConnect } from '@mdi/js'
 import { useDataStatus } from '../useDataStatus'
 
 const { status, progress } = useDataStatus()
@@ -16,6 +16,10 @@ const view = computed(() => {
   }
   if (current.phase === 'failed') {
     return { color: 'error', icon: mdiAlertCircleOutline, text: 'Data failed to load', spoken: 'Data failed to load' }
+  }
+  // Every file is saved and searchable; the server is saving each comparison group's statistics.
+  if (current.phase === 'buildingStatistics') {
+    return { color: 'info', icon: mdiChartBoxOutline, text: 'Building statistics', spoken: 'Building statistics' }
   }
   const percent = progress.value == null ? '' : ` ${Math.round(progress.value * 100)}%`
   return { color: 'info', icon: mdiCloudDownloadOutline, text: `Loading data${percent}`, spoken: 'Loading data' }

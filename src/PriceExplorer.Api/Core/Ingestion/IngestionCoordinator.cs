@@ -1,18 +1,21 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using PriceExplorer.Api.Configuration;
+using PriceExplorer.Api.Core.Data;
 
 namespace PriceExplorer.Api.Core.Ingestion;
 
 /// <summary>
-/// Runs the whole load: read each configured index, then download → parse → save every in-network file it lists.
-/// One file failing never stops the others, and data from earlier runs stays queryable throughout.
+/// Runs the whole load: read each configured index, then download → parse → save every in-network file it lists, then
+/// rebuild the statistics of each snapshot whose saved statistics aren't current. One file failing never stops the
+/// others, and data from earlier runs stays queryable throughout.
 /// </summary>
 internal sealed class IngestionCoordinator(
     IOptions<IngestionOptions> options,
     TableOfContentsReader indexReader,
     FileDownloader downloader,
     DuckDbIngestionWriter writer,
+    SnapshotStatisticsBuilder statistics,
     IngestionStatus status,
     ILogger<IngestionCoordinator> logger)
 {
@@ -82,9 +85,57 @@ internal sealed class IngestionCoordinator(
             }
         }
 
+        await BuildStatisticsAsync(cancellationToken);
+
         status.Update(s => s.DataAvailable
             ? s with { Phase = IngestionPhase.Ready, Message = "Data is ready.", CurrentFile = null, CurrentFileProgress = null }
             : s with { Phase = IngestionPhase.Failed, Message = "No rate data could be loaded. See the issues listed below.", CurrentFile = null, CurrentFileProgress = null });
+    }
+
+    /// <summary>
+    /// Rebuilds the saved statistics of every snapshot search can serve whose statistics aren't current (see
+    /// <see cref="SavedStatistics"/>); the others keep theirs. Runs after loading, and also repairs a build an earlier run
+    /// didn't finish. Search never reads these tables, so it keeps answering meanwhile, and a failed build is reported
+    /// without stopping the rest.
+    /// </summary>
+    public async Task BuildStatisticsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<StatisticsState> stale;
+        try
+        {
+            stale = await statistics.FindStaleAsync(cancellationToken);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogError(ex, "Statistics: couldn't check which snapshots need building");
+            status.AddIssue("warning", $"Statistics couldn't be checked; search still works. {ex.Message}", null);
+            return;
+        }
+
+        foreach (var snapshot in stale)
+        {
+            try
+            {
+                var build = await statistics.BuildAsync(
+                    snapshot,
+                    (done, total) => status.Update(s => s with
+                    {
+                        Phase = IngestionPhase.BuildingStatistics,
+                        Message = $"Building statistics for {snapshot.Label}: {done:N0} of {total:N0} codes…",
+                        CurrentFile = null,
+                        CurrentFileProgress = null,
+                    }),
+                    cancellationToken);
+                logger.LogInformation(
+                    "Statistics: {Snapshot}: {Groups} comparison groups, {Values} provider values from {Codes} codes, built in {BuildMs} ms",
+                    snapshot.Label, build.Groups, build.ProviderValues, build.Codes, (int)build.Elapsed.TotalMilliseconds);
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                logger.LogError(ex, "Statistics: {Snapshot} couldn't be built", snapshot.Label);
+                status.AddIssue("warning", $"Statistics for {snapshot.Label} couldn't be built; search still works. {ex.Message}", null);
+            }
+        }
     }
 
     private async Task CompleteSnapshotAsync(int snapshotId, TableOfContents index, string? error)

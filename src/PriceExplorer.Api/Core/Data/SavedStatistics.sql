@@ -1,0 +1,27 @@
+-- Whether each snapshot's saved statistics (group_stats, provider_values) still match what search shows. They do while
+-- they were built from the snapshot's saved rate files as they are now (each file's id, load time, product key and
+-- label: everything SearchRates.sql reads from source_files), by this build of the app, and no rate in them has passed
+-- its expiration date (search stops showing a rate the next day; current_date is fixed for a transaction).
+-- Lists every snapshot search can serve (one with a saved rate file, the rule LatestSnapshot.sql and
+-- ResolveSnapshot.sql use), newest first; $snapshotId narrows it to one. The statistics build rebuilds the snapshots
+-- that aren't current, and readers report it.
+WITH saved AS (
+    SELECT snapshot_id,
+           string_agg(concat(file_id, '@', loaded_at, '@', product_key, '@', product_label), ',' ORDER BY file_id) AS rate_files
+    FROM source_files
+    WHERE kind = 'in_network' AND status IN ('loaded', 'partial')
+    GROUP BY snapshot_id
+)
+SELECT
+    s.snapshot_id    AS SnapshotId,
+    s.index_date     AS IndexDate,
+    saved.rate_files AS RateFiles,
+    b.built_at       AS BuiltAt,
+    b.expires_on     AS ExpiresOn,
+    coalesce(b.rate_files = saved.rate_files AND b.code_version = $codeVersion
+             AND (b.expires_on IS NULL OR b.expires_on >= current_date), false) AS Current
+FROM snapshots s
+JOIN saved ON saved.snapshot_id = s.snapshot_id
+LEFT JOIN stats_builds b ON b.snapshot_id = s.snapshot_id
+WHERE $snapshotId::INTEGER IS NULL OR s.snapshot_id = $snapshotId::INTEGER
+ORDER BY s.index_date DESC NULLS LAST, s.snapshot_id DESC
