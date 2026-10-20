@@ -46,7 +46,7 @@ public sealed record CodeInfo(
 /// A fair comparison group: same code, product, fee type, setting, modifiers and rate type. Stats count each provider (tax ID) once.
 /// </summary>
 /// <param name="StatsLevel">"list" (fewer than 5 providers: rates listed, no stats), "basic" (5–9: median and range), "full" (10+).</param>
-/// <param name="SavingsPerCase">Median minus 25th percentile: what moving one case from a typical to a low-cost provider saves. Full stats only.</param>
+/// <param name="LowerQuartileGap">Median minus 25th percentile: how far a typical (median) rate sits above the lower quartile. Plans and employers read it as room to steer care; providers as negotiating context. Full stats only.</param>
 public sealed record RateGroup(
     string Key,
     string ProductKey,
@@ -68,7 +68,7 @@ public sealed record RateGroup(
     int RateCount,
     string StatsLevel,
     RateStats Stats,
-    decimal? SavingsPerCase,
+    decimal? LowerQuartileGap,
     IReadOnlyList<decimal> ListedRates,
     IReadOnlyList<ProviderPosition> Highlights,
     IReadOnlyList<string> Notes);

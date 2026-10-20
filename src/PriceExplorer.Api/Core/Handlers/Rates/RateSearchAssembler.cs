@@ -186,7 +186,7 @@ internal static class RateSearchAssembler
             RateCount: group.RateIds.Count,
             StatsLevel: level,
             Stats: stats,
-            SavingsPerCase: full && median is { } m && p25 is { } q ? m - q : null,
+            LowerQuartileGap: full && median is { } m && p25 is { } q ? m - q : null,
             ListedRates: level == "list" ? values : [],
             Highlights: highlights,
             Notes: NotesFor(group, category, catalog, values));

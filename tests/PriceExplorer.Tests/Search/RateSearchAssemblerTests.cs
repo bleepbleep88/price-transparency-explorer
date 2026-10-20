@@ -65,7 +65,7 @@ public sealed class RateSearchAssemblerTests
     }
 
     [Fact]
-    public void Full_stats_and_savings_need_ten_providers()
+    public void Full_stats_and_the_lower_quartile_gap_need_ten_providers()
     {
         var nine = Enumerable.Range(1, 9).Select(i => Fact(provider: $"10000000{i}", rate: 100m * i)).ToList();
         var ten = Enumerable.Range(1, 10).Select(i => Fact(provider: $"20000000{i % 10}{i / 10}", rate: 100m * i)).ToList();
@@ -76,14 +76,14 @@ public sealed class RateSearchAssemblerTests
         basic.StatsLevel.Should().Be("basic");
         basic.Stats.Median.Should().Be(500m);
         basic.Stats.SpreadMultiple.Should().BeNull();
-        basic.SavingsPerCase.Should().BeNull();
+        basic.LowerQuartileGap.Should().BeNull();
 
         full.StatsLevel.Should().Be("full");
         full.Stats.P25.Should().Be(325m);   // linear interpolation over 100..1000
         full.Stats.Median.Should().Be(550m);
         full.Stats.P75.Should().Be(775m);
         full.Stats.SpreadMultiple.Should().Be(10m);
-        full.SavingsPerCase.Should().Be(225m);
+        full.LowerQuartileGap.Should().Be(225m);
     }
 
     [Fact]
