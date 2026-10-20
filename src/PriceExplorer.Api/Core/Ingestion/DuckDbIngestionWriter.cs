@@ -11,7 +11,7 @@ namespace PriceExplorer.Api.Core.Ingestion;
 internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections, TimeProvider time, ILogger<DuckDbIngestionWriter> logger)
 {
     /// <summary>Bump when Schema.sql changes: all tables are rebuilt from the download cache.</summary>
-    public const int SchemaVersion = 3;
+    public const int SchemaVersion = 4;
 
     /// <summary>The meta key holding the per-install secret behind masked provider keys (see <see cref="ProviderKeys"/>).</summary>
     private const string ProviderKeySecret = "provider_key_secret";
@@ -24,6 +24,7 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
 
     private static readonly string[] Tables =
     [
+        "stats_builds", "provider_values", "group_stats",
         "ingestion_rejects", "code_descriptions", "rate_provider_refs", "rate_places", "rates",
         "group_npis", "provider_groups", "source_files", "structure_files", "plans", "snapshots", "meta",
     ];
@@ -431,6 +432,9 @@ internal static class AppenderRowExtensions
 
     public static IDuckDBAppenderRow AppendDate(this IDuckDBAppenderRow row, DateOnly? value) =>
         value is { } date ? row.AppendValue(date) : row.AppendNullValue();
+
+    public static IDuckDBAppenderRow AppendNumber(this IDuckDBAppenderRow row, decimal? value) =>
+        value is { } number ? row.AppendValue(number) : row.AppendNullValue();
 }
 
 internal sealed record SnapshotHeader(

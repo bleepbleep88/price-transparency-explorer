@@ -10,6 +10,9 @@ public enum IngestionPhase
     Downloading,
     Parsing,
     Saving,
+
+    /// <summary>Saving each snapshot's comparison-group statistics. Saved rates are searchable meanwhile.</summary>
+    BuildingStatistics,
     Ready,
     Failed,
 }

@@ -68,9 +68,15 @@ internal sealed class IngestionService(
     private async Task ServeSavedDataOnlyAsync(CancellationToken cancellationToken)
     {
         logger.LogInformation("Ingestion is disabled by configuration; serving saved data only");
-        var hasData = await writer.HasLoadedDataAsync(cancellationToken);
-        status.Update(s => hasData
-            ? s with { Phase = IngestionPhase.Ready, DataAvailable = true, Message = "Loading is turned off; showing saved data." }
-            : s with { Phase = IngestionPhase.Failed, Message = "Loading is turned off and there is no saved data." });
+        if (!await writer.HasLoadedDataAsync(cancellationToken))
+        {
+            status.Update(s => s with { Phase = IngestionPhase.Failed, Message = "Loading is turned off and there is no saved data." });
+            return;
+        }
+
+        // Saved rates are searchable at once. Statistics a stopped run never finished are built from them meanwhile.
+        status.Update(s => s with { DataAvailable = true, Message = "Loading is turned off; showing saved data." });
+        await coordinator.BuildStatisticsAsync(cancellationToken);
+        status.Update(s => s with { Phase = IngestionPhase.Ready, Message = "Loading is turned off; showing saved data." });
     }
 }
