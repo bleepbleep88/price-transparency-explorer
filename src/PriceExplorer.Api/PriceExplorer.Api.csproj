@@ -3,8 +3,8 @@
   <PropertyGroup>
     <RootNamespace>PriceExplorer.Api</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <!-- XML docs feed OpenAPI descriptions; not every public type needs one. -->
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- XML docs feed OpenAPI descriptions. Only non-obvious members/parameters are documented (CS1591, CS1573). -->
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +26,8 @@
   <ItemGroup>
     <!-- Queries live in .sql files next to the handlers that run them. -->
     <EmbeddedResource Include="Core\**\*.sql" />
+    <!-- Plain-language labels for official code sets (place of service, revenue code categories, modifiers). -->
+    <EmbeddedResource Include="Core\Reference\*.tsv" />
   </ItemGroup>
 
 </Project>

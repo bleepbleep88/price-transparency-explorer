@@ -12,13 +12,15 @@ public sealed class SnapshotsController(ISender sender) : ControllerBase
 {
     /// <summary>Every snapshot, newest first, with each product's rate file, source details, and load results.</summary>
     [HttpGet]
+    [ProducesResponseType<IReadOnlyList<SnapshotSummary>>(StatusCodes.Status200OK, "application/json")]
     public Task<IReadOnlyList<SnapshotSummary>> List(CancellationToken cancellationToken) =>
         sender.Send(new ListSnapshotsQuery(), cancellationToken);
 
     /// <summary>Plans covered by a snapshot, grouped by product. Plans in one product share the same rates.</summary>
     [HttpGet("{snapshotId:int}/plans")]
-    [ProducesResponseType<SnapshotPlans>(StatusCodes.Status200OK)]
-    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<SnapshotPlans>(StatusCodes.Status200OK, "application/json")]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
     public Task<SnapshotPlans> Plans(int snapshotId, CancellationToken cancellationToken) =>
         sender.Send(new ListPlansQuery(snapshotId), cancellationToken);
 }

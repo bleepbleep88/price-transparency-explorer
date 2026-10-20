@@ -1,0 +1,113 @@
+modifier	label	component
+22	Unusually complex procedure
+24	Unrelated visit during a post-surgery period
+25	Separate visit on the same day as a procedure
+26	Doctor's interpretation only (professional component)	professional
+33	Preventive service
+50	Both sides of the body
+51	Multiple procedures
+52	Reduced service
+53	Procedure stopped early
+59	Distinct procedure
+76	Repeat procedure, same doctor
+77	Repeat procedure, different doctor
+78	Return to the operating room
+79	Unrelated procedure during a post-surgery period
+80	Assistant surgeon
+90	Sent to an outside lab
+91	Repeat lab test
+95	Telehealth (audio and video)
+93	Telehealth (audio only)
+A1	Dressing for one wound
+AF	Specialty physician
+AS	Assistant at surgery (non-physician)
+GC	Done with a resident under a teaching physician
+GE	Done by a resident without a teaching physician present
+GN	Speech therapy plan of care
+GO	Occupational therapy plan of care
+GP	Physical therapy plan of care
+GT	Telehealth (interactive audio and video)
+GY	Not a covered benefit
+JW	Drug amount discarded
+JZ	No drug amount discarded
+KX	Requirements met (documentation on file)
+LT	Left side
+NU	New equipment
+PT	Screening turned diagnostic (colorectal)
+QW	Lab test waived under CLIA
+RR	Rental equipment
+RT	Right side
+SA	Nurse practitioner with a physician
+SH	Second infusion at the same time
+SU	Equipment used in a doctor's office
+TC	Equipment and staff only (technical component)	technical
+UE	Used equipment
+XE	Separate encounter
+XP	Separate practitioner
+XS	Separate organ or structure
+XU	Unusual non-overlapping service
+23	Unusual anesthesia	
+32	Mandated service	
+47	Anesthesia by the surgeon	
+54	Surgical care only	
+55	Post-operative care only	
+56	Pre-operative care only	
+57	Decision for surgery	
+58	Staged or related procedure	
+62	Two surgeons	
+63	Procedure on an infant	
+66	Surgical team	
+73	Outpatient procedure stopped before anesthesia	
+74	Outpatient procedure stopped after anesthesia	
+81	Minimum assistant surgeon	
+82	Assistant surgeon (no qualified resident available)	
+92	Alternative lab testing platform	
+96	Habilitative service	
+97	Rehabilitative service	
+99	Multiple modifiers apply	
+AA	Anesthesia personally performed by an anesthesiologist	
+AD	Anesthesiologist supervising more than 4 procedures	
+AH	Clinical psychologist	
+AJ	Clinical social worker	
+CR	Catastrophe or disaster related	
+CS	Cost sharing waived	
+ET	Emergency service	
+GA	Waiver of liability on file	
+GV	Attending physician not employed by hospice	
+GW	Not related to the hospice condition	
+GZ	Expected to be denied as not reasonable and necessary	
+HN	Bachelor's-level clinician	
+HO	Master's-level clinician	
+HP	Doctoral-level clinician	
+JA	Given intravenously	
+JB	Given subcutaneously	
+JG	Drug bought under the 340B program	
+P1	Healthy patient (anesthesia)	
+P2	Patient with mild systemic disease (anesthesia)	
+P3	Patient with severe systemic disease (anesthesia)	
+P4	Patient with life-threatening disease (anesthesia)	
+P5	Patient not expected to survive without the operation (anesthesia)	
+P6	Brain-dead organ donor (anesthesia)	
+PD	Diagnostic service within 3 days of an inpatient stay	
+PN	Non-excepted off-campus hospital department	
+PO	Excepted off-campus hospital department	
+Q5	Substitute physician (reciprocal billing)	
+Q6	Substitute physician (fee-for-time)	
+QK	Anesthesiologist directing 2 to 4 procedures	
+QS	Monitored anesthesia care	
+QX	Nurse anesthetist with medical direction	
+QY	Anesthesiologist directing one nurse anesthetist	
+QZ	Nurse anesthetist without medical direction	
+TB	Drug bought under the 340B program (hospital)	
+TF	Intermediate level of care	
+TG	Complex level of care	
+TH	Obstetrical service	
+U1	Payer-defined level 1	
+U2	Payer-defined level 2	
+U3	Payer-defined level 3	
+U4	Payer-defined level 4	
+U5	Payer-defined level 5	
+U6	Payer-defined level 6	
+U7	Payer-defined level 7	
+U8	Payer-defined level 8	
+U9	Payer-defined level 9	

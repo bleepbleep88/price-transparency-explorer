@@ -1,0 +1,54 @@
+pos	name	setting_key
+01	Pharmacy	other
+02	Telehealth provided other than in patient's home	telehealth-other
+03	School	other
+04	Homeless shelter	other
+05	Indian Health Service free-standing facility	other
+06	Indian Health Service provider-based facility	other
+07	Tribal 638 free-standing facility	other
+08	Tribal 638 provider-based facility	other
+09	Prison/correctional facility	other
+10	Telehealth provided in patient's home	telehealth-home
+11	Office	office
+12	Home	home
+13	Assisted living facility	other
+14	Group home	other
+15	Mobile unit	other
+16	Temporary lodging	other
+17	Walk-in retail health clinic	other
+18	Place of employment/worksite	other
+19	Off campus outpatient hospital	hospital-outpatient
+20	Urgent care facility	urgent-care
+21	Inpatient hospital	inpatient
+22	On campus outpatient hospital	hospital-outpatient
+23	Emergency room (hospital)	er
+24	Ambulatory surgical center	asc
+25	Birthing center	other
+26	Military treatment facility	other
+27	Outreach site/street	other
+31	Skilled nursing facility	inpatient
+32	Nursing facility	inpatient
+33	Custodial care facility	other
+34	Hospice	other
+41	Ambulance (land)	other
+42	Ambulance (air or water)	other
+49	Independent clinic	other
+50	Federally qualified health center	fqhc
+51	Inpatient psychiatric facility	inpatient
+52	Psychiatric facility, partial hospitalization	other
+53	Community mental health center	other
+54	Intermediate care facility for individuals with intellectual disabilities	other
+55	Residential substance abuse treatment facility	other
+56	Psychiatric residential treatment center	other
+57	Non-residential substance abuse treatment facility	other
+58	Non-residential opioid treatment facility	other
+60	Mass immunization center	other
+61	Comprehensive inpatient rehabilitation facility	inpatient
+62	Comprehensive outpatient rehabilitation facility	other
+65	End-stage renal disease treatment facility	other
+66	PACE center	other
+71	Public health clinic	other
+72	Rural health clinic	rhc
+81	Independent laboratory	lab
+99	Other place of service	other
+CSTM-00	Any place of service	any

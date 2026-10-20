@@ -7,7 +7,11 @@ using PriceExplorer.Api.Core.Exceptions;
 
 namespace PriceExplorer.Api.Hosting;
 
-/// <summary>Turns known exceptions into RFC 9457 problem responses. Anything else falls through to a generic 500.</summary>
+/// <summary>
+/// Turns exceptions into RFC 9457 problem responses: known ones into their status and code, anything else into a 500
+/// with code "server_error". Unknown exceptions are logged here, once; because this handler handles them, the framework's
+/// exception middleware doesn't log them a second time.
+/// </summary>
 internal sealed class ExplorerExceptionHandler(
     IProblemDetailsService problemDetailsService,
     ILogger<ExplorerExceptionHandler> logger) : IExceptionHandler
@@ -24,7 +28,12 @@ internal sealed class ExplorerExceptionHandler(
         if (problem is null)
         {
             logger.LogError(exception, "Unhandled exception for {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
-            return false;
+            problem = new ProblemDetails
+            {
+                Status = StatusCodes.Status500InternalServerError,
+                Title = "Something went wrong on the server",
+                Extensions = { ["code"] = "server_error" },
+            };
         }
 
         if (exception is IndexNotReadyException notReady)
@@ -33,12 +42,15 @@ internal sealed class ExplorerExceptionHandler(
         }
 
         httpContext.Response.StatusCode = problem.Status ?? StatusCodes.Status500InternalServerError;
-        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
+        // JsonProblemDetailsWriter writes even when the Accept header rules JSON out, so this always handles the exception:
+        // the exception middleware then neither writes a generic response nor logs it a second time.
+        await problemDetailsService.WriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
             ProblemDetails = problem,
             Exception = exception,
         });
+        return true;
     }
 
     private static ValidationProblemDetails ToValidationProblem(ValidationException exception)
