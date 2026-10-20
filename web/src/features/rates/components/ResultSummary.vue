@@ -5,6 +5,7 @@ import { plural, shortDate, wholeNumber } from '@/lib/format'
 import type { LocationOption, ProductFileSummary, RateSearchResult, SettingOption } from '../api/types'
 import { groupName } from '../lib/lenses'
 import { locationTitle } from '../lib/locations'
+import { pricingNotes } from '../lib/pricing'
 import type { QueryPatch, SearchParams } from '../lib/searchParams'
 
 const props = defineProps<{
@@ -17,6 +18,13 @@ const props = defineProps<{
 const emit = defineEmits<{ update: [patch: QueryPatch] }>()
 
 const code = computed(() => props.result.code)
+// "Procedures · Digestive/Gastrointestinal"; CMS's family, when there is one, in the tooltip.
+const categoryLabel = computed(() => {
+  const classification = code.value?.classification
+  if (!classification) return null
+  return classification.subcategory ? `${classification.category} · ${classification.subcategory}` : classification.category
+})
+const notes = computed(() => pricingNotes(props.result))
 
 // Removable chips for everything that narrows the results.
 const activeFilters = computed(() => {
@@ -81,13 +89,31 @@ const qualityChips = computed(() => {
       <h2 id="result-heading" class="text-headline-small">
         {{ code ? `${code.codeType} ${code.code}` : result.query.code }}
       </h2>
-      <span v-if="code" class="text-title-large font-weight-regular text-medium-emphasis">
+      <span v-if="code" class="text-title-large font-weight-regular text-medium-emphasis" data-testid="code-name">
         {{ code.name ?? 'No description published by the plan' }}
       </span>
+      <v-tooltip
+        v-if="code?.descriptionSource === 'cms_hcpcs'"
+        :text="code.description ?? code.name ?? ''"
+        :disabled="!code.description"
+        max-width="480"
+        location="bottom"
+      >
+        <template #activator="{ props: tip }">
+          <span v-bind="tip" class="text-body-small text-medium-emphasis" :class="{ 'has-tooltip': code.description }" :tabindex="code.description ? 0 : undefined" data-testid="cms-name">
+            Name from CMS's HCPCS list: the plan's file doesn't name this code.
+          </span>
+        </template>
+      </v-tooltip>
     </div>
 
     <div v-if="code" class="d-flex flex-wrap align-center ga-2 text-body-medium">
-      <v-chip variant="tonal" color="primary">{{ code.category.label }}</v-chip>
+      <v-tooltip v-if="code.classification.family" :text="`CMS's category for this code: ${code.classification.family}`" max-width="360" location="bottom">
+        <template #activator="{ props: tip }">
+          <v-chip v-bind="tip" variant="tonal" color="primary" data-testid="category-chip">{{ categoryLabel }}</v-chip>
+        </template>
+      </v-tooltip>
+      <v-chip v-else variant="tonal" color="primary" data-testid="category-chip">{{ categoryLabel }}</v-chip>
       <span>Priced {{ code.category.unit }}</span>
       <span class="text-medium-emphasis">
         · Found as: {{ code.foundVia.slice(0, 2).join('; ') }}
@@ -102,6 +128,20 @@ const qualityChips = computed(() => {
     <p v-if="code?.levelFamily" class="text-body-medium text-medium-emphasis">
       {{ code.levelFamily }} codes come in levels. Compare level to level.
     </p>
+
+    <v-expansion-panels v-if="notes.length" variant="accordion" flat class="pricing-notes" data-testid="pricing-notes">
+      <v-expansion-panel>
+        <v-expansion-panel-title class="text-body-medium">How it's priced</v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <dl class="d-flex flex-column ga-2">
+            <div v-for="note in notes" :key="note.key" :data-testid="`pricing-note-${note.key}`">
+              <dt class="text-body-medium font-weight-medium">{{ note.title }}</dt>
+              <dd class="text-body-medium">{{ note.text }}</dd>
+            </div>
+          </dl>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
 
     <div v-if="activeFilters.length" class="d-flex flex-wrap ga-2" aria-label="Active filters">
       <v-chip
@@ -162,5 +202,9 @@ const qualityChips = computed(() => {
 
 .active-filter :deep(.v-chip__content) {
   min-width: 0;
+}
+
+.pricing-notes {
+  max-width: 760px;
 }
 </style>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
-import type { LocationOption, RateSearchResult } from '../../api/types'
+import type { CodeInfo, LocationOption, RateSearchResult } from '../../api/types'
 import { parseRouteQuery } from '../../lib/searchParams'
 import ResultSummary from '../ResultSummary.vue'
 
@@ -66,5 +66,55 @@ describe('ResultSummary', () => {
     expect(all.map((chip) => chip.classes().includes('copper-mark'))).toEqual([true, false, false])
     // Long specialty names wrap inside the chip, so its remove button stays in view.
     expect(all.every((chip) => chip.classes().includes('active-filter'))).toBe(true)
+  })
+
+  it('shows the CMS category, a name from CMS when the plan has none, and how it is priced', async () => {
+    const propofol: CodeInfo = {
+      codeType: 'HCPCS',
+      code: 'J2704',
+      name: 'Injection, propofol, 10 mg',
+      description: null,
+      descriptionSource: 'cms_hcpcs',
+      category: { key: 'drugs', label: 'Drugs & biologicals', unit: "per HCPCS unit (see the code's description)", perUnit: true },
+      classification: { key: 'RI', category: 'Treatments', subcategory: 'Injections and Infusions (nononcologic)', family: null, source: 'cms_rbcs' },
+      doseUnit: { amount: 10, unit: 'mg', text: '10 mg' },
+      levelFamily: null,
+      foundVia: ['Billing code (HCPCS)'],
+    }
+    const vuetify = createVuetify({ theme: { defaultTheme: 'light' } })
+    const wrapper = mount(ResultSummary, {
+      props: { result: { ...result({ code: 'J2704' }), code: propofol }, params: parseRouteQuery({ code: 'J2704' }), products: [], settings: [], locations },
+      global: { plugins: [vuetify] },
+    })
+
+    expect(wrapper.get('[data-testid="category-chip"]').text()).toBe('Treatments · Injections and Infusions (nononcologic)')
+    expect(wrapper.get('[data-testid="code-name"]').text()).toBe('Injection, propofol, 10 mg')
+    expect(wrapper.get('[data-testid="cms-name"]').text()).toContain("Name from CMS's HCPCS list")
+    await wrapper.get('[data-testid="pricing-notes"] button').trigger('click')
+    expect(wrapper.get('[data-testid="pricing-note-drugs"]').text()).toContain('(for J2704, 10 mg)')
+  })
+
+  it('names a code the plan describes without the CMS note', () => {
+    const vuetify = createVuetify({ theme: { defaultTheme: 'light' } })
+    const colonoscopy: CodeInfo = {
+      codeType: 'CPT',
+      code: '45378',
+      name: 'DIAGNOSTIC COLONOSCOPY',
+      description: null,
+      descriptionSource: 'payer_file',
+      category: { key: 'surgery', label: 'Surgery & procedures', unit: 'per procedure', perUnit: false },
+      classification: { key: 'PG004', category: 'Procedures', subcategory: 'Digestive/Gastrointestinal', family: 'Lower GI Endoscopy - Other', source: 'cms_rbcs' },
+      doseUnit: null,
+      levelFamily: null,
+      foundVia: [],
+    }
+    const wrapper = mount(ResultSummary, {
+      props: { result: { ...result({}), code: colonoscopy }, params: parseRouteQuery({ code: '45378' }), products: [], settings: [], locations },
+      global: { plugins: [vuetify] },
+    })
+
+    expect(wrapper.get('[data-testid="category-chip"]').text()).toBe('Procedures · Digestive/Gastrointestinal')
+    expect(wrapper.find('[data-testid="cms-name"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pricing-notes"]').exists()).toBe(false)
   })
 })

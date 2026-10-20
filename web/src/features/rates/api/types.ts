@@ -99,13 +99,34 @@ export interface ServiceCategory {
   perUnit: boolean
 }
 
+/** What a code is: CMS's RBCS category, subcategory and family, or the code-range category when CMS doesn't list it. */
+export interface CodeClassification {
+  /** The most specific category key: an RBCS family ("PG004") or subcategory ("PG"), or a code-range category ("facility"). */
+  key: string
+  category: string
+  subcategory: string | null
+  family: string | null
+  source: 'cms_rbcs' | 'code_ranges' | string
+}
+
+/** How much of a drug one HCPCS unit holds, as the code's name says: { amount: 10, unit: 'mg', text: '10 mg' }. */
+export interface DoseUnit {
+  amount: number
+  unit: string
+  text: string
+}
+
 export interface CodeInfo {
   codeType: string
   code: string
+  /** The plan's own name, else CMS's HCPCS name (shortened when long). */
   name: string | null
   description: string | null
-  descriptionSource: 'payer_file' | 'none' | string
+  descriptionSource: 'payer_file' | 'cms_hcpcs' | 'none' | string
+  /** How the code is priced: its kind of service and the unit a rate pays for. */
   category: ServiceCategory
+  classification: CodeClassification
+  doseUnit: DoseUnit | null
   levelFamily: string | null
   foundVia: string[]
 }
@@ -434,4 +455,36 @@ export interface SpecialtySuggestion {
   specialty: string
   group: string | null
   npis: number
+}
+
+/** GET /api/v1/rates/levels: each level of a visit code's family, side by side for like-for-like lines. */
+export interface LevelLadder {
+  snapshot: { snapshotId: number; indexDate: string | null; isLatest: boolean }
+  family: string
+  codes: { code: string; level: number }[]
+  lines: LevelLine[]
+}
+
+/** One plan, fee type, setting, modifier set and rate type, across the levels it has prices for. */
+export interface LevelLine {
+  key: string
+  productKey: string
+  productLabel: string
+  feeType: string
+  settingKey: string
+  settingLabel: string
+  modifiers: ModifierRef[]
+  negotiatedType: string
+  unit: string
+  levels: LevelStep[]
+}
+
+/** One level's search card, as numbers. */
+export interface LevelStep {
+  code: string
+  level: number
+  groupKey: string
+  providerCount: number
+  statsLevel: string
+  stats: RateStats
 }

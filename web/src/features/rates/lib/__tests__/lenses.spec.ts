@@ -376,6 +376,8 @@ describe('life sciences lens', () => {
     description: null,
     descriptionSource: 'payer_file',
     category: { key: 'drugs', label: 'Drugs & biologicals', unit: 'per HCPCS unit', perUnit: true },
+    classification: { key: 'RI', category: 'Treatments', subcategory: 'Injections and Infusions (nononcologic)', family: null, source: 'cms_rbcs' },
+    doseUnit: { amount: 1, unit: 'unit', text: '1 unit' },
     levelFamily: null,
     foundVia: [],
   }
