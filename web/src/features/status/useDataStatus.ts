@@ -1,9 +1,10 @@
 import { computed, onScopeDispose, shallowRef, watch } from 'vue'
 import { createSharedComposable } from '@vueuse/core'
-import { useQueryClient } from '@tanstack/vue-query'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { buildUrl } from '@/lib/apiClient'
 import { ratesApi } from '@/features/rates/api/ratesApi'
 import type { IngestionStatus } from '@/features/rates/api/types'
+import { statusKeys } from '@/features/rates/lib/queryKeys'
 
 /**
  * Live data-loading status, shared app-wide. The server pushes every change over server-sent events
@@ -11,27 +12,24 @@ import type { IngestionStatus } from '@/features/rates/api/types'
  * "still loading" (503) re-runs by itself.
  */
 export const useDataStatus = createSharedComposable(() => {
-  const status = shallowRef<IngestionStatus | null>(null)
+  // What the stream pushed last; it wins over the first fetch as soon as it speaks.
+  const pushed = shallowRef<IngestionStatus | null>(null)
   const connected = shallowRef(false)
   const queryClient = useQueryClient()
 
   const source = typeof EventSource === 'undefined' ? null : new EventSource(buildUrl('/api/v1/status/stream'))
   source?.addEventListener('status', (event) => {
     connected.value = true
-    status.value = JSON.parse((event as MessageEvent<string>).data) as IngestionStatus
+    pushed.value = JSON.parse((event as MessageEvent<string>).data) as IngestionStatus
   })
   // The browser reconnects an EventSource on its own; just reflect the state.
   source?.addEventListener('error', () => {
     connected.value = false
   })
 
-  // First paint without waiting for the stream to connect.
-  ratesApi
-    .status()
-    .then((initial) => {
-      status.value ??= initial
-    })
-    .catch(() => undefined)
+  // First paint without waiting for the stream to connect, through the query cache like all server data.
+  const initial = useQuery({ queryKey: statusKeys.current(), queryFn: ({ signal }) => ratesApi.status(signal) })
+  const status = computed(() => pushed.value ?? initial.data.value ?? null)
 
   watch(
     () => status.value?.phase,
