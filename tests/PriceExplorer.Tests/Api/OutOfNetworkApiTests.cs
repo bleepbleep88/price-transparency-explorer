@@ -33,12 +33,14 @@ public sealed class OutOfNetworkApiTests(ExplorerApiFactory factory) : IClassFix
             .Should().Be((12, 3, 4), "the 24 published payments are the same 12 under two item names");
         Amounts(ambetter.GetProperty("allowed")).Should().Be((12, 23.38m, 1185.02m, 18803.47m, 0), "1,185.015 rounds half away from zero");
         Amounts(ambetter.GetProperty("billed")).Should().Be((13, 434.92m, 2233m, 217627m, 0), "one payment lists two providers");
+        ambetter.GetProperty("allowedShareOfBilled").GetDecimal().Should().Be(0.30m);
 
         var essential = groups[1];
         (essential.GetProperty("payments").GetInt32(), essential.GetProperty("providers").GetInt32(), essential.GetProperty("npis").GetInt32())
             .Should().Be((20, 5, 7));
         Amounts(essential.GetProperty("allowed")).Should().Be((20, 60.12m, 1375.18m, 187538.55m, 0));
         Amounts(essential.GetProperty("billed")).Should().Be((22, 551.92m, 5110m, 1733257m, 0));
+        essential.GetProperty("allowedShareOfBilled").GetDecimal().Should().Be(0.21m);
     }
 
     [Fact(Timeout = 60_000)]
@@ -56,10 +58,12 @@ public sealed class OutOfNetworkApiTests(ExplorerApiFactory factory) : IClassFix
         allowed.GetProperty("median").ValueKind.Should().Be(JsonValueKind.Null, "a midpoint of 4 amounts would read as a price nobody was paid");
         allowed.GetProperty("listed").EnumerateArray().Select(a => a.GetDecimal()).Should().Equal(217.92m, 544.80m, 762.72m, 8373.66m);
         ambetter.GetProperty("billed").GetProperty("listed").EnumerateArray().Select(a => a.GetDecimal()).Should().Equal(3892m, 9730m, 13622m, 134647.88m);
+        ambetter.GetProperty("allowedShareOfBilled").ValueKind.Should().Be(JsonValueKind.Null, "4 pairs are too few for a median");
 
         var essential = groups[1];
         Amounts(essential.GetProperty("allowed")).Should().Be((18, 91.25m, 349.79m, 64150.47m, 0));
         Amounts(essential.GetProperty("billed")).Should().Be((18, 246m, 2640m, 1452463.76m, 0));
+        essential.GetProperty("allowedShareOfBilled").GetDecimal().Should().Be(0.22m);
     }
 
     [Theory(Timeout = 60_000)]
@@ -87,6 +91,7 @@ public sealed class OutOfNetworkApiTests(ExplorerApiFactory factory) : IClassFix
         anesthesia.Select(g => g.GetProperty("code").GetString()).Should().Equal("00812", "00812");
         anesthesia.Should().AllSatisfy(g => g.GetProperty("perUnitCode").GetBoolean().Should().BeTrue("in-network anesthesia rates are per unit"));
         Amounts(anesthesia[1].GetProperty("allowed")).Should().Be((9, 60m, 1358m, 28370m, 0));
+        anesthesia[1].GetProperty("allowedShareOfBilled").GetDecimal().Should().Be(0.03m);
         lens.Should().ContainSingle().Which.GetProperty("productKey").GetString().Should().Be("essential-plan");
         otherType.GetArrayLength().Should().Be(0, "CPT 00450 has no out-of-network payments");
     }

@@ -66,6 +66,26 @@ public sealed class OutOfNetworkSummaryTests
     }
 
     [Fact]
+    public void The_share_allowed_is_the_median_over_each_provider_on_a_payment_from_five_pairs()
+    {
+        // Allowed ÷ billed: 0.10, 0.20, 0.25, 0.40, 0.50, 1.00; the payment without a billed charge has no share.
+        var six = OutOfNetworkSummary.Summarize(
+        [
+            Fact(1, allowed: 10m, billed: 100m),
+            Fact(2, allowed: 20m, billed: 100m),
+            Fact(3, allowed: 25m, billed: 100m),
+            Fact(4, allowed: 40m, billed: 100m),
+            Fact(5, allowed: 50m, providerIndex: 0, billed: 100m, npi: 1407814825),
+            Fact(5, allowed: 50m, providerIndex: 1, billed: 50m, npi: 1538690458),
+            Fact(6, allowed: 70m, providerIndex: null, billed: null, npi: null),
+        ], Catalog).Single();
+        var four = OutOfNetworkSummary.Summarize([Fact(1), Fact(2), Fact(3), Fact(4)], Catalog).Single();
+
+        six.AllowedShareOfBilled.Should().Be(0.33m, "(0.25 + 0.40) / 2 = 0.325 rounds half away from zero");
+        four.AllowedShareOfBilled.Should().BeNull();
+    }
+
+    [Fact]
     public void A_group_with_no_billed_charges_has_none_and_places_are_the_union_of_its_payments()
     {
         var groups = OutOfNetworkSummary.Summarize(
@@ -76,6 +96,7 @@ public sealed class OutOfNetworkSummaryTests
 
         var group = groups.Should().ContainSingle().Subject;
         group.Billed.Should().BeNull();
+        group.AllowedShareOfBilled.Should().BeNull();
         group.Places.Select(place => place.Pos).Should().Equal("19", "22", "23");
         group.Places[0].Name.Should().Be("Off campus outpatient hospital");
     }

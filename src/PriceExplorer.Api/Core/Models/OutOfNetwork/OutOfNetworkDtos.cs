@@ -30,6 +30,10 @@ public sealed record OutOfNetworkFile(int FileId, string ProductKey, string Prod
 /// <param name="Payments">Unique payments (distinct allowed amounts per tax ID and place), after duplicates collapse.</param>
 /// <param name="Providers">Tax IDs paid.</param>
 /// <param name="Billed">What the providers billed, one charge per provider on a payment; null when none was published.</param>
+/// <param name="AllowedShareOfBilled">
+/// The median of allowed ÷ billed over each provider on a payment (0.21 = the plan allowed 21% of the charge), with 5 or
+/// more such pairs; null under 5. It holds even where a listed amount is a total of several claims.
+/// </param>
 public sealed record OutOfNetworkGroup(
     string Key,
     string ProductKey,
@@ -45,7 +49,8 @@ public sealed record OutOfNetworkGroup(
     int Providers,
     int Npis,
     AmountSummary Allowed,
-    AmountSummary? Billed);
+    AmountSummary? Billed,
+    decimal? AllowedShareOfBilled);
 
 /// <summary>A set of dollar amounts. Under 5 amounts they're listed instead of summarized, so no midpoint reads as a price.</summary>
 /// <param name="Median">With 5 or more amounts: linear interpolation, rounded to cents. Null under 5.</param>

@@ -8,7 +8,8 @@ namespace PriceExplorer.Api.Core.Handlers.OutOfNetwork;
 
 /// <summary>
 /// Groups out-of-network payments by code, product, fee type and modifiers, and summarizes each group's allowed amounts
-/// (one per unique payment) and billed charges (one per provider on a payment). Pure; covered by unit tests.
+/// (one per unique payment), billed charges (one per provider on a payment) and the share of each charge allowed.
+/// Pure; covered by unit tests.
 /// </summary>
 internal static class OutOfNetworkSummary
 {
@@ -48,11 +49,12 @@ internal static class OutOfNetworkSummary
     private static OutOfNetworkGroup ToGroup(GroupKey key, List<OutOfNetworkFact> facts, ReferenceCatalog catalog)
     {
         var payments = facts.DistinctBy(fact => fact.PaymentId).ToList();
-        var billed = facts
+        var providerEntries = facts
             .Where(fact => fact is { ProviderIndex: not null, BilledCharge: not null })
             .DistinctBy(fact => (fact.PaymentId, fact.ProviderIndex))
-            .Select(fact => fact.BilledCharge!.Value)
             .ToList();
+        var billed = providerEntries.Select(fact => fact.BilledCharge!.Value).ToList();
+        var shares = providerEntries.Select(fact => fact.AllowedAmount / fact.BilledCharge!.Value).Order().ToList();
 
         return new OutOfNetworkGroup(
             Key: string.Join('|', key.ProductKey, key.CodeType, key.Code, key.FeeType, key.Modifiers),
@@ -76,7 +78,8 @@ internal static class OutOfNetworkSummary
             Providers: payments.Select(payment => payment.ProviderKey).Distinct(StringComparer.Ordinal).Count(),
             Npis: facts.Where(fact => fact.Npi is not null).Select(fact => fact.Npi).Distinct().Count(),
             Allowed: Amounts(payments.Select(payment => payment.AllowedAmount)),
-            Billed: billed.Count == 0 ? null : Amounts(billed));
+            Billed: billed.Count == 0 ? null : Amounts(billed),
+            AllowedShareOfBilled: shares.Count < RateStatistics.MinimumForBasicStats ? null : RateStatistics.Median(shares));
     }
 
     private sealed record GroupKey(
