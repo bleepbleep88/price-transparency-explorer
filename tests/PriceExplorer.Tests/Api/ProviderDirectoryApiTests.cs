@@ -55,6 +55,74 @@ public sealed class ProviderDirectoryApiTests(ExplorerApiFactory factory) : ICla
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task A_picked_specialty_finds_that_specialty_only()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = factory.CreateClient();
+        await factory.WaitForIngestionAsync(ct);
+
+        var suggestions = await client.GetFromJsonAsync<JsonElement>("/api/v1/specialties?q=gastroenterology", ct);
+        var picked = suggestions.EnumerateArray().First(s => s.GetProperty("specialty").GetString() == "Gastroenterology Physician");
+        var result = await SearchAsync("code=45378&specialty=Gastroenterology%20Physician&pageSize=100", ct);
+
+        // Matching specialties are listed first, so each row leads with the one picked.
+        var rows = result.GetProperty("rows").GetProperty("items").EnumerateArray().ToList();
+        rows.Should().NotBeEmpty().And.OnlyContain(row =>
+            row.GetProperty("profile").GetProperty("specialties")[0].GetProperty("specialty").GetString() == "Gastroenterology Physician");
+        picked.GetProperty("npis").GetInt32().Should().BePositive();
+    }
+
+    [Theory(Timeout = 60_000)]
+    // Typed words match from the start of a word: never "Neurology", never "Surgical" for GI.
+    [InlineData("urology", "Neurology")]
+    [InlineData("GI", "Surgical")]
+    [InlineData("physician assistant", "Nurse Practitioner")]
+    public async Task Typed_specialty_words_match_from_the_start_of_a_word(string typed, string never)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = factory.CreateClient();
+        await factory.WaitForIngestionAsync(ct);
+
+        var suggestions = await client.GetFromJsonAsync<JsonElement>($"/api/v1/specialties?q={Uri.EscapeDataString(typed)}&limit=50", ct);
+
+        suggestions.EnumerateArray().Select(s => s.GetProperty("specialty").GetString()!)
+            .Should().NotBeEmpty().And.NotContain(name => name.Contains(never, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory(Timeout = 60_000)]
+    [InlineData("cardiologist", "Cardiovascular Disease Physician")]
+    [InlineData("orthopaedic surgeon", "Orthopaedic Surgery Physician")]
+    [InlineData("ENT", "Otolaryngology Physician")]
+    [InlineData("ob/gyn", "Obstetrics & Gynecology Physician")]
+    [InlineData("anesthesia", "Anesthesiology Physician")]
+    public async Task Common_specialty_words_find_the_registry_name(string typed, string name)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = factory.CreateClient();
+        await factory.WaitForIngestionAsync(ct);
+
+        var suggestions = await client.GetFromJsonAsync<JsonElement>($"/api/v1/specialties?q={Uri.EscapeDataString(typed)}&limit=50", ct);
+
+        suggestions.EnumerateArray().Select(s => s.GetProperty("specialty").GetString()).Should().Contain(name);
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task Location_names_match_with_or_without_county_borough_or_the()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var bronx = await SearchAsync("code=45378&county=Bronx&pageSize=100", ct);
+        var theBronx = await SearchAsync("code=45378&county=The%20Bronx&pageSize=100", ct);
+        var bronxCounty = await SearchAsync("code=45378&county=Bronx%20County&pageSize=100", ct);
+        var manhattan = await SearchAsync("code=45378&county=Manhattan&pageSize=100", ct);
+        var nyc = await SearchAsync("code=45378&county=NYC&pageSize=100", ct);
+
+        Names(bronx).Should().NotBeEmpty();
+        Names(theBronx).Should().Equal(Names(bronx));
+        Names(bronxCounty).Should().Equal(Names(bronx));
+        Total(nyc).Should().BeGreaterThan(Total(manhattan)).And.BeGreaterThan(Total(bronx));
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task Filters_pick_providers_but_statistics_stay_market_wide()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -197,6 +265,8 @@ public sealed class ProviderDirectoryApiTests(ExplorerApiFactory factory) : ICla
         await factory.WaitForIngestionAsync(ct);
         return await client.GetFromJsonAsync<JsonElement>($"/api/v1/rates?{query}", ct);
     }
+
+    private static int Total(JsonElement result) => result.GetProperty("rows").GetProperty("total").GetInt32();
 
     private static List<string> Names(JsonElement result) =>
         result.GetProperty("rows").GetProperty("items").EnumerateArray().Select(r => r.GetProperty("businessName").GetString()!).ToList();

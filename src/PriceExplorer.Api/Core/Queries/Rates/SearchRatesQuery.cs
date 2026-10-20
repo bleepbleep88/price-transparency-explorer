@@ -19,8 +19,8 @@ namespace PriceExplorer.Api.Core.Queries.Rates;
 /// <param name="Setting">Optional care setting key, e.g. "asc", "hospital-outpatient", "office".</param>
 /// <param name="FeeType">Optional: "facility" or "professional".</param>
 /// <param name="Provider">Optional text matched against provider business names.</param>
-/// <param name="Specialty">Optional: providers listing an NPI with this specialty (NUCC name or grouping text, e.g. "gastro", or a taxonomy code).</param>
-/// <param name="County">Optional: providers listing an NPI that practices in this New York county or NYC borough ("Manhattan", "Monroe", or a FIPS code).</param>
+/// <param name="Specialty">Optional: providers listing an NPI with this specialty. A full NUCC specialty name ("Urology Physician") matches that specialty only; other text matches names with a word starting with each typed word ("gastro", "cardiologist"); a taxonomy code matches that code.</param>
+/// <param name="County">Optional: providers listing an NPI that practices in this New York county or NYC borough ("Manhattan", "The Bronx", "Kings County", "Monroe", a FIPS code, or "NYC" for all five boroughs).</param>
 /// <param name="Group">Optional comparison group key: limits the rows (not the group cards) to that group.</param>
 /// <param name="Snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
 /// <param name="Sort">rate | -rate | provider | -provider | vsMedian | -vsMedian.</param>

@@ -27,7 +27,7 @@ export interface SearchParams {
   setting?: string
   feeType?: FeeType
   provider?: string
-  /** Specialty text matched against the national provider registry, e.g. "gastro". */
+  /** A specialty name from the typeahead, or words matched against the start of words in specialty names, e.g. "gastro". */
   specialty?: string
   /** A New York county or NYC borough from the reference list, e.g. "Manhattan" or "Monroe". */
   county?: string
