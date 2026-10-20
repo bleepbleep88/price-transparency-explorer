@@ -2,7 +2,7 @@
 
 Search what a health plan has agreed to pay for a service, and see how each provider's rate compares with every other provider's rate for the same service in the same setting.
 
-It reads Centene's Fidelis Care **Transparency in Coverage** index (`2026-08-31_fidelis_index.json`, from the brief), loads every in-network rate file the index lists (Ambetter from Fidelis Care and the Essential Plan, about 263 MB of JSON), cleans and de-duplicates them into DuckDB, and serves a search API and a Vue web app.
+It reads Centene's Fidelis Care **Transparency in Coverage** index (`2026-08-31_fidelis_index.json`, from the brief), loads every in-network rate file the index lists (Ambetter from Fidelis Care and the Essential Plan, about 263 MB of JSON) and its out-of-network allowed-amount files, cleans and de-duplicates them into DuckDB, and serves a search API and a Vue web app.
 
 **Search** needs a billing code (CPT, HCPCS or revenue code). NPI and EIN are optional and narrow the results to one provider, which is then shown against the market.
 
@@ -62,7 +62,7 @@ flowchart LR
 
 - **Ingestion** runs in the background. A file is streamed element by element, so memory stays flat whatever the file size. Each file is saved in one transaction, so a search never sees half a file. One failing file never stops the others; a payer outage falls back to the cached copy.
 - **API**: ASP.NET Core controllers send MediatR queries. Each query has a validator, and each handler runs its own `.sql` file next to it. Errors are RFC 9457 problem responses with camelCase field errors. While nothing is loaded, data endpoints answer `503` with `Retry-After`.
-- **Every rate is traceable.** The source drawer shows the file URL, the index date, the file's own date, HTTP Last-Modified, SHA-256, the JSON path of the price, and the values as published.
+- **Every rate is traceable.** The source drawer shows the file URL, the index date, the file's own date, HTTP Last-Modified, SHA-256, the JSON path of the price, and the values as published. The **sources page** (`/sources`) lists every file with its dates, checksums, published → unique counts, each clean-up rule's count, and everything set aside with its reason and first example.
 
 ## What the data looks like (measured on the 2026-08-31 files)
 
@@ -81,6 +81,8 @@ flowchart LR
 | Three dates per file | The index date in the file name (2026-08-31), `last_updated_on` inside each file (2026-09-02), and HTTP Last-Modified (2026-09-04). | All three are kept and shown in the source drawer. |
 | Rates that aren't comparable | Clinic (FQHC/RHC) rates are all-inclusive per-visit payments. | Kept in their own setting, never compared with office fees. |
 | What's absent | Every price has `expiration_date` 9999-12-31 (no end date). No inpatient DRGs; codes are CPT, HCPCS or revenue codes only. | Expiry shown as "no end date". The scope is outpatient and professional rates. |
+| Out-of-network amounts are thin, repeated and often totals | Plans list a provider and service only with 20+ claims in a 90-day window: 33 codes (Ambetter) and 115 (Essential Plan). Revenue-code items repeat the same payments under unrelated names: 237 published → 103 unique, 1,033 → 605. Many amounts are far above one service: CPT 97530 (a 15-minute therapy unit, about $32 in network) has a median of $1,814.70, and a BLS ambulance code reaches $1,038,971. | Duplicates collapse. A small panel on search results shows payments, allowed and billed amounts per product and fee type, and the median share of the charge allowed (ER facility 21–30%, ambulance about 100%), which holds even for totals. |
+| EINs written as numbers | 6 EINs in the Essential Plan allowed-amount file have 8 digits (60646659 for 06-0646659). | The leading zero is restored before the IRS prefix check. |
 
 ## Comparing fairly
 
@@ -109,6 +111,8 @@ Filtering by NPI, EIN or name narrows the rows to that provider's matching rates
 | `GET /api/v1/codes?q=` · `/providers?q=` · `/reference` | Typeahead and filter options |
 | `GET /api/v1/status` · `/status/stream` | Loading progress (the stream uses server-sent events) |
 | `GET /api/v1/snapshots` · `/snapshots/{id}/plans` | Loaded files, their sources and counts; plans per product |
+| `GET /api/v1/sources` | Every snapshot and file (rate and allowed-amount files): URL, three dates, size, SHA-256, ETag, counts, rejects by reason, timing |
+| `GET /api/v1/out-of-network?code=&codeType=&snapshot=` | What the plan allowed out of network for a code, per product and fee type |
 | `/health/live` · `/health/ready` | Ready once rate data can be searched |
 
 ## Assumptions and tradeoffs
