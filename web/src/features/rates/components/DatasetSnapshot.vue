@@ -20,7 +20,7 @@ const totals = computed(() =>
 </script>
 
 <template>
-  <v-card variant="outlined" data-testid="dataset-snapshot">
+  <v-card data-testid="dataset-snapshot">
     <v-card-item>
       <v-card-title class="text-wrap">What's loaded</v-card-title>
       <v-card-subtitle class="text-wrap">
@@ -35,7 +35,7 @@ const totals = computed(() =>
         <strong>{{ wholeNumber(totals.unique) }} unique rates</strong> once exact duplicates are removed.
       </p>
 
-      <v-sheet v-for="product in snapshot.products" :key="product.fileId" rounded="lg" border class="pa-3 d-flex flex-column ga-1">
+      <v-sheet v-for="product in snapshot.products" :key="product.fileId" rounded="sm" border class="pa-3 d-flex flex-column ga-1">
         <div class="d-flex align-center ga-2 flex-wrap">
           <span class="text-title-small">{{ product.productLabel }}</span>
           <v-chip :color="statusColor[product.status] ?? 'default'" size="x-small" variant="tonal">{{ product.status }}</v-chip>

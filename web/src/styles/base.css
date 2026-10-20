@@ -25,3 +25,51 @@
   text-underline-offset: 3px;
   cursor: help;
 }
+
+/* ---- Ledger type: Fraunces for headings, IBM Plex Sans for everything else, figures that line up. ---- */
+:root {
+  --v-font-body: 'IBM Plex Sans Variable', 'IBM Plex Sans', system-ui, sans-serif;
+  --v-font-heading: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+}
+
+body,
+.v-application {
+  font-family: var(--v-font-body);
+  font-variant-numeric: tabular-nums;
+}
+
+/* App title, page and section titles, card titles. */
+h1,
+h2,
+.v-toolbar-title,
+.v-card-title {
+  font-family: var(--v-font-heading);
+  font-optical-sizing: auto;
+  letter-spacing: 0;
+}
+
+.v-card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+/* Big numbers stay in the body face so every figure in the app shares one set of digits. */
+.stat-figure {
+  font-family: var(--v-font-body);
+  font-weight: 600;
+}
+
+/* ---- Ledger rules ---- */
+
+/* A firmer rule under table headers; rows keep Vuetify's hairline. */
+.v-table > .v-table__wrapper > table > thead > tr > th {
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.45);
+}
+
+/* Field outlines at rest meet 3:1 against the page (Vuetify's 0.38 is about 2.4:1). Hover, focus and error keep
+   Vuetify's own stronger values because this rule stops matching in those states. */
+.v-input:not(.v-input--error) .v-field:not(:hover):not(.v-field--focused) .v-field__outline {
+  --v-field-border-opacity: 0.5;
+}

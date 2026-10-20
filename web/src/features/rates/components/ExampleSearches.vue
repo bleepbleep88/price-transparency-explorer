@@ -11,7 +11,7 @@ const examples = [
 </script>
 
 <template>
-  <v-card variant="outlined">
+  <v-card>
     <v-card-item title="Try an example" subtitle="Each one shows something the raw files get wrong or hide." />
     <v-list density="compact" class="pt-0">
       <v-list-item

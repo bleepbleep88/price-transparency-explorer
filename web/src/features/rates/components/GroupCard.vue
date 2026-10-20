@@ -30,13 +30,13 @@ function positionText(position: ProviderPosition): string {
 
 <template>
   <v-card
-    :variant="selected ? 'tonal' : 'outlined'"
+    :variant="selected ? 'tonal' : undefined"
     :color="selected ? 'primary' : undefined"
     class="h-100 d-flex flex-column"
     data-testid="group-card"
   >
     <v-card-item>
-      <v-card-title class="text-title-medium font-weight-medium text-wrap">
+      <v-card-title class="text-wrap">
         {{ group.feeTypeLabel }} · {{ group.settingLabel }}
       </v-card-title>
       <v-card-subtitle class="text-wrap">
@@ -71,7 +71,7 @@ function positionText(position: ProviderPosition): string {
 
       <!-- 5 to 9 providers: median and range. -->
       <div v-else-if="group.statsLevel === 'basic'" data-testid="stats-basic">
-        <p class="text-title-large">{{ money(stats.median) }} <span class="text-body-medium text-medium-emphasis">median</span></p>
+        <p class="text-title-large stat-figure">{{ money(stats.median) }} <span class="text-body-medium text-medium-emphasis">median</span></p>
         <p class="text-body-medium text-medium-emphasis">Range {{ money(stats.min) }} to {{ money(stats.max) }}</p>
         <RangeBar :stats="stats" :marker="group.highlights[0]?.rate" class="mt-1" />
       </div>
@@ -85,7 +85,7 @@ function positionText(position: ProviderPosition): string {
           </div>
           <div>
             <div class="text-body-small text-medium-emphasis">Median</div>
-            <div class="text-title-large">{{ money(stats.median) }}</div>
+            <div class="text-title-large stat-figure">{{ money(stats.median) }}</div>
           </div>
           <div>
             <div class="text-body-small text-medium-emphasis">75th percentile</div>
