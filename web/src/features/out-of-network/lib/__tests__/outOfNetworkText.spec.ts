@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest'
+import type { OutOfNetworkFile } from '../../api/types'
 import {
+  OUT_OF_NETWORK_NOTES,
+  PER_UNIT_NOTE,
   aboutTimes,
-  amountHeadline,
-  amountRange,
-  amountSentence,
+  amountsListed,
+  amountsSentence,
+  amountsText,
   billedLine,
   billedVersusAllowed,
   dollars,
+  fileNotes,
   groupLabel,
   leadGroup,
   listText,
+  noBilledLine,
   plansLensLine,
   providersLensLine,
   severalCodes,
@@ -17,7 +22,13 @@ import {
 } from '../outOfNetworkText'
 import { LISTED_CT_READ, oonGroup, oonResult as result } from './fixtures'
 
-const NO_STATISTICS_WORDS = /median|percentile|quartile|÷|×/i
+// No statistics words (decision 89), no "typical" figure for amounts that may cover several visits, and no "payments",
+// which read as a claim count the files don't have.
+const NOT_SAID = /median|percentile|quartile|÷|×|typical|payment/i
+
+function file(productKey: string, productLabel: string, status: string): OutOfNetworkFile {
+  return { fileId: 1, productKey, productLabel, url: `https://example.com/${productKey}.json`, status, fileLastUpdatedOn: null }
+}
 
 describe('out-of-network readings', () => {
   it('writes dollars the way the rest of the app does: whole dollars from $100, cents below', () => {
@@ -28,24 +39,63 @@ describe('out-of-network readings', () => {
     expect(aboutTimes(33.33)).toBe('about 33 times')
   })
 
-  it('lists fewer than 5 amounts and gives the typical amount and the range from 5 on', () => {
-    expect(amountHeadline(LISTED_CT_READ.allowed)).toBe('$218, $545, $763 and $8,374')
-    expect(amountRange(LISTED_CT_READ.allowed)).toBeNull()
-    expect(amountHeadline(oonGroup().allowed)).toBe('Typical: $1,375')
-    expect(amountRange(oonGroup().allowed)).toBe('Ran from $60.12 to $187,539')
+  it('shows the amounts, never a typical one: their range from 5 providers, every amount under 5', () => {
+    expect(amountsText(LISTED_CT_READ.allowed)).toBe('$218, $545, $763 and $8,374')
+    expect(amountsText(oonGroup().allowed)).toBe('ran from $60.12 to $187,539')
+    expect(amountsText({ count: 6, min: 300, median: 300, max: 300, listed: [] })).toBe('all $300')
+    expect(amountsSentence(oonGroup().allowed, 'Allowed amounts')).toBe('Allowed amounts listed ran from $60.12 to $187,539.')
+    expect(amountsSentence(LISTED_CT_READ.billed!, 'Billed charges')).toBe('Billed charges listed: $3,892, $9,730, $13,622 and $134,648.')
     expect(listText([1700])).toBe('$1,700')
     expect(listText([775.71, 936.22])).toBe('$776 and $936')
-    expect(amountSentence(oonGroup().allowed, 'allowed amount')).toBe('Typical allowed amount: $1,375. Ran from $60.12 to $187,539.')
-    expect(amountSentence(LISTED_CT_READ.billed!, 'billed charge')).toBe('Billed charges: $3,892, $9,730, $13,622 and $134,648.')
+    expect(amountsListed(20)).toBe('20 different amounts listed')
+    expect(amountsListed(1)).toBe('1 different amount listed')
   })
 
-  it('says how billed charges compare with the allowed amount only with enough pairs', () => {
+  it('says "times" only from exactly 2×, a percentage below, and "about the same" within 5%', () => {
     expect(billedVersusAllowed(oonGroup())).toBe('about 4.8 times')
-    expect(billedVersusAllowed(oonGroup({ billedToAllowed: 1.01 }))).toBe('about the same as')
-    expect(billedVersusAllowed(oonGroup({ billedToAllowed: 0.8 }))).toBe('less than')
+    expect(billedVersusAllowed(oonGroup({ billedToAllowed: 2 }))).toBe('about 2 times')
+    // 1.97 is under 2: never rounded up to "about 2 times".
+    expect(billedVersusAllowed(oonGroup({ billedToAllowed: 1.97 }))).toBe('about 97% more than')
+    expect(billedVersusAllowed(oonGroup({ billedToAllowed: 1.48 }))).toBe('about 48% more than')
+    expect(billedVersusAllowed(oonGroup({ billedToAllowed: 1.04 }))).toBe('about the same as')
+    expect(billedVersusAllowed(oonGroup({ billedToAllowed: 0.96 }))).toBe('about the same as')
+    expect(billedVersusAllowed(oonGroup({ billedToAllowed: 0.8 }))).toBe('about 20% less than')
+    expect(billedLine(oonGroup())).toBe('Providers usually billed about 4.8 times what the plan allowed.')
+    expect(billedLine(oonGroup({ billedToAllowed: 1.97 }))).toBe('Providers usually billed about 97% more than what the plan allowed.')
+  })
+
+  it('counts providers, not amounts: under 5 providers nothing is compared', () => {
     expect(billedVersusAllowed(LISTED_CT_READ)).toBeNull()
-    expect(billedLine(oonGroup())).toBe('Billed charges were usually about 4.8 times the allowed amount.')
+    expect(billedVersusAllowed(oonGroup({ providers: 4 }))).toBeNull()
     expect(billedLine(LISTED_CT_READ)).toBeNull()
+    expect(noBilledLine(LISTED_CT_READ)).toBe('Only 1 provider: too few to compare.')
+    expect(noBilledLine(oonGroup({ billed: null, billedToAllowed: null }))).toBe('Too few billed charges published to compare.')
+  })
+
+  it('says only what the files support about the amounts', () => {
+    expect(OUT_OF_NETWORK_NOTES).toContain(
+      "Each different amount is listed once, with no claim count. The files don't say whether an amount covers one visit or several, so compare these with in-network prices carefully.",
+    )
+    for (const note of [...OUT_OF_NETWORK_NOTES, PER_UNIT_NOTE]) {
+      expect(note).not.toMatch(/look like|totals|so most|whole service/i)
+      expect(note).not.toMatch(NOT_SAID)
+    }
+  })
+
+  it('says in one line per product when its file was only partly read or could not be loaded', () => {
+    const files = [
+      file('ambetter-from-fidelis-care', 'Ambetter from Fidelis Care', 'failed'),
+      file('essential-plan', 'Essential Plan', 'partial'),
+      file('other', 'Other Plan', 'loaded'),
+    ]
+    const res = { ...result([oonGroup()]), files }
+    expect(fileNotes(res, {})).toEqual([
+      "Ambetter from Fidelis Care's out-of-network file couldn't be loaded, so its amounts aren't shown.",
+      "Essential Plan's out-of-network file was only partly read, so some amounts may be missing.",
+    ])
+    expect(fileNotes(res, { product: 'essential-plan' })).toHaveLength(1)
+    expect(fileNotes(result([oonGroup()]), {})).toEqual([])
+    expect(fileNotes(null, {})).toEqual([])
   })
 
   it('applies the search page product and fee type filters', () => {
@@ -68,32 +118,37 @@ describe('out-of-network readings', () => {
     )
   })
 
-  it('reads the lead group (most payments) for the lens lines, in plain words', () => {
+  it('reads the lead group (most providers, then most amounts) for the lens lines, in plain words', () => {
     const groups = [LISTED_CT_READ, oonGroup()]
     expect(leadGroup(groups)?.code).toBe('0450')
+    expect(leadGroup([oonGroup({ key: 'a', payments: 9 }), oonGroup({ key: 'b', payments: 21 })])?.key).toBe('b')
     const plans = plansLensLine(groups)
     const providers = providersLensLine([oonGroup()])
     expect(plans).toBe(
-      'Out of network (Essential Plan · Facility fee · RC 0450), billed charges were usually about 4.8 times what the plan allowed, over 20 payments.',
+      'Out of network (Essential Plan · Facility fee · RC 0450), providers usually billed about 4.8 times what the plan allowed, across 20 different amounts listed.',
     )
     expect(providers).toBe(
-      'Providers outside the network usually billed about 4.8 times what the plan allowed them (Essential Plan · Facility fee, 20 payments).',
+      'Providers outside the network usually billed about 4.8 times what the plan allowed them (Essential Plan · Facility fee, 20 different amounts listed).',
     )
-    expect(`${plans} ${providers}`).not.toMatch(NO_STATISTICS_WORDS)
+    expect(plansLensLine([oonGroup({ billedToAllowed: 1.97 })])).toContain('providers usually billed about 97% more than what the plan allowed')
+    expect(`${plans} ${providers}`).not.toMatch(NOT_SAID)
   })
 
-  it('falls back to the allowed amounts when billed charges cannot be compared, and says nothing without groups', () => {
+  it('lists the amounts under 5 providers, gives their range otherwise, and says nothing without groups', () => {
     expect(plansLensLine([LISTED_CT_READ])).toBe(
-      "Out of network (Ambetter from Fidelis Care · Doctor's fee), the plan allowed $218, $545, $763 and $8,374 over 4 payments.",
+      "Out of network (Ambetter from Fidelis Care · Doctor's fee), the plan allowed $218, $545, $763 and $8,374 (1 provider).",
     )
     expect(providersLensLine([LISTED_CT_READ])).toBe(
-      "Providers outside the network were allowed $218, $545, $763 and $8,374 (Ambetter from Fidelis Care · Doctor's fee).",
+      "Providers outside the network were allowed $218, $545, $763 and $8,374 (Ambetter from Fidelis Care · Doctor's fee, 1 provider).",
     )
     const noCharges = oonGroup({ billed: null, billedToAllowed: null })
-    expect(plansLensLine([noCharges])).toBe('Out of network (Essential Plan · Facility fee), the typical allowed amount was $1,375 over 20 payments.')
-    expect(providersLensLine([noCharges])).toBe(
-      'For providers outside the network, the typical allowed amount was $1,375 (Essential Plan · Facility fee, 20 payments).',
+    expect(plansLensLine([noCharges])).toBe(
+      'Out of network (Essential Plan · Facility fee), the amounts the plan allowed ran from $60.12 to $187,539 (20 different amounts listed).',
     )
+    expect(providersLensLine([noCharges])).toBe(
+      'For providers outside the network, the amounts the plan allowed ran from $60.12 to $187,539 (Essential Plan · Facility fee, 20 different amounts listed).',
+    )
+    for (const line of [plansLensLine([LISTED_CT_READ]), providersLensLine([noCharges])]) expect(line).not.toMatch(NOT_SAID)
     expect(plansLensLine([])).toBeNull()
     expect(providersLensLine([])).toBeNull()
   })

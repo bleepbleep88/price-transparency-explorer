@@ -2,7 +2,7 @@
 
 import type { ModifierRef, PlaceRef } from '@/features/rates/api/types'
 
-/** Under 5 amounts they're listed (median null); from 5 on, min, median and max (listed empty). */
+/** From fewer than 5 providers the amounts are listed (median null); from 5 providers on, min, median and max (listed empty). */
 export interface AmountSummary {
   count: number
   min: number
@@ -21,16 +21,16 @@ export interface OutOfNetworkGroup {
   feeTypeLabel: string
   places: PlaceRef[]
   modifiers: ModifierRef[]
-  /** In-network rates for this code are per unit; these amounts are for the whole service. */
+  /** In-network rates for this code are per unit; the files don't say how many units an out-of-network amount covers. */
   perUnitCode: boolean
-  /** Unique payments: distinct allowed amounts per tax ID and place. */
+  /** Different amounts listed: distinct allowed amounts per tax ID and place. Not a claim count; the files have none. */
   payments: number
   /** Tax IDs paid. */
   providers: number
   npis: number
   allowed: AmountSummary
   billed: AmountSummary | null
-  /** Median of billed ÷ allowed (4.81: providers usually billed about 4.8 times the allowed amount), from 5 pairs; null under 5. */
+  /** Median of billed ÷ allowed (4.81: providers usually billed about 4.8 times what the plan allowed), from 5 providers; null with fewer. */
   billedToAllowed: number | null
 }
 

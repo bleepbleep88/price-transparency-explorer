@@ -76,7 +76,7 @@ describe('lenses and out-of-network payments', () => {
     const wrapper = await mountLens('plans', oonResult([oonGroup(), LISTED_CT_READ]))
 
     expect(wrapper.get('[data-testid="lens-oon-line"]').text()).toBe(
-      'Out of network (Essential Plan · Facility fee · RC 0450), billed charges were usually about 4.8 times what the plan allowed, over 20 payments.',
+      'Out of network (Essential Plan · Facility fee · RC 0450), providers usually billed about 4.8 times what the plan allowed, across 20 different amounts listed.',
     )
   })
 
@@ -84,12 +84,12 @@ describe('lenses and out-of-network payments', () => {
     const without = await mountLens('providers', oonResult([oonGroup()]))
     const withNpi = await mountLens('providers', oonResult([oonGroup()]), { npi: '1801474036' })
 
-    const line = 'Providers outside the network usually billed about 4.8 times what the plan allowed them (Essential Plan · Facility fee, 20 payments).'
+    const line = 'Providers outside the network usually billed about 4.8 times what the plan allowed them (Essential Plan · Facility fee, 20 different amounts listed).'
     expect(without.get('[data-testid="lens-oon-line"]').text()).toBe(line)
     expect(withNpi.get('[data-testid="lens-oon-line"]').text()).toBe(line)
   })
 
-  it('no out-of-network payments, or none under the product filter: no line', async () => {
+  it('no out-of-network amounts, or none under the product filter: no line', async () => {
     const none = await mountLens('plans', oonResult([]))
     const filtered = await mountLens('plans', oonResult([oonGroup()]), { product: 'ambetter-from-fidelis-care' })
     const notLoaded = await mountLens('providers', null)
