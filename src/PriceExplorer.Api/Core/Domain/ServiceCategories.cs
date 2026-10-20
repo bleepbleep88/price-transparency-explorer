@@ -25,6 +25,20 @@ internal static class ServiceCategories
     private static readonly ServiceCategory Drugs = new(DrugsKey, "Drugs & biologicals", "per HCPCS unit (see the code's description)", true);
     private static readonly ServiceCategory Supplies = new("supplies", "Supplies & equipment", "per item or unit", true);
     private static readonly ServiceCategory Other = new("other", "Other services", "per service", false);
+    private static readonly ServiceCategory GCodes = new("medicare-g-codes", "Procedures & services (HCPCS G-codes)", "per service", false);
+    private static readonly ServiceCategory CommunityServices = new("community-services", "Behavioral health & community services", "per service or unit", false);
+    private static readonly ServiceCategory PrivatePayer = new("private-payer", "Private-payer service codes", "per service", false);
+    private static readonly ServiceCategory HospitalOutpatient = new("hospital-outpatient", "Hospital outpatient items (temporary codes)", "per item", true);
+
+    /// <summary>Every category key <see cref="Classify"/> can return.</summary>
+    public static readonly IReadOnlyList<string> Keys =
+    [
+        .. new[]
+        {
+            FacilityRevenueCode, Anesthesia, Surgery, Imaging, Lab, BehavioralHealth, Visits, Medicine, QualityMeasure, EmergingTech,
+            Drugs, Supplies, Other, GCodes, CommunityServices, PrivatePayer, HospitalOutpatient,
+        }.Select(category => category.Key),
+    ];
 
     /// <summary>Overrides the unit for settings that pay one all-inclusive amount per visit.</summary>
     public const string PerVisitAllInclusive = "per visit (all-inclusive)";
@@ -43,10 +57,10 @@ internal static class ServiceCategories
                 'J' => Drugs,
                 'Q' => TemporaryCode(code),
                 'A' or 'E' or 'K' or 'L' or 'B' => Supplies,
-                'G' => new ServiceCategory("medicare-g-codes", "Procedures & services (HCPCS G-codes)", "per service", false),
-                'H' or 'T' => new ServiceCategory("community-services", "Behavioral health & community services", "per service or unit", false),
-                'S' => new ServiceCategory("private-payer", "Private-payer service codes", "per service", false),
-                'C' => new ServiceCategory("hospital-outpatient", "Hospital outpatient items (temporary codes)", "per item", true),
+                'G' => GCodes,
+                'H' or 'T' => CommunityServices,
+                'S' => PrivatePayer,
+                'C' => HospitalOutpatient,
                 _ => Other,
             };
         }

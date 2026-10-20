@@ -138,7 +138,7 @@ public sealed class SuggestCodesHandler(DuckDbConnectionFactory connections, Cod
         if (request.Category is { } category)
         {
             var codes = (await SnapshotCodes.ListAsync(connection, snapshot.SnapshotId))
-                .Where(c => codeReference.PathOf(c.CodeType, c.Code).Any(level => level.Key == category))
+                .Where(c => codeReference.PathOf(c.CodeType, c.Code).Any(level => string.Equals(level.Key, category, StringComparison.OrdinalIgnoreCase)))
                 .Select(c => $"{c.CodeType}:{c.Code}")
                 .ToList();
             if (codes.Count == 0)
@@ -162,7 +162,7 @@ public sealed class SuggestCodesHandler(DuckDbConnectionFactory connections, Cod
                 : (CodeNames.Short(row.CmsName), CodeNames.Short(row.CmsName) == row.CmsName ? null : row.CmsName);
             return new CodeSuggestion(
                 row.CodeType, row.Code, name, description,
-                classification.Subcategory is null ? classification.Category : $"{classification.Category} · {classification.Subcategory}",
+                CodeReference.Label(classification),
                 pricing.Unit, row.Direct,
                 (row.RevenueCodes ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal).ToList(),
                 row.Rates);

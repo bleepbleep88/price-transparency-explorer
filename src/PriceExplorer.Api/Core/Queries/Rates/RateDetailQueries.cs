@@ -3,6 +3,7 @@ using MediatR;
 using PriceExplorer.Api.Core.Behaviors;
 using PriceExplorer.Api.Core.Domain;
 using PriceExplorer.Api.Core.Models.Rates;
+using PriceExplorer.Api.Core.Reference;
 
 namespace PriceExplorer.Api.Core.Queries.Rates;
 
@@ -106,7 +107,7 @@ public sealed class ListRateNpisQueryValidator : AbstractValidator<ListRateNpisQ
 
 public sealed class SuggestCodesQueryValidator : AbstractValidator<SuggestCodesQuery>
 {
-    public SuggestCodesQueryValidator()
+    public SuggestCodesQueryValidator(CodeReference codeReference)
     {
         RuleFor(query => query.Q)
             .Must(q => q is not null && q.Trim().Length is >= 1 and <= 60)
@@ -117,9 +118,12 @@ public sealed class SuggestCodesQueryValidator : AbstractValidator<SuggestCodesQ
             .When(query => query.Q is not null)
             .WithMessage("Search text can't contain control characters.");
         RuleFor(query => query.Category)
+            .Cascade(CascadeMode.Stop)
             .Must(category => category is { Length: >= 1 and <= 40 } && category.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'))
-            .When(query => query.Category is not null)
-            .WithMessage("Category is a key from /api/v1/categories, for example PG or PG004 (letters, digits and hyphens).");
+            .WithMessage("Category is a key from /api/v1/categories, for example PG or PG004 (letters, digits and hyphens).")
+            .Must(category => codeReference.IsKnownCategory(category!))
+            .WithMessage("That isn't a category key: use one from /api/v1/categories, for example P, PG or PG004.")
+            .When(query => query.Category is not null);
         RuleFor(query => query.Limit).InclusiveBetween(1, 50).WithMessage("Limit is between 1 and 50.");
         RuleFor(query => query.Snapshot).GreaterThan(0).When(query => query.Snapshot is not null).WithMessage("Snapshot id must be a positive number.");
     }

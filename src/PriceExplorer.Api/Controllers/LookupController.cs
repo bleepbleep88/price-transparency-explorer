@@ -19,8 +19,10 @@ public sealed class LookupController(ISender sender) : ControllerBase
     /// given; then, without it, the category's codes come most rates first.</param>
     /// <param name="snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
     /// <param name="limit">How many suggestions, 1 to 50.</param>
-    /// <param name="category">Optional category key from /api/v1/categories: an RBCS category (P), subcategory (PG) or family
-    /// (PG004), or a code-range category (facility).</param>
+    /// <param name="category">Optional category key from /api/v1/categories, in any letter case: an RBCS category (P),
+    /// subcategory (PG) or family (PG004, or PG000 for its codes with no family), or a code-range category (facility,
+    /// or code-ranges for all of them). These are a search result's classification keys, not its category (pricing)
+    /// keys. A key that isn't in the tree is a 400.</param>
     [HttpGet("codes")]
     [ProducesResponseType<IReadOnlyList<CodeSuggestion>>(StatusCodes.Status200OK, "application/json")]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]

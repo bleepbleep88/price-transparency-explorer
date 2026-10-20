@@ -38,13 +38,17 @@ public sealed class GetCategoriesHandler(DuckDbConnectionFactory connections, Co
         return new CategoryTree(new SnapshotRef(snapshot.SnapshotId, snapshot.IndexDate, snapshot.IsLatest), Ordered(roots));
     }
 
-    /// <summary>RBCS categories before code-range ones, then the most rates first.</summary>
+    /// <summary>
+    /// RBCS categories before the code-range root, then the most rates first. Children add up to their parent: codes CMS
+    /// gives no family sit in an "Other …" family, shown only when the subcategory has real families too.
+    /// </summary>
     private static List<CategoryNode> Ordered(Dictionary<string, Node> nodes) =>
         nodes.Values
             .OrderBy(node => node.Level.Source == CodeReference.RbcsSource ? 0 : 1)
             .ThenByDescending(node => node.Rates)
             .ThenBy(node => node.Level.Key, StringComparer.Ordinal)
-            .Select(node => new CategoryNode(node.Level.Key, node.Level.Label, node.Level.Source, node.Codes, node.Rates, Ordered(node.Children)))
+            .Select(node => new CategoryNode(node.Level.Key, node.Level.Label, node.Level.Source, node.Codes, node.Rates,
+                node.Children.Count == 1 && CodeReference.IsOtherFamily(node.Children.Values.Single().Level) ? [] : Ordered(node.Children)))
             .ToList();
 
     private sealed class Node(CategoryLevel level)

@@ -63,7 +63,7 @@ public sealed class SearchInputTests
     {
         _validator.TestValidate(new SearchRatesQuery("99213", Provider: "\0\0")).ShouldHaveValidationErrorFor(q => q.Provider);
         _validator.TestValidate(new SearchRatesQuery("99213", Provider: "a\0b")).ShouldHaveValidationErrorFor(q => q.Provider);
-        new SuggestCodesQueryValidator().TestValidate(new SuggestCodesQuery("\0")).ShouldHaveValidationErrorFor(q => q.Q);
+        new SuggestCodesQueryValidator(new PriceExplorer.Api.Core.Reference.CodeReference()).TestValidate(new SuggestCodesQuery("\0")).ShouldHaveValidationErrorFor(q => q.Q);
         new SuggestProvidersQueryValidator().TestValidate(new SuggestProvidersQuery("\0\0")).ShouldHaveValidationErrorFor(q => q.Q);
         new SuggestSpecialtiesQueryValidator().TestValidate(new SuggestSpecialtiesQuery("g\0")).ShouldHaveValidationErrorFor(q => q.Q);
         _validator.TestValidate(new SearchRatesQuery("99213", Specialty: "ga\0")).ShouldHaveValidationErrorFor(q => q.Specialty);

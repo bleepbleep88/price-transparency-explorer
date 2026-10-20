@@ -25,7 +25,9 @@ public sealed class GetLevelLadderHandler(DuckDbConnectionFactory connections, R
             .Where(fact => fact.CodeType == BillingCodes.Cpt)
             .ToList();
 
+        // A percentage of billed charges isn't a dollar amount, so it can't stand on a ladder of prices.
         var lines = RateSearchAssembler.Summarize(facts, catalog)
+            .Where(group => group.NegotiatedType != "percentage")
             .GroupBy(group => string.Join('|', group.ProductKey, group.CodeType, group.FeeType, group.SettingKey, group.Modifiers, group.NegotiatedType),
                 StringComparer.Ordinal)
             .Select(line => Line(line.Key, line.ToList(), family))

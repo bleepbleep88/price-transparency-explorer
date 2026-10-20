@@ -39,6 +39,9 @@ public sealed class CodeSetApiTests(CodeSetApiTests.Factory factory) : IClassFix
             Item("RC", "0636", "DRUGS REQUIRING DETAILED CODING", "[21]", Price(rate: "12.50", additionalInformation: "J2704")),
             // A facility rate under a revenue code alone, with no procedure code: RBCS has no class for it.
             Item("RC", "0450", "EMERGENCY ROOM", "[22]", Price(rate: "500.00", serviceCode: "[\"23\"]")),
+            // 80% of billed charges: not a dollar amount, so the ladder leaves it out.
+            Item("CPT", "99213", "OFFICE VISIT", "[23]",
+                Price(rate: "80", serviceCode: "[\"11\"]", billingClass: "professional").Replace("\"negotiated\"", "\"percentage\"", StringComparison.Ordinal)),
         ]);
 
     [Fact(Timeout = 60_000)]
@@ -97,10 +100,22 @@ public sealed class CodeSetApiTests(CodeSetApiTests.Factory factory) : IClassFix
             .GetProperty("children").EnumerateArray().Single(node => node.GetProperty("key").GetString() == "EV001");
         office.GetProperty("codes").GetInt32().Should().Be(4, "99212 to 99215 are in the synthetic file, 99214 in the real slice too");
 
-        // Codes RBCS doesn't list come after the RBCS categories, by their code range.
-        var sources = tree.Select(node => node.GetProperty("source").GetString()).ToList();
-        sources.LastIndexOf("cms_rbcs").Should().BeLessThan(sources.IndexOf("code_ranges"));
-        tree.Should().Contain(node => node.GetProperty("key").GetString() == "facility" && node.GetProperty("source").GetString() == "code_ranges");
+        // Codes RBCS doesn't list come last, under one root, by their code range.
+        var outside = tree[^1];
+        outside.GetProperty("key").GetString().Should().Be("code-ranges");
+        outside.GetProperty("label").GetString().Should().Be("Not in CMS's categories");
+        outside.GetProperty("children").EnumerateArray().Select(node => node.GetProperty("key").GetString()).Should().Contain("facility");
+        tree.Take(tree.Count - 1).Should().OnlyContain(node => node.GetProperty("source").GetString() == "cms_rbcs");
+
+        // Children add up to their parent: codes CMS gives no family sit in "Other …" beside the real families.
+        var injections = tree.Single(node => node.GetProperty("key").GetString() == "R").GetProperty("children").EnumerateArray()
+            .Single(node => node.GetProperty("key").GetString() == "RI");
+        var families = injections.GetProperty("children").EnumerateArray().ToList();
+        families.Sum(node => node.GetProperty("codes").GetInt32()).Should().Be(injections.GetProperty("codes").GetInt32());
+        families.Should().Contain(node => node.GetProperty("key").GetString() == "RI000"
+            && node.GetProperty("label").GetString() == "Other Injections and Infusions (nononcologic)");
+        // A subcategory with no families at all stays a leaf.
+        tree.Single(node => node.GetProperty("key").GetString() == "A").GetProperty("children")[0].GetProperty("children").GetArrayLength().Should().Be(0);
     }
 
     [Fact(Timeout = 60_000)]
@@ -116,10 +131,19 @@ public sealed class CodeSetApiTests(CodeSetApiTests.Factory factory) : IClassFix
         drugs.EnumerateArray().Select(code => code.GetProperty("code").GetString()).Should().Equal("J2704");
         drugs[0].GetProperty("name").GetString().Should().Be("Injection, propofol, 10 mg", "CMS's name is searchable too");
         none.GetArrayLength().Should().Be(0);
+
+        // Keys ignore letter case, and "Other …" families filter too.
+        (await GetAsync("/api/v1/codes?category=pg004&limit=50", ct)).EnumerateArray().Select(code => code.GetProperty("code").GetString())
+            .Should().Contain("45378");
+        (await GetAsync("/api/v1/codes?category=RI000", ct)).EnumerateArray().Select(code => code.GetProperty("code").GetString())
+            .Should().Equal("J2704");
+        (await GetAsync("/api/v1/codes?category=code-ranges", ct)).EnumerateArray().Select(code => code.GetProperty("code").GetString())
+            .Should().Contain("0450");
     }
 
     [Theory(Timeout = 60_000)]
     [InlineData("/api/v1/codes?category=P%20G")]
+    [InlineData("/api/v1/codes?category=ZZ")]
     [InlineData("/api/v1/codes")]
     [InlineData("/api/v1/rates/levels?code=45378")]
     [InlineData("/api/v1/rates/levels")]
@@ -146,12 +170,15 @@ public sealed class CodeSetApiTests(CodeSetApiTests.Factory factory) : IClassFix
         var line = ladder.GetProperty("lines")[0];
         line.GetProperty("key").GetString().Should().Be("essential-plan|CPT|professional|office||negotiated");
         line.GetProperty("settingLabel").GetString().Should().Be("Doctor's office");
+        ladder.GetProperty("lines").EnumerateArray().Should().NotContain(other => other.GetProperty("negotiatedType").GetString() == "percentage");
         var steps = line.GetProperty("levels").EnumerateArray().ToList();
         steps.Select(step => (step.GetProperty("level").GetInt32(), step.GetProperty("providerCount").GetInt32(), step.GetProperty("statsLevel").GetString()))
             .Should().Equal((2, 6, "basic"), (3, 6, "basic"), (4, 6, "basic"), (5, 2, "list"));
 
         // Each step is that level's search card, number for number.
         var search = await GetAsync("/api/v1/rates?code=99213", ct);
+        search.GetProperty("groups").EnumerateArray().Should().Contain(group => group.GetProperty("negotiatedType").GetString() == "percentage",
+            "the percentage card is there in search, just not on the ladder");
         var card = search.GetProperty("groups").EnumerateArray().Single(group => group.GetProperty("key").GetString() == steps[1].GetProperty("groupKey").GetString());
         steps[1].GetProperty("stats").GetRawText().Should().Be(card.GetProperty("stats").GetRawText());
         steps[1].GetProperty("stats").GetProperty("median").GetDecimal().Should().Be(85m);
@@ -180,7 +207,7 @@ public sealed class CodeSetApiTests(CodeSetApiTests.Factory factory) : IClassFix
             code.GetProperty("classification").GetProperty("source").GetString().Should().Be("code_ranges");
             code.GetProperty("classification").GetProperty("key").GetString().Should().Be("surgery");
             code.GetProperty("descriptionSource").GetString().Should().Be("payer_file");
-            tree.GetProperty("categories").EnumerateArray().Should().OnlyContain(node => node.GetProperty("source").GetString() == "code_ranges");
+            tree.GetProperty("categories").EnumerateArray().Select(node => node.GetProperty("key").GetString()).Should().Equal("code-ranges");
         }
         finally
         {
