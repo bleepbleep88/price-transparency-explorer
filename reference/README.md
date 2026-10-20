@@ -22,3 +22,19 @@ dotnet run --project tools/PriceExplorer.ReferenceBuilder -c Release -- provider
 ```
 
 Caveats: NPPES addresses are self-reported and can be stale or out of state; a provider's specialty is its primary taxonomy only; a deactivated NPI keeps only its number and dates (no name, type, specialty or place).
+
+## hcpcs_names.csv.gz
+
+`code`, `description`: the long name of every HCPCS Level II code (a letter and four digits, such as J0585) in CMS's newest quarterly HCPCS file (October 2026). The search shows it when the plan's file doesn't name the code itself. Public domain. Two kinds of names are left out on purpose: CPT codes (the AMA's descriptors, and not in this file anyway) and dental D codes (the American Dental Association's).
+
+## rbcs.csv.gz
+
+`code`, `rbcs_id`, `category_code`, `category`, `subcategory_code`, `subcategory`, `family_code`, `family`: CMS's Restructured BETOS Classification System (RBCS, RY2026) for every CPT and HCPCS code, one row per code (the assignment CMS marks as the latest; `family` is empty where CMS gives none). Codes and CMS's category names only, no code descriptors. Codes it doesn't cover (revenue codes, some new codes) fall back to the code-range rules in `ServiceCategories.cs`.
+
+Rebuild both (about 3 MB of downloads into `.data/reference-cache`; no database needed):
+
+```bash
+dotnet run --project tools/PriceExplorer.ReferenceBuilder -c Release -- codes
+```
+
+Each file's `.source.json` names the exact download and release.

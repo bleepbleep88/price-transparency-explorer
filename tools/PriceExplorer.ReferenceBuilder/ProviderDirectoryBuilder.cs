@@ -73,7 +73,7 @@ internal static partial class ProviderDirectoryBuilder
         return [.. await connection.QueryAsync<long>("SELECT DISTINCT npi FROM group_npis")];
     }
 
-    private static async Task<string> FindLinkAsync(HttpClient http, string page, Regex pattern, string baseUrl, CancellationToken cancellationToken)
+    internal static async Task<string> FindLinkAsync(HttpClient http, string page, Regex pattern, string baseUrl, CancellationToken cancellationToken)
     {
         var html = await http.GetStringAsync(page, cancellationToken);
         var match = pattern.Match(html);
@@ -86,7 +86,7 @@ internal static partial class ProviderDirectoryBuilder
     }
 
     /// <summary>Downloads into the cache once (resuming a partial file); later runs reuse it when the size still matches.</summary>
-    private static async Task<string> DownloadAsync(HttpClient http, string url, string cache, CancellationToken cancellationToken)
+    internal static async Task<string> DownloadAsync(HttpClient http, string url, string cache, CancellationToken cancellationToken)
     {
         var path = Path.Combine(cache, Path.GetFileName(new Uri(url).AbsolutePath));
         using var head = await http.SendAsync(new HttpRequestMessage(HttpMethod.Head, url), cancellationToken);
