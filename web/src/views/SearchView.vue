@@ -190,6 +190,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
       :rate-id="sourceRow?.firstRateId ?? null"
       :provider-name="sourceRow?.businessName"
       :provider-key="sourceRow?.providerKey ?? null"
+      :whole-tax-id-rate-id="sourceRow?.wholeTaxIdRateId ?? null"
     />
     <NpiDialog v-model="npiOpen" :row="npiRow" />
   </v-container>

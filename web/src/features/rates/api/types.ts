@@ -191,6 +191,8 @@ export interface RateRow {
   matched: boolean
   /** Every rate behind the row (a provider can have several in one group); the NPI list covers all of them. */
   rateIds: number[]
+  /** The whole-tax-ID contract behind `einLevel`, when it's a different rate than `firstRateId`; null otherwise. */
+  wholeTaxIdRateId: number | null
 }
 
 export interface RateRowsPage {

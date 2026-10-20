@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 import { mdiCheck, mdiClose, mdiContentCopy, mdiOpenInNew } from '@mdi/js'
 import { copyText } from '@/lib/clipboard'
@@ -8,12 +8,34 @@ import { ApiError } from '@/lib/apiClient'
 import { useRateSource } from '../composables/useRateQueries'
 
 const open = defineModel<boolean>({ required: true })
-const props = defineProps<{ rateId: number | null; providerName?: string; providerKey?: string | null }>()
+const props = defineProps<{
+  rateId: number | null
+  providerName?: string
+  providerKey?: string | null
+  /** The row's whole-tax-ID contract, when it's a different rate than `rateId`. */
+  wholeTaxIdRateId?: number | null
+}>()
 
 const { smAndDown } = useDisplay()
-// Which value was copied last; the check mark stays until another rate opens or the drawer closes (no timer).
-const copied = ref<'JSON path' | 'SHA-256' | null>(null)
+const heading = useTemplateRef<HTMLElement>('heading')
+
+// The rate on show: the row's own, or its whole-tax-ID contract after "Show that contract". Opening starts on the row's own.
+const shownRateId = ref<number | null>(props.rateId)
 watch([() => props.rateId, open], () => {
+  shownRateId.value = props.rateId
+})
+const showingWholeTaxId = computed(() => props.wholeTaxIdRateId != null && shownRateId.value === props.wholeTaxIdRateId)
+
+async function showRate(rateId: number | null) {
+  shownRateId.value = rateId
+  // The button just pressed goes away, so start again from the top of the drawer.
+  await nextTick()
+  heading.value?.focus()
+}
+
+// Which value was copied last; the check mark stays until another rate shows or the drawer closes (no timer).
+const copied = ref<'JSON path' | 'SHA-256' | null>(null)
+watch([shownRateId, open], () => {
   copied.value = null
 })
 
@@ -25,7 +47,7 @@ async function copyValue(value: string, what: 'JSON path' | 'SHA-256') {
 }
 // The row's provider is listed first, so it's visible even when a rate covers hundreds of provider groups.
 const source = useRateSource(
-  () => (open.value ? props.rateId : null),
+  () => (open.value ? shownRateId.value : null),
   () => props.providerKey ?? null,
 )
 
@@ -60,14 +82,18 @@ const comparisons = computed(() => {
   <v-navigation-drawer v-model="open" location="right" temporary :width="smAndDown ? 340 : 540" data-testid="source-drawer">
     <div class="d-flex align-center pa-4 pb-2">
       <div class="flex-grow-1">
-        <h2 class="text-title-large">Where this rate comes from</h2>
+        <h2 ref="heading" tabindex="-1" class="text-title-large">Where this rate comes from</h2>
         <p v-if="providerName" class="text-body-medium text-medium-emphasis">{{ providerName }}</p>
       </div>
       <v-btn :icon="mdiClose" variant="text" aria-label="Close" @click="open = false" />
     </div>
 
     <div class="px-4 pb-6 d-flex flex-column ga-4">
-      <v-skeleton-loader v-if="source.isPending.value && rateId != null" type="article, table" />
+      <div v-if="showingWholeTaxId" data-testid="whole-tax-id-shown">
+        <p class="text-body-medium">Showing the row's whole-tax-ID contract.</p>
+        <v-btn variant="text" size="small" class="px-0" @click="showRate(rateId)">Back to the row's rate</v-btn>
+      </div>
+      <v-skeleton-loader v-if="source.isPending.value && shownRateId != null" type="article, table" />
       <v-alert v-else-if="errorMessage" type="error" variant="tonal">{{ errorMessage }}</v-alert>
 
       <template v-else-if="data">
@@ -178,6 +204,10 @@ const comparisons = computed(() => {
               </template>
             </v-list-item>
           </v-list>
+          <div v-if="wholeTaxIdRateId != null && !showingWholeTaxId" class="mt-2" data-testid="whole-tax-id-contract">
+            <p class="text-body-medium">This row also includes a whole-tax-ID contract (no NPIs listed).</p>
+            <v-btn variant="text" size="small" class="px-0" @click="showRate(wholeTaxIdRateId)">Show that contract</v-btn>
+          </div>
         </section>
       </template>
     </div>
