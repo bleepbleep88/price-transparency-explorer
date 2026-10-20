@@ -116,6 +116,8 @@ public sealed record GroupTrend(string Key, string ProductKey, IReadOnlyList<Tre
 /// <param name="StatsLevel">list (fewer than 5 providers: no median), basic (5–9) or full (10+: p10 and p90 too).</param>
 /// <param name="Provider">The searched provider's rate here, as the card marks it (the first highlighted provider); null
 /// without an NPI, EIN or name filter, or when the provider has no rate in the group in this snapshot.</param>
+/// <param name="SincePrevious">How the providers moved since the previous complete file; null for the first complete
+/// file and for a partial one.</param>
 public sealed record TrendPoint(
     int SnapshotId,
     DateOnly? IndexDate,
@@ -129,7 +131,20 @@ public sealed record TrendPoint(
     decimal? P75,
     decimal? P90,
     decimal Max,
-    TrendProvider? Provider);
+    TrendProvider? Provider,
+    TrendStep? SincePrevious);
+
+/// <summary>
+/// The providers behind a group's move from the previous complete file (<paramref name="SinceSnapshotId"/>) to this one,
+/// one value per provider as the cards count them. When Raised and Lowered are 0, a move in the typical price comes only
+/// from which providers are listed.
+/// </summary>
+/// <param name="Stayed">Providers in both files.</param>
+/// <param name="Raised">Of those, the ones with a higher rate here.</param>
+/// <param name="Lowered">Of those, the ones with a lower rate here.</param>
+/// <param name="Left">Providers only in the previous file.</param>
+/// <param name="Joined">Providers only in this file.</param>
+public sealed record TrendStep(int SinceSnapshotId, int Stayed, int Raised, int Lowered, int Left, int Joined);
 
 /// <param name="Rate">The provider's rate in the group: an NPI's own rate with an NPI filter, as its search row shows.</param>
 public sealed record TrendProvider(string ProviderKey, string DisplayName, decimal Rate);

@@ -36,9 +36,9 @@ internal sealed class ExplorerExceptionHandler(
             };
         }
 
-        if (exception is IndexNotReadyException notReady)
+        if (exception is IRetryLater later)
         {
-            httpContext.Response.Headers.RetryAfter = notReady.RetryAfterSeconds.ToString(CultureInfo.InvariantCulture);
+            httpContext.Response.Headers.RetryAfter = later.RetryAfterSeconds.ToString(CultureInfo.InvariantCulture);
         }
 
         httpContext.Response.StatusCode = problem.Status ?? StatusCodes.Status500InternalServerError;

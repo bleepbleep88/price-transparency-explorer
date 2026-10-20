@@ -45,6 +45,14 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var fromState = (await SavedStatistics.StateAsync(connection, from.SnapshotId, transaction)).SingleOrDefault();
         var toState = (await SavedStatistics.StateAsync(connection, to.SnapshotId, transaction)).SingleOrDefault();
+
+        // Before a snapshot's first build its saved values are empty, which would read as every rate new or dropped.
+        var unbuilt = new[] { (from, fromState), (to, toState) }.Where(pair => pair.Item2?.BuiltAt is null).Select(pair => Name(pair.Item1)).ToList();
+        if (unbuilt.Count > 0)
+        {
+            throw new StatisticsNotReadyException(
+                $"The saved statistics for {string.Join(" and ", unbuilt)} aren't built yet. They're built once loading finishes.");
+        }
         var products = await ProductsAsync(connection, from, to, transaction);
         var compared = products
             .Where(entry => entry.Compared && (product is null || entry.ProductKey == product))

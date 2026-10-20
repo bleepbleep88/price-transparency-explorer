@@ -68,6 +68,32 @@ public sealed class HistoryLifecycleTests
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task Changes_wait_for_both_snapshots_statistics_with_a_503_to_try_later()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = Factory();
+        using var client = factory.CreateClient();
+        await factory.WaitForIngestionAsync(ct);
+
+        // As while August's statistics are being built: no build recorded and no saved values yet.
+        await using (var connection = await factory.Services.GetRequiredService<DuckDbConnectionFactory>().OpenAsync(ct))
+        {
+            const string august = "(SELECT snapshot_id FROM snapshots WHERE index_date = DATE '2026-08-31')";
+            await connection.ExecuteAsync($"DELETE FROM stats_builds WHERE snapshot_id = {august}");
+            await connection.ExecuteAsync($"DELETE FROM provider_values WHERE snapshot_id = {august}");
+            await connection.ExecuteAsync($"DELETE FROM group_stats WHERE snapshot_id = {august}");
+        }
+
+        using var response = await client.GetAsync("/api/v1/changes", ct);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        response.Headers.RetryAfter.Should().NotBeNull();
+        problem.GetProperty("code").GetString().Should().Be("statistics_building");
+        problem.GetRawText().Should().NotContain("\"counts\"", "no counts from empty tables");
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task A_product_whose_file_failed_to_load_is_left_out_of_changes_and_says_so()
     {
         var ct = TestContext.Current.CancellationToken;

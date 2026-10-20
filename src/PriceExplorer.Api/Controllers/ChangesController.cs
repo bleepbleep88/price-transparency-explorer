@@ -14,7 +14,7 @@ public sealed class ChangesController(ISender sender) : ControllerBase
     /// Rates that changed between two snapshots: the same provider (tax ID) in the same comparison group with a different
     /// rate, plus providers only in the newer file (new) or only in the older one (dropped). Products whose file looks
     /// partial in either snapshot are left out, and the response says why. A change means the file says something
-    /// different; it isn't a claim.
+    /// different; it isn't a claim. 503 statistics_building (with Retry-After) until both snapshots' statistics are built.
     /// </summary>
     [HttpGet]
     [ProducesResponseType<ChangesResult>(StatusCodes.Status200OK, "application/json")]

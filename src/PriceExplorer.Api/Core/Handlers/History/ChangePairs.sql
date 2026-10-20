@@ -3,9 +3,10 @@
 -- provider_group_id: the files renumber it every month. Only $products (comma-separated keys: those both snapshots have
 -- complete); $codes (comma-separated stored forms) and $codeType narrow to one code. A value is the provider's rate in the
 -- group, as its search row shows it. Changes smaller than $minChangePct (percent, up or down) drop out.
--- A new or dropped pair is listed_elsewhere when its provider has the same code and fee type in the other file under
--- another group: other modifiers or another setting (Centene reshuffles telehealth modifiers such as GQ and GT from
--- month to month). $listedElsewhere keeps only those (true) or leaves them out (false).
+-- A new pair is listed_elsewhere when the same provider also has a dropped pair with the same product, code and fee type
+-- (and a dropped pair when it has such a new one): the rate moved to other modifiers or another setting (Centene reshuffles
+-- telehealth modifiers such as GQ and GT from month to month). A provider that simply has another group in the other file,
+-- one it is still in, doesn't count. $listedElsewhere keeps only those (true) or leaves them out (false).
 -- ChangeCounts.sql and ChangeRows.sql each end this query with their own SELECT from shown.
 WITH older AS (
     SELECT *

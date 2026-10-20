@@ -37,7 +37,9 @@ WHERE s.kind <> 'unchanged'
        OR ($kind::VARCHAR = 'increased' AND s.kind = 'changed' AND s.to_value > s.from_value)
        OR ($kind::VARCHAR = 'decreased' AND s.kind = 'changed' AND s.to_value < s.from_value))
 ORDER BY
-    -- largest: the biggest moves first, then new and dropped rates, highest first.
+    -- largest: rates under a procedure code before facility charges filed under a revenue code alone (they state no unit,
+    -- so they aren't ranked with the rest); within each, the biggest moves first, then new and dropped rates, highest first.
+    CASE WHEN $sort = 'largest' THEN s.code_type = 'RC' END ASC,
     CASE WHEN $sort = 'largest' THEN abs(s.change_pct) END DESC NULLS LAST,
     CASE WHEN $sort = 'largest' THEN coalesce(s.to_value, s.from_value) END DESC,
     CASE WHEN $sort = '-changePct' THEN s.change_pct END DESC NULLS LAST,

@@ -291,6 +291,12 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
         Points(trend, EssentialColonoscopyAsc).Select(p => p.GetProperty("partial").GetBoolean())
             .Should().Equal([true, false, false], "July's Essential Plan file is a partial upload");
         Points(trend, AmbetterColonoscopyAsc).Should().OnlyContain(p => p.GetProperty("provider").ValueKind == JsonValueKind.Null);
+
+        // Who stayed, moved, left and joined from each complete file to the next (July's Essential Plan file is partial).
+        Points(trend, AmbetterColonoscopyAsc).Select(Step).Should().Equal(
+            "none", $"{ids[July]}: 6 stayed, 0 up, 0 down, 0 left, 0 joined", $"{ids[August]}: 4 stayed, 2 up, 1 down, 2 left, 1 joined");
+        Points(trend, EssentialColonoscopyAsc).Select(Step).Should().Equal(
+            "none", "none", $"{ids[August]}: 5 stayed, 1 up, 0 down, 0 left, 0 joined");
     }
 
     [Theory(Timeout = 60_000)]
@@ -388,6 +394,15 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
 
     private static List<JsonElement> Points(JsonElement trend, string key) =>
         Groups(trend).Single(group => group.GetProperty("key").GetString() == key).GetProperty("points").EnumerateArray().ToList();
+
+    private static string Step(JsonElement point)
+    {
+        var step = point.GetProperty("sincePrevious");
+        return step.ValueKind == JsonValueKind.Null
+            ? "none"
+            : $"{step.GetProperty("sinceSnapshotId").GetInt32()}: {step.GetProperty("stayed").GetInt32()} stayed, {step.GetProperty("raised").GetInt32()} up, " +
+              $"{step.GetProperty("lowered").GetInt32()} down, {step.GetProperty("left").GetInt32()} left, {step.GetProperty("joined").GetInt32()} joined";
+    }
 
     /// <summary>The provider's EIN as shown, or "masked".</summary>
     private static string Who(JsonElement row) =>

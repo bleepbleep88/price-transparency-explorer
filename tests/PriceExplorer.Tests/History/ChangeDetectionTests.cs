@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using PriceExplorer.Api.Configuration;
 using PriceExplorer.Api.Core.Data;
+using PriceExplorer.Api.Core.Exceptions;
 using PriceExplorer.Api.Core.Handlers.History;
 using PriceExplorer.Api.Core.Ingestion;
 using PriceExplorer.Api.Core.Models.History;
@@ -41,6 +42,9 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
             """);
         await FileAsync(August, Ambetter);
         await FileAsync(September, Ambetter);
+        // Both snapshots' statistics are built from these files; files a test adds later leave them built, not current.
+        await MarkStatisticsCurrentAsync(August);
+        await MarkStatisticsCurrentAsync(September);
     }
 
     public ValueTask DisposeAsync()
@@ -179,17 +183,58 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
     {
         await PairAsync(Colonoscopy, "111111111", 600m, 660m);
 
-        var unbuilt = await ChangesAsync(new GetChangesQuery());
-        await MarkStatisticsCurrentAsync(September);
-        var halfBuilt = await ChangesAsync(new GetChangesQuery());
+        var current = await ChangesAsync(new GetChangesQuery());
+        // As if the app was rebuilt since August's statistics: still built, no longer current.
+        await ExecuteAsync("UPDATE stats_builds SET code_version = 'an-older-app' WHERE snapshot_id = 1");
+        var halfCurrent = await ChangesAsync(new GetChangesQuery());
 
-        unbuilt.Current.Should().BeFalse();
-        unbuilt.To.StatisticsBuiltAt.Should().BeNull();
-        unbuilt.Rows.Items.Single().Should().Match<RateChange>(row => row.FromRateId == null && row.ToRateId == null);
-        halfBuilt.Current.Should().BeFalse("the older snapshot's statistics still aren't current");
-        halfBuilt.To.StatisticsCurrent.Should().BeTrue();
-        halfBuilt.From.StatisticsCurrent.Should().BeFalse();
-        halfBuilt.Rows.Items.Single().Should().Match<RateChange>(row => row.FromRateId == null && row.ToRateId != null);
+        current.Current.Should().BeTrue();
+        current.Rows.Items.Single().Should().Match<RateChange>(row => row.FromRateId != null && row.ToRateId != null);
+        halfCurrent.Current.Should().BeFalse("the older snapshot's statistics aren't current");
+        halfCurrent.To.StatisticsCurrent.Should().BeTrue();
+        halfCurrent.From.StatisticsCurrent.Should().BeFalse();
+        halfCurrent.Rows.Items.Single().Should().Match<RateChange>(row => row.FromRateId == null && row.ToRateId != null);
+    }
+
+    [Fact]
+    public async Task Until_both_snapshots_statistics_are_built_there_are_no_counts_only_a_503_to_try_later()
+    {
+        // While August's statistics are built, its saved values are empty: every September rate would read as new.
+        await ValueAsync(September, Colonoscopy, "111111111", 660m);
+        await ExecuteAsync("DELETE FROM stats_builds WHERE snapshot_id = 1");
+
+        var changes = () => ChangesAsync(new GetChangesQuery());
+
+        var problem = (await changes.Should().ThrowAsync<StatisticsNotReadyException>()).Which;
+        problem.Code.Should().Be("statistics_building");
+        problem.StatusCode.Should().Be(503);
+        problem.Message.Should().Be("The saved statistics for 2026-08-31 aren't built yet. They're built once loading finishes.");
+    }
+
+    [Fact]
+    public async Task The_biggest_moves_lead_with_procedure_codes_and_revenue_code_only_charges_follow()
+    {
+        // A facility charge filed under a revenue code alone states no unit, so it isn't ranked with procedure codes.
+        await PairAsync("ambetter|RC|0301|facility|hospital-outpatient||negotiated", "rc-only", 20m, 1667m, name: "RC only");
+        await PairAsync("ambetter|CPT|45378|facility|asc||negotiated", "cpt-small", 100m, 101m, name: "CPT small");
+        await PairAsync("ambetter|CPT|99213|professional|office||negotiated", "cpt-big", 100m, 150m, name: "CPT big");
+
+        var largest = await ChangesAsync(new GetChangesQuery());
+        var byPercent = await ChangesAsync(new GetChangesQuery(Sort: "-changePct"));
+
+        largest.Rows.Items.Select(row => row.ProviderKey).Should().Equal("cpt-big", "cpt-small", "rc-only");
+        byPercent.Rows.Items.Select(row => row.ProviderKey).Should().Equal(["rc-only", "cpt-big", "cpt-small"], "only the default order sets them apart");
+        largest.Counts.Changed.Should().Be(3, "revenue-code rows still count");
+    }
+
+    [Fact]
+    public void A_trend_step_counts_who_stayed_who_moved_and_who_came_or_went()
+    {
+        var before = new Dictionary<string, decimal> { ["a"] = 100m, ["b"] = 100m, ["c"] = 50m, ["gone"] = 10m };
+        var after = new Dictionary<string, decimal> { ["a"] = 110m, ["b"] = 100m, ["c"] = 40m, ["new1"] = 300m, ["new2"] = 300m };
+
+        GetRateTrendHandler.Step(7, before, after).Should().Be(new TrendStep(7, Stayed: 3, Raised: 1, Lowered: 1, Left: 1, Joined: 2));
+        GetRateTrendHandler.Step(7, before, before).Should().Be(new TrendStep(7, Stayed: 4, Raised: 0, Lowered: 0, Left: 0, Joined: 0));
     }
 
     [Theory]
