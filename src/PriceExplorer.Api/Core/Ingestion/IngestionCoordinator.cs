@@ -52,7 +52,9 @@ internal sealed class IngestionCoordinator(
 
         status.Update(s => s with { FilesTotal = indexes.Sum(index => index.InNetworkFiles.Count), FilesDone = 0 });
 
-        foreach (var index in indexes)
+        // Newest first: searches default to the newest snapshot, so on a first start it shows from its first saved file
+        // on, instead of an older month showing until the newest one finishes.
+        foreach (var index in indexes.OrderByDescending(index => index.Header.IndexDate ?? DateOnly.MinValue))
         {
             // Each snapshot is isolated: a failure here is reported and the next snapshot still loads.
             int? snapshotId = null;
