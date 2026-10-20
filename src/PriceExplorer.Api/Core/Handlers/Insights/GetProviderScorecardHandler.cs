@@ -97,7 +97,7 @@ internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connec
             ProductLabel: row.ProductLabel,
             CodeType: row.CodeType,
             Code: row.Code,
-            CodeName: InsightSupport.NameOf(names, row.CodeType, row.Code),
+            CodeName: InsightSupport.NameOf(names, catalog, row.CodeType, row.Code),
             CategoryKey: category.Key,
             CategoryLabel: category.Label,
             FeeType: row.FeeType,

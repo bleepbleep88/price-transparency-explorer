@@ -43,7 +43,8 @@ public sealed record GapRowsPage(int Total, int Page, int PageSize, IReadOnlyLis
 
 /// <summary>One comparison group on the leaderboard, with the statistics its search card shows.</summary>
 /// <param name="Rank">Position in the whole ranking (1 = largest), not just this page.</param>
-/// <param name="CodeName">The code's name as the plan's file publishes it; null when the file has none.</param>
+/// <param name="CodeName">The code's name as the plan's files publish it; for a revenue code, which the files never name,
+/// the short label search shows ("Operating room"); otherwise null. Scorecard groups and pairs name codes the same way.</param>
 /// <param name="LowerQuartileGap">Median − 25th percentile, per case or per unit (see <paramref name="Unit"/>).</param>
 /// <param name="Search">Query parameters for GET /api/v1/rates (and the search page) that open this group.</param>
 public sealed record GapRow(

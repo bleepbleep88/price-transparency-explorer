@@ -200,7 +200,7 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
             row.BusinessName,
             row.CodeType,
             row.Code,
-            InsightSupport.NameOf(names, row.CodeType, row.Code),
+            InsightSupport.NameOf(names, catalog, row.CodeType, row.Code),
             pair.Category.Key,
             pair.Category.Label,
             row.FeeType,

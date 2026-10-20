@@ -3,6 +3,7 @@ using System.Globalization;
 using Dapper;
 using DuckDB.NET.Data;
 using PriceExplorer.Api.Core.Data;
+using PriceExplorer.Api.Core.Domain;
 using PriceExplorer.Api.Core.Handlers.Rates;
 using PriceExplorer.Api.Core.Models.Insights;
 using PriceExplorer.Api.Core.Models.Rates;
@@ -47,8 +48,15 @@ internal static class InsightSupport
             .ToDictionary(row => (row.CodeType, row.Code), row => (row.Name ?? row.Description)!.Trim());
     }
 
-    public static string? NameOf(IReadOnlyDictionary<(string CodeType, string Code), string> names, string codeType, string code) =>
-        names.TryGetValue((codeType, code), out var name) ? name : null;
+    /// <summary>
+    /// What to call a code: its name in the plan's files, else for a revenue code (which the files never name) the short
+    /// label search shows ("Operating room"), else nothing.
+    /// </summary>
+    public static string? NameOf(
+        IReadOnlyDictionary<(string CodeType, string Code), string> names, ReferenceCatalog catalog, string codeType, string code) =>
+        names.TryGetValue((codeType, code), out var name) ? name
+        : codeType == BillingCodes.RevenueCode ? catalog.RevenueCodeLabel(code)
+        : null;
 
     public static IReadOnlyList<ModifierRef> Modifiers(string modifiers, ReferenceCatalog catalog) =>
         modifiers.Length == 0 ? [] : modifiers.Split(',').Select(code => new ModifierRef(code, catalog.Modifier(code).Label)).ToList();

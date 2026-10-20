@@ -23,7 +23,7 @@ public sealed class InsightsOnFixtureTests(ExplorerApiFactory factory) : IClassF
         var checkedGroups = 0;
         foreach (var provider in providers)
         {
-            var scorecard = await client.GetFromJsonAsync<JsonElement>($"/api/v1/insights/providers/{provider}", ct);
+            var scorecard = await client.GetFromJsonAsync<JsonElement>($"/api/v1/insights/scorecard?provider={Uri.EscapeDataString(provider)}", ct);
             scorecard.GetProperty("groups").GetArrayLength()
                 .Should().Be(saved.Groups.Count(group => group.Providers.Any(value => value.ProviderKey == provider)), provider);
 

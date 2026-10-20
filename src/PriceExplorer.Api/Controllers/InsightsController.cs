@@ -27,17 +27,16 @@ public sealed class InsightsController(ISender sender) : ControllerBase
 
     /// <summary>
     /// One provider (tax ID) across every comparison group it has a rate in: its rate, percentile and × median in each
-    /// (as a search with its EIN shows them), its highest and lowest against the median, and a price index.
+    /// (as a search with its EIN shows them), its highest and lowest against the median, and a price index. The provider
+    /// is a query parameter, like the EIN filter of search, so a full masked tax ID never lands in a request path or log.
     /// </summary>
-    /// <param name="provider">An EIN (11-3471596) or a provider key from results.</param>
-    /// <param name="snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
-    [HttpGet("providers/{provider}")]
+    [HttpGet("scorecard")]
     [ProducesResponseType<ProviderScorecard>(StatusCodes.Status200OK, "application/json")]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
-    public Task<ProviderScorecard> Scorecard(string provider, [FromQuery] int? snapshot, CancellationToken cancellationToken) =>
-        sender.Send(new GetProviderScorecardQuery(provider, snapshot), cancellationToken);
+    public Task<ProviderScorecard> Scorecard([FromQuery] GetProviderScorecardQuery query, CancellationToken cancellationToken) =>
+        sender.Send(query, cancellationToken);
 
     /// <summary>
     /// The same provider in the same comparison group under two products, as the ratio product ÷ versus: how the ratios

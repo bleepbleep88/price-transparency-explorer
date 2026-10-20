@@ -5,13 +5,13 @@ using static PriceExplorer.Tests.Insights.InsightFiles;
 
 namespace PriceExplorer.Tests.Insights;
 
-/// <summary>GET /api/v1/insights/providers/{provider} on the synthetic files (see <see cref="InsightFiles"/>).</summary>
+/// <summary>GET /api/v1/insights/scorecard?provider={provider} on the synthetic files (see <see cref="InsightFiles"/>).</summary>
 public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassFixture<InsightsApiFactory>
 {
     [Fact(Timeout = 60_000)]
     public async Task Each_group_shows_the_providers_rate_percentile_and_times_median()
     {
-        var scorecard = await GetAsync($"/api/v1/insights/providers/{Key(3)}", TestContext.Current.CancellationToken);
+        var scorecard = await GetAsync($"/api/v1/insights/scorecard?provider={Key(3)}", TestContext.Current.CancellationToken);
 
         // A03: Ambetter 99213 at 100 (2 below, 2 others at 100 among 11 others), 45378 at 500, J0585 at 3;
         // Essential Plan 99213 at 100 (the median; 4 below, M also at 100) and 45378 at 500 (the median of 5).
@@ -26,7 +26,7 @@ public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassF
     [Fact(Timeout = 60_000)]
     public async Task The_price_index_is_the_median_times_median_and_the_lowest_groups_come_first()
     {
-        var scorecard = await GetAsync($"/api/v1/insights/providers/{Key(3)}", TestContext.Current.CancellationToken);
+        var scorecard = await GetAsync($"/api/v1/insights/scorecard?provider={Key(3)}", TestContext.Current.CancellationToken);
 
         var index = scorecard.GetProperty("index");
         index.GetProperty("value").GetDecimal().Should().Be(0.87m, "the median of 0.55, 0.80, 0.87, 1.00 and 1.00");
@@ -41,7 +41,7 @@ public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassF
     [Fact(Timeout = 60_000)]
     public async Task Fewer_than_five_groups_with_a_median_give_no_index_and_the_highest_list_their_furthest_first()
     {
-        var scorecard = await GetAsync($"/api/v1/insights/providers/{Key(8)}", TestContext.Current.CancellationToken);
+        var scorecard = await GetAsync($"/api/v1/insights/scorecard?provider={Key(8)}", TestContext.Current.CancellationToken);
 
         var index = scorecard.GetProperty("index");
         index.GetProperty("value").ValueKind.Should().Be(JsonValueKind.Null);
@@ -54,8 +54,8 @@ public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassF
     [Fact(Timeout = 60_000)]
     public async Task The_provider_is_named_with_its_npis_products_and_whole_tax_id_contracts()
     {
-        var a03 = (await GetAsync($"/api/v1/insights/providers/{Key(3)}", TestContext.Current.CancellationToken)).GetProperty("provider");
-        var a02 = (await GetAsync($"/api/v1/insights/providers/21-0000002", TestContext.Current.CancellationToken)).GetProperty("provider");
+        var a03 = (await GetAsync($"/api/v1/insights/scorecard?provider={Key(3)}", TestContext.Current.CancellationToken)).GetProperty("provider");
+        var a02 = (await GetAsync($"/api/v1/insights/scorecard?provider=21-0000002", TestContext.Current.CancellationToken)).GetProperty("provider");
 
         a03.GetProperty("name").GetString().Should().Be("Clinic A03");
         a03.GetProperty("einDisplay").GetString().Should().Be("21-0000003");
@@ -73,7 +73,7 @@ public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassF
     {
         using var client = factory.CreateClient();
         await factory.WaitForIngestionAsync(TestContext.Current.CancellationToken);
-        using var response = await client.GetAsync($"/api/v1/insights/providers/{MaskedEin}", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync($"/api/v1/insights/scorecard?provider={MaskedEin}", TestContext.Current.CancellationToken);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -84,14 +84,14 @@ public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassF
         provider.GetProperty("ein").ValueKind.Should().Be(JsonValueKind.Null);
         provider.GetProperty("einMasked").GetBoolean().Should().BeTrue();
 
-        var byKey = await GetAsync($"/api/v1/insights/providers/{provider.GetProperty("providerKey").GetString()}", TestContext.Current.CancellationToken);
+        var byKey = await GetAsync($"/api/v1/insights/scorecard?provider={provider.GetProperty("providerKey").GetString()}", TestContext.Current.CancellationToken);
         byKey.GetProperty("groups").GetArrayLength().Should().Be(1);
     }
 
     [Fact(Timeout = 60_000)]
     public async Task A_tax_id_that_isnt_an_ein_is_found_by_its_key()
     {
-        var scorecard = await GetAsync($"/api/v1/insights/providers/{TypedKey}", TestContext.Current.CancellationToken);
+        var scorecard = await GetAsync($"/api/v1/insights/scorecard?provider={TypedKey}", TestContext.Current.CancellationToken);
 
         scorecard.GetProperty("provider").GetProperty("einDisplay").GetString().Should().Be("NPI 1234567893");
         Groups(scorecard).Should().ContainSingle().Which.Should().Be(("CPT", "99214", Ambetter, 170m, null, null, null));
@@ -103,7 +103,7 @@ public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassF
         using var client = factory.CreateClient();
         foreach (var provider in Enumerable.Range(1, 12).Select(Key).Append(TypedKey))
         {
-            var scorecard = await GetAsync($"/api/v1/insights/providers/{provider}", TestContext.Current.CancellationToken);
+            var scorecard = await GetAsync($"/api/v1/insights/scorecard?provider={Uri.EscapeDataString(provider)}", TestContext.Current.CancellationToken);
             foreach (var group in scorecard.GetProperty("groups").EnumerateArray())
             {
                 var link = group.GetProperty("search").Deserialize<Dictionary<string, string>>()!;
@@ -122,6 +122,19 @@ public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassF
         }
     }
 
+    [Fact(Timeout = 60_000)]
+    public async Task The_provider_is_required()
+    {
+        using var client = factory.CreateClient();
+        await factory.WaitForIngestionAsync(TestContext.Current.CancellationToken);
+
+        using var response = await client.GetAsync("/api/v1/insights/scorecard", TestContext.Current.CancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken))
+            .GetProperty("errors").TryGetProperty("provider", out _).Should().BeTrue();
+    }
+
     [Theory(Timeout = 60_000)]
     [InlineData("not-a-key", HttpStatusCode.BadRequest, "validation_failed")]
     [InlineData("12-345", HttpStatusCode.BadRequest, "validation_failed")]
@@ -131,7 +144,7 @@ public sealed class ProviderScorecardTests(InsightsApiFactory factory) : IClassF
         using var client = factory.CreateClient();
         await factory.WaitForIngestionAsync(TestContext.Current.CancellationToken);
 
-        using var response = await client.GetAsync($"/api/v1/insights/providers/{provider}", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync($"/api/v1/insights/scorecard?provider={Uri.EscapeDataString(provider)}", TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(status);
         (await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("code").GetString().Should().Be(code);

@@ -69,7 +69,7 @@ internal sealed class GetGapLeaderboardHandler(DuckDbConnectionFactory connectio
                 ProductLabel: group.ProductLabel,
                 CodeType: group.CodeType,
                 Code: group.Code,
-                CodeName: InsightSupport.NameOf(names, group.CodeType, group.Code),
+                CodeName: InsightSupport.NameOf(names, catalog, group.CodeType, group.Code),
                 CategoryKey: entry.Category.Key,
                 CategoryLabel: entry.Category.Label,
                 FeeType: group.FeeType,

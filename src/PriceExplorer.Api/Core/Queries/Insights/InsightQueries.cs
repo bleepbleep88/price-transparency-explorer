@@ -28,9 +28,9 @@ public sealed record GetGapLeaderboardQuery(
     int PageSize = 25) : IRequest<GapLeaderboard>, IRequiresData;
 
 /// <summary>One provider (tax ID) across every comparison group it has a rate in, with its price index.</summary>
-/// <param name="Provider">Required. An EIN or a provider key from results.</param>
+/// <param name="Provider">Required. An EIN (11-3471596) or a provider key from results.</param>
 /// <param name="Snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
-public sealed record GetProviderScorecardQuery(string? Provider, int? Snapshot = null) : IRequest<ProviderScorecard>, IRequiresData;
+public sealed record GetProviderScorecardQuery(string? Provider = null, int? Snapshot = null) : IRequest<ProviderScorecard>, IRequiresData;
 
 /// <summary>
 /// The same provider in the same comparison group under two products: product ÷ versus. Without products, the

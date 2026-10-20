@@ -28,7 +28,7 @@ public sealed class InsightsLifecycleTests
         }
 
         var gaps = await client.GetFromJsonAsync<JsonElement>("/api/v1/insights/gaps", ct);
-        var scorecard = await client.GetFromJsonAsync<JsonElement>("/api/v1/insights/providers/46-0857425", ct);
+        var scorecard = await client.GetFromJsonAsync<JsonElement>("/api/v1/insights/scorecard?provider=46-0857425", ct);
 
         foreach (var result in new[] { gaps, scorecard })
         {
@@ -76,7 +76,7 @@ public sealed class InsightsLifecycleTests
         await using var factory = ExplorerApiFactory.With(http => http.Hold(FixtureHttpHandler.AmbetterUrl));
         using var client = factory.CreateClient();
 
-        foreach (var url in new[] { "/api/v1/insights/gaps", "/api/v1/insights/providers/46-0857425", "/api/v1/insights/compare" })
+        foreach (var url in new[] { "/api/v1/insights/gaps", "/api/v1/insights/scorecard?provider=46-0857425", "/api/v1/insights/compare" })
         {
             using var response = await client.GetAsync(url, ct);
             response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, url);
@@ -94,8 +94,8 @@ public sealed class InsightsLifecycleTests
 
         Parameters(paths, "/api/v1/insights/gaps").Should().Contain(["product", "category", "setting", "feeType", "code", "sort", "page", "pageSize"]);
         Parameters(paths, "/api/v1/insights/compare").Should().Contain(["product", "versus", "code", "category", "setting", "sort"]);
-        Parameters(paths, "/api/v1/insights/providers/{provider}").Should().Contain(["provider", "snapshot"]);
-        foreach (var path in new[] { "/api/v1/insights/gaps", "/api/v1/insights/compare", "/api/v1/insights/providers/{provider}" })
+        Parameters(paths, "/api/v1/insights/scorecard").Should().Contain(["provider", "snapshot"]);
+        foreach (var path in new[] { "/api/v1/insights/gaps", "/api/v1/insights/compare", "/api/v1/insights/scorecard" })
         {
             Parameters(paths, path).Should().NotContain(name => char.IsUpper(name[0]), path);
             paths.GetProperty(path).GetProperty("get").GetProperty("responses").GetProperty("400").GetProperty("content")
