@@ -17,7 +17,7 @@ import type { RateRow } from '@/features/rates/api/types'
 import { useRateSearch, useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import { useSearchRoute } from '@/features/rates/composables/useSearchRoute'
 import { highlightHeading } from '@/features/rates/lib/lenses'
-import type { SortKey } from '@/features/rates/lib/searchParams'
+import type { QueryPatch, SortKey } from '@/features/rates/lib/searchParams'
 
 const { params, hasCode, urlErrors, canSearch, update, replace, startOver } = useSearchRoute()
 const search = useRateSearch(params, canSearch)
@@ -66,6 +66,15 @@ async function showGroup(groupKey: string) {
   await update({ group: groupKey })
   await nextTick()
   tableSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+/** A lens can pick a group (the plans lens's "highest rates in this group"): bring the table into view as a card does. */
+async function onLensUpdate(patch: QueryPatch) {
+  await update(patch)
+  if (patch.group) {
+    await nextTick()
+    tableSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 
 function onTableOptions(options: { page: number; pageSize: number; sort: SortKey }) {
@@ -130,7 +139,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
             v-if="result.groups.length"
             :result="result"
             :params="params"
-            @update="update"
+            @update="onLensUpdate"
             @cases="(cases) => replace({ cases })"
             @focus-npi="searchForm?.focusNpi()"
             @search="(code) => startOver(code)"

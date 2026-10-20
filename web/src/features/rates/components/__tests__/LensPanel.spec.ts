@@ -109,11 +109,18 @@ describe('LensPanel', () => {
     expect(wrapper.get('[data-testid="more-groups"]').text()).toBe('1 more group in the cards below.')
   })
 
-  it('plans: widest spread first, and one click sorts by the highest rate', async () => {
+  it('plans: widest spread first, and one click shows the highest rates in that group', async () => {
     const wrapper = mountPanel(result([group()]), { lens: 'plans' })
-    expect(wrapper.get('[data-testid="spread-line"]').text()).toContain('the median sits $123.86 above the lower quartile')
-    await wrapper.get('[data-testid="sort-highest"]').trigger('click')
-    expect(wrapper.emitted('update')).toEqual([[{ sort: '-rate', page: 1 }]])
+    expect(wrapper.get('[data-testid="spread-line"]').text()).toContain('the gap to the lower quartile is $123.86')
+    await wrapper.get('[data-testid="show-highest"]').trigger('click')
+    expect(wrapper.emitted('update')).toEqual([[{ group: 'ambetter|CPT|45378|facility|asc||negotiated', sort: '-rate', page: 1 }]])
+  })
+
+  it("plans: says so when no group's rates spread", () => {
+    const flat = group({ stats: { min: 7.94, p10: 7.94, p25: 7.94, median: 7.94, p75: 7.94, p90: 7.94, max: 7.94, spreadMultiple: 1, p90ToP10: 1 }, lowerQuartileGap: 0 })
+    const wrapper = mountPanel(result([flat]), { lens: 'plans' })
+    expect(wrapper.text()).toContain("Rates don't spread here")
+    expect(wrapper.find('[data-testid="spread-line"]').exists()).toBe(false)
   })
 
   it('employers: median and gap, and cases a year become a yearly figure for one named group', async () => {

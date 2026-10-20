@@ -203,15 +203,17 @@ describe('plans lens', () => {
     expect(lines.map((line) => line.providers)).toEqual([10, 8])
     expect(lines[0]!.highestToMedian).toBeCloseTo(9091.97 / 2762.15)
     expect(spreadText(lines[0]!)).toBe(
-      'The 90th percentile is 6.18× the 10th; the highest rate is 3.29× the median; the median sits $1,400.85 above the lower quartile.',
+      'The 90th percentile is 6.18× the 10th; the highest rate is 3.29× the median; the gap to the lower quartile is $1,400.85.',
     )
     expect(spreadText(lines[1]!)).toBe('The highest rate is 1.60× the median.')
   })
 
-  it('ranks the widest spread first, preferring groups with full statistics', () => {
+  it('ranks the widest spread first, listing only groups whose 90th percentile is above their 10th', () => {
     const narrow = { ...lines[0]!, groupKey: 'narrow', p90ToP10: 1.43, providers: 100 }
-    expect(widestSpread([narrow, lines[1]!, lines[0]!]).map((line) => line.groupKey)).toEqual([lines[0]!.groupKey, 'narrow'])
-    expect(widestSpread([lines[1]!])).toEqual([lines[1]])
+    const flat = { ...lines[0]!, groupKey: 'flat', p90ToP10: 1, highestToMedian: 1, providers: 51 }
+    expect(widestSpread([narrow, flat, lines[1]!, lines[0]!]).map((line) => line.groupKey)).toEqual([lines[0]!.groupKey, 'narrow'])
+    // Basic statistics have no 90th/10th percentile, so they aren't ranked.
+    expect(widestSpread([lines[1]!])).toEqual([])
   })
 })
 

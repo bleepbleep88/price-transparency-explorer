@@ -193,20 +193,19 @@ export function spreadLines(result: RateSearchResult): SpreadLine[] {
     }))
 }
 
-/** Widest first: by 90th-to-10th percentile where groups have full statistics, else by highest ÷ median. */
+/** Groups whose 90th percentile is above their 10th, widest first. A group where they're equal has no spread to show. */
 export function widestSpread(lines: SpreadLine[], count = 3): SpreadLine[] {
-  const full = lines.filter((line) => line.p90ToP10 != null)
-  const ranked = full.length
-    ? [...full].sort((a, b) => b.p90ToP10! - a.p90ToP10! || b.providers - a.providers)
-    : [...lines].sort((a, b) => b.highestToMedian - a.highestToMedian || b.providers - a.providers)
-  return ranked.slice(0, count)
+  return lines
+    .filter((line) => line.p90ToP10 != null && line.p90ToP10 > 1)
+    .sort((a, b) => b.p90ToP10! - a.p90ToP10! || b.providers - a.providers)
+    .slice(0, count)
 }
 
 export function spreadText(line: SpreadLine): string {
   const parts: string[] = []
   if (line.p90ToP10 != null) parts.push(`the 90th percentile is ${times(line.p90ToP10)} the 10th`)
   parts.push(`the highest rate is ${times(line.highestToMedian)} the median`)
-  if (line.gap) parts.push(`the median sits ${money(line.gap)} above the lower quartile`)
+  if (line.gap) parts.push(`the gap to the lower quartile is ${money(line.gap)}`)
   return sentence(parts)
 }
 
