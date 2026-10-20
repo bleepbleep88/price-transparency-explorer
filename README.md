@@ -14,7 +14,7 @@ One neutral explorer, with a "start here" card and a short "what this means for 
 |---|---|
 | Providers | Where does my rate sit against other providers for the same service and setting, and how has it moved? |
 | Health plans | Where are prices spread widest, which rates are outliers, and what changed since the last file? |
-| Employers | What does a service typically cost, how far above the lower quartile is a typical rate, and how is the median moving? |
+| Employers | What does a service typically cost, how much less do lower-priced providers get, and is the typical price moving? |
 | Innovators | How clean is this data, and can I trace and build on every number? |
 | Life sciences | What does a drug or device cost per unit, by site of care? |
 
@@ -90,17 +90,25 @@ Rates are compared only like for like. A **comparison group** is:
 
 product × code × fee type (facility or professional) × care setting × modifiers × rate type
 
-Each provider (tax ID) counts once per group. If it has several rates in one group, the one that counts is the NPI-weighted median: the rate in the middle of its clinicians. That is always a rate someone is really paid, never an average of two. The row shows the range. The statistics shown depend on group size:
+Each provider (tax ID) counts once per group. If it has several rates in one group, the one that counts is the NPI-weighted median: the rate in the middle of its clinicians. That is always a rate someone is really paid, never an average of two. The row shows the range.
 
-| Providers in group | Shown |
-|---|---|
-| under 5 | the rates themselves |
-| 5–9 | median and range |
-| 10 or more | percentiles (10th–90th), spread, and the **gap to the lower quartile** = median − 25th percentile |
+### Plain numbers
 
-The gap to the lower quartile is how far a typical rate sits above the cheapest quarter of providers. Plans and employers read it as room to steer care; providers read it as negotiating context. The files have no claim counts, so it is never multiplied into a total unless you enter a number of cases yourself.
+The people who read these pages aren't statisticians, so no page says percentile, median, quartile, "×" or index. Each figure is said in plain words, and a page makes only claims the files support. The API keeps the precise fields for anyone building on it. All the wording lives in one place, `web/src/lib/plainNumbers.ts`, which has its own tests. The end-to-end tests load every kind of page on the real data and fail if one shows a statistics word.
 
-Filtering by NPI, EIN, name, specialty or location narrows the rows to the matching providers' rates (an NPI search shows that NPI's own rate), but the statistics stay market-wide. So a provider is shown as "17th percentile, 0.92× median" against everyone else. Providers paid the same rate count half in a percentile, so a provider paid the fee-schedule rate most of its group gets sits near the middle, not at the bottom. Care settings come from CMS place-of-service codes. Hospital outpatient (POS 19 and 22) is one setting. Clinics, and telehealth at home versus elsewhere, each have their own.
+| On the page | What it is | Needs |
+|---|---|---|
+| "Only 3 providers: too few to compare." | each price listed, nothing compared or ranked | under 5 providers |
+| "Typical price: $578" | the median | 5 providers |
+| "Prices run from $185 to $205." | lowest to highest | 5–9 providers |
+| "Most providers get between $372 and $664." | 10th to 90th percentile | 10 providers |
+| "The lower-priced quarter of providers get $454 or less: $124 less than typical." | 25th percentile, and median − 25th percentile (`lowerQuartileGap`) | 10 providers |
+| "Lower than most · $23 less than typical", "About typical", "Higher than most" | at or below the 25th percentile, within 5% of typical, at or above the 75th; always with dollars, worked out from the figures as shown so they add up | 5 providers |
+| "about 2.4 times the typical price" | a ratio, said as "times" only from 2×; below that, dollars | |
+
+Plans and employers read the lower-priced quarter as room to steer care. Providers read it as negotiating context. It is never called savings. The files have no claim counts, so it is never multiplied into a total unless you enter a number of cases yourself. Each page says once that these are negotiated rates, not what a person pays.
+
+Filtering by NPI, EIN, name, specialty or location narrows the rows to the matching providers' rates (an NPI search shows that NPI's own rate), but the statistics stay market-wide. So a provider is shown as "Lower than most · $23 less than typical" against everyone else. A provider paid the fee-schedule rate that most of its group gets reads "About typical", not "Lower than most". Care settings come from CMS place-of-service codes. Hospital outpatient (POS 19 and 22) is one setting. Clinics, and telehealth at home versus elsewhere, each have their own.
 
 ## Extra: who is behind each rate
 
@@ -115,7 +123,7 @@ The rate files list bare NPIs. `reference/provider_directory.csv.gz` (1.9 MB) gi
 Three monthly files are loaded. The snapshot picker in the app bar switches every page to another month, and the choice stays in the URL.
 
 - **Changes** (`/changes`): the same provider (tax ID) in the same comparison group, between two files. The page says a rate went up or down (in dollars and percent), is new (only in the newer file) or is gone (only in the older one); the API calls these changed, new and dropped. Providers are matched on their tax ID key, never on `provider_group_id`, which the payer renumbers every month. A change means the file lists a different rate: a provider whose rates are the same, with only the NPI counts behind them moved, is unchanged. It isn't a claim, and the files don't say how often a service is used.
-- **Facility charges with no procedure named** (filed under a revenue code alone) are left out of the order and the counts unless the switch the insights pages use adds them (decision 89): hospitals bundle different services under them, so they don't compare like for like. The switch shows how many the other filters match. Added, they come after the rest in the default order.
+- **Facility charges with no procedure named** (filed under a revenue code alone) are left out of the order and the counts unless the switch the insights pages use adds them: hospitals bundle different services under them, so they don't compare like for like. The switch shows how many the other filters match. Added, they come after the rest in the default order.
 - **Not before the numbers are saved**: changes read each month's saved statistics. Until both months' are built and current (after loading, or after a file or the app changed), the API answers `current: false` with a message and no counts or rows, and the page and the plans lens say they show once loading finishes.
 - **Listed differently**: a quarter (July to August) to two fifths (August to September) of new and dropped rates are the same provider and code under other modifiers or another setting. Centene reshuffles telehealth modifiers (`95,GQ,GT` becomes `95,GT`). These are marked, and a switch hides them.
 - **Trends**: each group card draws its typical price (the median) across the files, the range most providers get (10th to 90th percentile, from 10 providers) and, with an NPI or EIN, that provider's own rate, with the same numbers in words, worked out from the figures as the card shows them. With three files each one is named, so the file on screen is never skipped ("The typical price was $573 (Jul 27), $578 (Aug 31) and $569 (Sep 28)."). The line leads with the providers listed in both files, so a move that only reflects who is listed is never worded as a price change: "Of the 37 providers listed in the Aug 31 and Sep 28 files, all kept the same rate. 87 left and 39 joined, so the typical price on this card was $51.45 (Jul 27), $51.45 (Aug 31) and $114 (Sep 28)." Otherwise it says how many got a higher or a lower rate, then how the typical price moved. The chart's tooltip and the employers lens line follow the same rule. A card names the provider it follows ("Heel Sole Podiatry PC's rate ..."); only the providers lens says "your rate". The trend runs the search itself in each month, so every point equals that month's card.
@@ -127,6 +135,23 @@ Three monthly files are loaded. The snapshot picker in the app bar switches ever
 | 2026-08-31 and 2026-09-28 | 3,899 (1,960, 1,939) | 14,632 (5,858) | 16,776 (5,856) | 41,196 |
 
 These include facility charges with no procedure named (3,335 and 3,816 of the changed, new and dropped rows), which the page leaves out by default. Counts are of provider values: one per provider per comparison group. When a provider has several rates in a group, its value is their NPI-weighted median, so it also moves when a rate is added or removed; the changes page marks those rows. Same rates with only the NPI counts moved (11 and 33 pairs) are unchanged.
+
+## Insights across codes
+
+Three pages read each month's saved statistics, so they look across every code at once instead of searching one code at a time. Each says which month it describes and whether its numbers are up to date. Until the statistics are built, it says the numbers will fill in once loading finishes.
+
+- **Where prices differ most** (`/insights/gaps`): cards with 10 or more providers, ordered by how much less the lower-priced quarter get than typical, or by the widest price range in dollars.
+  - On the 2026-08-31 files, 1,043 cards have 10+ providers.
+  - In 727 of them the lower-priced quarter get the typical price, mostly because they are fee schedules. The page says how many it leaves out instead of ranking a $0 difference.
+  - 125 are facility charges with no procedure named.
+  - That leaves 191 to rank.
+- **Provider scorecard** (`/providers/:key`, found from `/providers`): one tax ID in every card it is in, each placed exactly as a search with its EIN places it.
+  - With 5 or more shared services, an overall line: "Usually about 8% more than typical (across 26 services)".
+  - Lists of the services where it is lower or higher than most.
+  - A masked tax ID can be found by its full number, but only its key comes back.
+- **Plan comparison** (`/insights/compare`): the same provider in the same card under both plans. "The same" means exactly the same rate. Of the 7,951 provider-and-service pairs priced under both plans, 5,979 are paid exactly the same. Pairs priced in different units are left out and counted.
+- Facility charges with no procedure named are left out of every reading and order by default. A switch adds them and shows how many it adds.
+- On the real files, scorecard and comparison numbers were checked against search: 60 providers' scorecards, 150 ranked cards and 120 pairs each equal their searches.
 
 ## Extra: what each code is, visit levels and drug doses
 
@@ -146,6 +171,9 @@ Two more small CMS files ship in `reference/` (built by the same tool, see `refe
 | `GET /api/v1/rates?code=&npi=&ein=&provider=&specialty=&county=&product=&setting=&feeType=&group=&sort=&page=&pageSize=&snapshot=` | Comparison groups, provider rows, and hints that explain empty or surprising results. Every hint link is checked to find rates before it's sent. |
 | `GET /api/v1/rates/{id}/source` · `/npis?provider=&alsoRate=` | Where a rate came from; the NPIs behind a result row, each with its rate |
 | `GET /api/v1/codes?q=&category=` · `/providers?q=` · `/specialties?q=` · `/reference` | Typeahead and filter options (including New York counties and the registry release) |
+| `GET /api/v1/insights/gaps?product=&category=&setting=&feeType=&code=&includeFacilityCharges=&sort=&snapshot=&page=&pageSize=` | Groups with 10+ providers, ranked by how much less the lower-priced quarter get, or by range |
+| `GET /api/v1/insights/scorecard?provider=&includeFacilityCharges=&snapshot=` | One tax ID (EIN or provider key) in every comparison group it is in, with its overall reading |
+| `GET /api/v1/insights/compare?product=&versus=&code=&category=&setting=&includeFacilityCharges=&sort=&snapshot=&page=&pageSize=` | The same provider in the same group under two plans |
 | `GET /api/v1/categories` · `/rates/levels?code=` | Category tree (CMS RBCS, with code-range fallback) with code and rate counts; each visit level, like for like |
 | `GET /api/v1/status` · `/status/stream` | Loading progress (the stream uses server-sent events) |
 | `GET /api/v1/snapshots` · `/snapshots/{id}/plans` | Loaded files, their sources and counts, and how complete each looks; plans per product |
@@ -167,11 +195,23 @@ Two more small CMS files ship in `reference/` (built by the same tool, see `refe
 
 - **% of Medicare** for each rate, the benchmark plans, employers and providers all use. The comparison groups and units are already in place.
 - **CMS schema 3.0.** Network-level files arrive quarterly from April 2027 under the October 2026 final rule.
-- More payers and indexes. The parser already handles gzip, string numbers, either key order and inline provider groups.
+- **More payers and indexes.** The parser already handles gzip, string numbers, either key order and inline provider groups. With two payers, the plan comparison would work across payers as it does across plans.
+- **A cost for a whole procedure**: facility, doctor and anesthesia units together. Codes, units and settings are already modeled; it needs a rule for which codes go together.
+- **CSV export** of each insights page, and saved searches.
+- **Refresh without a restart.** Each file is already saved in one transaction, so a scheduled re-check of the index could load a new month while the app keeps serving.
+- **Inpatient (DRG) and employer-plan files**, which these Centene files don't include.
 
 ## Built with AI
 
 This was built with Claude Code. I made the scope, data-handling and metric decisions; the AI wrote most of the code and tests. Every PR had to pass CI. Each core PR also went through adversarial reviews on the real files: independent reviewers recomputed every number from the database and followed every hint link, and an issue counted only if a second check reproduced it. The search API took six rounds (12, 17, 23, 34, 15 and 9 confirmed issues, the last two rounds with nothing high-severity). Those reviews caught real problems: an NPI search showing the tax ID's blended rate, masked tax IDs that could be reversed from their keys, a surgery center's Botox charge shown as a per-unit price, and hints that pointed to empty pages. Each now has a test.
+
+Each extra (provider directory, plain numbers, sources and out-of-network, insights, price history, categories and doses) had one independent review on the real files, and every confirmed issue was fixed before it merged. The reviews caught:
+- a typical price that moved only because providers joined or left, worded as a price change;
+- a dose priced from the rate for discarded drug (JW);
+- "the same" said of rates that weren't;
+- facility charges ranked against procedures.
+
+I added the plain-numbers rule after the core was built, because the people who use this aren't statisticians.
 
 ## Notice
 
