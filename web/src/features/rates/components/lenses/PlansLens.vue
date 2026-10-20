@@ -4,6 +4,7 @@ import { plural } from '@/lib/format'
 import { typicalLine } from '@/lib/plainNumbers'
 import type { OutOfNetworkResult } from '@/features/out-of-network/api/types'
 import { plansLensLine, visibleGroups } from '@/features/out-of-network/lib/outOfNetworkText'
+import { compareLink, gapsLink, hasRankedGroup } from '@/features/insights/lib/insightLinks'
 import type { RateSearchResult } from '../../api/types'
 import { hasProviderFilter, spreadLines, spreadText, widestSpread } from '../../lib/lenses'
 import type { QueryPatch, SearchParams } from '../../lib/searchParams'
@@ -15,6 +16,8 @@ const lines = computed(() => spreadLines(props.result))
 const varying = computed(() => widestSpread(lines.value, lines.value.length))
 const widest = computed(() => varying.value.slice(0, 3))
 const outOfNetworkLine = computed(() => plansLensLine(visibleGroups(props.outOfNetwork, props.params)))
+const ranked = computed(() => hasRankedGroup(props.result))
+const compare = computed(() => compareLink(props.result))
 
 // The spread line describes everyone in the group, so its highest rates are shown for everyone, not only the filtered providers.
 function showHighest(groupKey: string) {
@@ -56,5 +59,13 @@ function showHighest(groupKey: string) {
       </p>
     </template>
     <p v-if="outOfNetworkLine" class="text-body-medium" data-testid="lens-oon-line">{{ outOfNetworkLine }}</p>
+    <div class="d-flex flex-wrap ga-2">
+      <v-btn :to="gapsLink(result, 'range')" variant="text" color="primary" class="px-1" data-testid="lens-gaps-link">
+        {{ ranked ? 'See how widely prices range for this code' : 'See where prices range widest' }}
+      </v-btn>
+      <v-btn v-if="compare" :to="compare" variant="text" color="primary" class="px-1" data-testid="lens-compare-link">
+        Compare the two plans for this code
+      </v-btn>
+    </div>
   </div>
 </template>

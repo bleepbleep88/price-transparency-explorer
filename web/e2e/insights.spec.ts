@@ -1,0 +1,78 @@
+import { expect, test, type Page } from '@playwright/test'
+
+// Runs against the real API and data, like search.spec.ts. See playwright.config.ts for E2E_BASE_URL.
+
+// Decision 89: the insights pages speak plain numbers, never statistics jargon.
+async function expectPlainWords(page: Page) {
+  await expect(page.locator('main')).not.toContainText(/percentile|median|quartile|×|÷|price index/i)
+}
+
+test('plans and employers lenses open the leaderboard and the comparison for their code, and both lead back to search', async ({ page }) => {
+  // Employers: the code's ranked groups, then one of them in search with the same typical price.
+  await page.goto('/?code=45378&lens=employers')
+  await page.getByTestId('lens-panel').getByTestId('lens-gaps-link').click()
+  await expect(page).toHaveURL(/\/insights\/gaps\?code=CPT(\+|%20)45378(&|$)/)
+  await expect(page.getByRole('heading', { name: 'Where prices differ most' })).toBeVisible()
+  await expect(page.getByTestId('gaps-note')).toContainText("don't say how often a service happens")
+  await expectPlainWords(page)
+  // "Times" only from twice, and nothing ranked without a difference.
+  await expect(page.locator('main')).not.toContainText(/about 1(\.\d)? times|\$0\.00 less than typical/)
+
+  const ranked = page.getByTestId('gap-row').first()
+  await expect(ranked).toContainText('CPT 45378')
+  const typical = await ranked.getByTestId('gap-typical').innerText()
+  await ranked.getByTestId('gap-search').click()
+  await expect(page).toHaveURL(/[?&]group=/)
+  const picked = page.getByTestId('group-card').filter({ hasText: 'Showing these providers' })
+  await expect(picked).toContainText(typical)
+
+  // A stale page number says it's past the end and offers the way back.
+  await page.goto('/insights/gaps?page=99')
+  await expect(page.getByTestId('gaps-no-data')).toContainText('past the end')
+  await page.getByTestId('gaps-first-page').click()
+  await expect(page.getByTestId('gap-row').first()).toBeVisible()
+
+  // Plans: the comparison of the two products for the same code.
+  await page.goto('/?code=45378&lens=plans')
+  await page.getByTestId('lens-panel').getByTestId('lens-compare-link').click()
+  await expect(page).toHaveURL(/\/insights\/compare\?code=CPT(\+|%20)45378(&|$)/)
+  await expect(page.getByTestId('compare-same')).toContainText(/Pays the same as .+\d+%\d[\d,]* of [\d,]+/)
+  await expect(page.getByTestId('ratio-chart').locator('svg')).toBeVisible()
+  await expect(page.getByTestId('ratio-band')).toHaveCount(10)
+  await expectPlainWords(page)
+
+  // An amount opens the search that shows exactly that rate.
+  const pair = page.getByTestId('compare-pair').first()
+  const amount = (await pair.getByTestId('pair-product-value').innerText()).replace(/ per unit$/, '').trim()
+  await pair.getByTestId('pair-product-value').click()
+  await expect(page).toHaveURL(/[?&]ein=/)
+  await expect(page.getByTestId('row-rate')).toHaveText(amount)
+})
+
+test("an EIN's providers lens opens its scorecard, and a scorecard row reads as the search it opens", async ({ page }) => {
+  await page.goto('/?code=99213')
+  const rows = page.getByTestId('provider-row')
+  await expect(rows.first()).toBeVisible()
+  // A provider with a real tax ID: masked ones can't be typed back in.
+  const provider = rows.filter({ hasNotText: 'Unverified tax ID' }).first()
+  const ein = (await provider.getByTestId('row-ein').innerText()).replace(/^EIN\s+/, '').trim()
+  expect(ein).toMatch(/^\d{2}-\d{7}$/)
+
+  await page.goto(`/?code=99213&ein=${ein}&lens=providers`)
+  await page.getByTestId('scorecard-link').click()
+  await expect(page).toHaveURL(new RegExp(`/providers/${ein.replace('-', '')}$`))
+  await expect(page.getByTestId('scorecard-ein')).toHaveText(`EIN ${ein}`)
+  await expect(page.getByTestId('scorecard-overall')).toBeVisible()
+  await expectPlainWords(page)
+  await expect(page.getByTestId('nav-providers')).toHaveAttribute('aria-current', 'page')
+
+  // The scorecard's row for 99213 shows the price the search for 99213 with this EIN shows.
+  await page.getByRole('textbox', { name: 'Filter by code, name, plan or setting' }).fill('99213')
+  // The table's filter lives in the address, so a reload or a shared link keeps it.
+  await expect(page).toHaveURL(/[?&]q=99213(&|$)/)
+  const row = page.getByTestId('scorecard-row').filter({ hasText: 'CPT 99213' }).first()
+  const rate = await row.getByTestId('scorecard-rate').innerText()
+  await row.getByTestId('scorecard-search').click()
+  await expect(page).toHaveURL(/[?&]group=/)
+  await expect(page.getByTestId('row-rate')).toHaveText(rate)
+})

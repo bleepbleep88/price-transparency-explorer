@@ -67,6 +67,14 @@ internal static partial class ProviderKeys
     /// <summary>A provider key or EIN as <see cref="TryNormalizeEinFilter"/> reads it; null when blank or invalid.</summary>
     public static string? NormalizeKey(string? input) => TryNormalizeEinFilter(input, out var value) ? value : null;
 
+    /// <summary>How results show a tax ID: 11-3471596, ••-•••4567 when masked, or the type and value of one that isn't an EIN.</summary>
+    public static string Display(string providerKey, string? ein, bool einUnverified) => ein switch
+    {
+        null => providerKey.Replace(":", " ", StringComparison.Ordinal).ToUpperInvariant(),
+        _ when einUnverified => Ein.Mask(ein),
+        _ => Ein.Format(ein),
+    };
+
     [GeneratedRegex("^[uU][0-9a-fA-F]{12}$")]
     private static partial Regex OpaqueKey();
 
