@@ -6,9 +6,9 @@ using PriceExplorer.Api.Core.Data;
 namespace PriceExplorer.Api.Core.Ingestion;
 
 /// <summary>
-/// Runs the whole load: read each configured index, then download → parse → save every in-network file it lists, then
-/// rebuild the statistics of each snapshot whose saved statistics aren't current. One file failing never stops the
-/// others, and data from earlier runs stays queryable throughout.
+/// Runs the whole load: read each configured index, then download → parse → save every in-network file it lists and
+/// then its out-of-network allowed-amount files, then rebuild the statistics of each snapshot whose saved statistics
+/// aren't current. One file failing never stops the others, and data from earlier runs stays queryable throughout.
 /// </summary>
 internal sealed class IngestionCoordinator(
     IOptions<IngestionOptions> options,
@@ -16,6 +16,7 @@ internal sealed class IngestionCoordinator(
     FileDownloader downloader,
     DuckDbIngestionWriter writer,
     SnapshotStatisticsBuilder statistics,
+    AllowedAmountLoader allowedAmounts,
     IngestionStatus status,
     ILogger<IngestionCoordinator> logger)
 {
@@ -65,6 +66,12 @@ internal sealed class IngestionCoordinator(
                 {
                     var available = await LoadFileAsync(snapshotId.Value, index, file, cancellationToken);
                     status.Update(s => s with { FilesDone = s.FilesDone + 1, DataAvailable = s.DataAvailable || available });
+                }
+
+                // Extras after the rate files: they never count toward the snapshot's status or the rate-file progress.
+                foreach (var file in index.AllowedAmountFiles)
+                {
+                    await allowedAmounts.LoadAsync(snapshotId.Value, index, file, cancellationToken);
                 }
 
                 snapshotError = null;

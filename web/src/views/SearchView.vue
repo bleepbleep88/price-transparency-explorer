@@ -13,6 +13,9 @@ import ResultSummary from '@/features/rates/components/ResultSummary.vue'
 import SearchForm from '@/features/rates/components/SearchForm.vue'
 import SourceDrawer from '@/features/rates/components/SourceDrawer.vue'
 import StartHere from '@/features/rates/components/StartHere.vue'
+import OutOfNetworkPanel from '@/features/out-of-network/components/OutOfNetworkPanel.vue'
+import { useOutOfNetwork } from '@/features/out-of-network/composables/useOutOfNetwork'
+import { visibleGroups } from '@/features/out-of-network/lib/outOfNetworkText'
 import type { RateRow } from '@/features/rates/api/types'
 import { useRateSearch, useReferenceLists, useSnapshots } from '@/features/rates/composables/useRateQueries'
 import { useSearchRoute } from '@/features/rates/composables/useSearchRoute'
@@ -22,6 +25,7 @@ import type { QueryPatch, SortKey } from '@/features/rates/lib/searchParams'
 
 const { params, hasCode, urlErrors, canSearch, update, replace, startOver } = useSearchRoute()
 const search = useRateSearch(params, canSearch)
+const outOfNetwork = useOutOfNetwork(params, canSearch)
 const snapshots = useSnapshots()
 const reference = useReferenceLists()
 
@@ -39,6 +43,9 @@ const fieldErrors = computed(() => ({
   ...(apiError.value?.status === 400 ? apiError.value.fieldErrors : {}),
 }))
 const result = computed(() => (search.isError.value ? undefined : search.data.value))
+// The searched code's out-of-network amounts under the same product and fee type filters; none, no panel.
+const outOfNetworkResult = computed(() => outOfNetwork.data.value ?? null)
+const showOutOfNetwork = computed(() => visibleGroups(outOfNetworkResult.value, params.value).length > 0)
 
 const announcement = computed(() =>
   result.value
@@ -146,6 +153,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
             v-if="result.groups.length"
             :result="result"
             :params="params"
+            :out-of-network="outOfNetworkResult"
             @update="onLensUpdate"
             @cases="(cases) => replace({ cases })"
             @focus-npi="searchForm?.focusNpi()"
@@ -165,6 +173,8 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
               />
             </v-col>
           </v-row>
+
+          <OutOfNetworkPanel v-if="showOutOfNetwork && outOfNetworkResult" :result="outOfNetworkResult" :params="params" />
 
           <section v-if="result.groups.length" ref="tableSection" aria-labelledby="providers-heading">
             <div class="d-flex flex-wrap align-center ga-2 mb-2">

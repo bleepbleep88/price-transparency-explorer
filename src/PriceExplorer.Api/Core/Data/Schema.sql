@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS structure_files (
 CREATE TABLE IF NOT EXISTS source_files (
     file_id               INTEGER PRIMARY KEY,
     snapshot_id           INTEGER NOT NULL,
-    kind                  VARCHAR NOT NULL, -- in_network
+    kind                  VARCHAR NOT NULL, -- in_network | allowed_amount (out-of-network allowed amounts)
     structure_index       INTEGER NOT NULL,
     product_key           VARCHAR NOT NULL,
     product_label         VARCHAR NOT NULL,
@@ -62,8 +62,8 @@ CREATE TABLE IF NOT EXISTS source_files (
     file_schema_version   VARCHAR,
     reporting_entity_name VARCHAR,
     items                 INTEGER,
-    prices_raw            BIGINT,
-    rates_unique          INTEGER,
+    prices_raw            BIGINT,           -- published prices (allowed_amount files: published payments)
+    rates_unique          INTEGER,          -- unique rates (allowed_amount files: unique payments)
     duplicates_removed    BIGINT,
     provider_references   INTEGER,
     provider_groups       INTEGER,
@@ -71,9 +71,9 @@ CREATE TABLE IF NOT EXISTS source_files (
     distinct_eins         INTEGER,
     invalid_npis          INTEGER,
     ein_level_groups      INTEGER,
-    unverified_ein_groups INTEGER,
+    unverified_ein_groups INTEGER,          -- allowed_amount files: tax ID entries (allowed_amounts[]) with such an EIN
     dangling_references   INTEGER,
-    rejected_prices       BIGINT,
+    rejected_prices       BIGINT,           -- allowed_amount files: rejected payments
     download_ms           INTEGER,
     parse_ms              INTEGER,
     loaded_at             TIMESTAMP,
@@ -155,7 +155,56 @@ CREATE TABLE IF NOT EXISTS ingestion_rejects (
     file_id INTEGER NOT NULL,
     reason  VARCHAR NOT NULL,
     count   BIGINT NOT NULL,
-    example VARCHAR
+    example VARCHAR          -- the first one seen, as published (the API masks tax ID values)
+);
+
+-- Out-of-network allowed amounts (allowed_amount files): what the plan allowed when it paid providers outside its
+-- network. Plans list a provider and service only with 20 or more claims in a 90-day window, and each distinct amount
+-- once, with no claim count. One row per out_of_network[] item: a billing code and the name it was published under.
+CREATE TABLE IF NOT EXISTS oon_items (
+    file_id           INTEGER NOT NULL,
+    item_idx          INTEGER NOT NULL,  -- position in out_of_network[]
+    billing_code_type VARCHAR NOT NULL,
+    billing_code      VARCHAR NOT NULL,  -- standard form (RC 0450, CPT 00812)
+    billing_code_raw  VARCHAR NOT NULL,  -- as published (450, 812)
+    name              VARCHAR,
+    description       VARCHAR,
+    payments          INTEGER NOT NULL   -- payments published under this item, before duplicates collapse
+);
+
+-- Unique payments: one allowed amount for one code, tax ID, place(s) of service and claim form, with its providers.
+-- Revenue-code items repeat the same payments under unrelated names, so identical ones collapse (occurrences).
+CREATE TABLE IF NOT EXISTS oon_payments (
+    payment_id        BIGINT PRIMARY KEY, -- (file_id << 32) | sequence, like rate_id
+    file_id           INTEGER NOT NULL,
+    billing_code_type VARCHAR NOT NULL,
+    billing_code      VARCHAR NOT NULL,   -- standard form
+    billing_code_raw  VARCHAR NOT NULL,   -- as published
+    tin_type          VARCHAR NOT NULL,   -- ein | npi
+    tin_value         VARCHAR NOT NULL,   -- as published (an EIN written as a number lacks its leading zero)
+    ein               VARCHAR,            -- 9 digits, leading zero restored; NULL when not an EIN
+    ein_unverified    BOOLEAN NOT NULL,   -- IRS never issues this prefix
+    provider_key      VARCHAR NOT NULL,   -- same rule as provider_groups.provider_key (ProviderKeys.For)
+    service_codes     VARCHAR NOT NULL,   -- place-of-service codes, sorted, comma-separated; '' = not stated
+    billing_class     VARCHAR NOT NULL,   -- institutional | professional
+    modifiers         VARCHAR NOT NULL,   -- sorted, comma-separated; '' = none
+    allowed_amount    DECIMAL(18, 4) NOT NULL,
+    occurrences       INTEGER NOT NULL,   -- published copies collapsed into this one
+    item_label_count  INTEGER NOT NULL,
+    item_labels       VARCHAR,            -- up to 3 item names, ' | ' separated
+    item_index        INTEGER NOT NULL,   -- JSON path of the first copy:
+    allowed_index     INTEGER NOT NULL,   -- out_of_network[item_index].allowed_amounts[allowed_index]
+    payment_index     INTEGER NOT NULL    --   .payments[payment_index]
+);
+
+-- The providers on each payment. A provider entry with several NPIs has one row per NPI, all with its billed charge, so
+-- billed charges count once per (payment_id, provider_idx); an entry with no NPIs has one row with npi NULL.
+CREATE TABLE IF NOT EXISTS oon_providers (
+    payment_id    BIGINT NOT NULL,
+    provider_idx  INTEGER NOT NULL,       -- position in payments[].providers[]
+    billed_charge DECIMAL(18, 4),         -- NULL when not a positive number
+    npi           BIGINT,
+    npi_valid     BOOLEAN
 );
 
 -- Saved statistics: what GET /api/v1/rates shows with no provider filter, for every code of a snapshot, so history and

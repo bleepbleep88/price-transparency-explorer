@@ -10,6 +10,12 @@ const router = createRouter({
       meta: { title: 'Search rates' },
     },
     {
+      path: '/sources',
+      name: 'sources',
+      component: () => import('@/views/SourcesView.vue'),
+      meta: { title: 'Sources and data quality' },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('@/views/NotFoundView.vue'),

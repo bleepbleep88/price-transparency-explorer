@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { plural } from '@/lib/format'
+import type { OutOfNetworkResult } from '@/features/out-of-network/api/types'
+import { providersLensLine, visibleGroups } from '@/features/out-of-network/lib/outOfNetworkText'
 import type { RateSearchResult } from '../../api/types'
 import { hasProviderFilter, pinsProvider, yourRateGroups, type YourRateGroup } from '../../lib/lenses'
+import type { SearchParams } from '../../lib/searchParams'
 
-const props = defineProps<{ result: RateSearchResult }>()
+const props = defineProps<{ result: RateSearchResult; params?: SearchParams; outOfNetwork?: OutOfNetworkResult | null }>()
 const emit = defineEmits<{ focusNpi: [] }>()
 
 const SHOWN_LINES = 8
 const filtered = computed(() => hasProviderFilter(props.result))
 const pinned = computed(() => pinsProvider(props.result))
 const groups = computed(() => yourRateGroups(props.result))
+const outOfNetworkLine = computed(() => providersLensLine(visibleGroups(props.outOfNetwork, props.params ?? {})))
 // Whole groups, up to about eight lines, so a group's lines and its "showing 5 of 12" note stay together.
 const shownGroups = computed(() => {
   const shown: YourRateGroup[] = []
@@ -53,5 +57,6 @@ const moreGroups = computed(() => groups.value.length - shownGroups.value.length
         Enter your NPI
       </v-btn>
     </template>
+    <p v-if="outOfNetworkLine" class="text-body-medium" data-testid="lens-oon-line">{{ outOfNetworkLine }}</p>
   </div>
 </template>

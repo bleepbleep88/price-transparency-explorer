@@ -13,6 +13,8 @@ public sealed class FixtureHttpHandler : HttpMessageHandler
     public const string IndexUrl = BaseUrl + "2026-08-31_fidelis_index.json";
     public const string AmbetterUrl = BaseUrl + "2026-08-31_fidelis-ex_in-network.json";
     public const string EssentialUrl = BaseUrl + "2026-08-31_fidelis-es_in-network.json";
+    public const string AmbetterAllowedUrl = BaseUrl + "2026-08-31_fidelis-ex_allowed-amounts.json";
+    public const string EssentialAllowedUrl = BaseUrl + "2026-08-31_fidelis-es_allowed-amounts.json";
 
     private readonly ConcurrentDictionary<string, Func<HttpRequestMessage, HttpResponseMessage>> _routes = new(StringComparer.OrdinalIgnoreCase);
 
@@ -21,6 +23,8 @@ public sealed class FixtureHttpHandler : HttpMessageHandler
         ServeFixture(IndexUrl, "2026-08-31_fidelis_index.json");
         ServeFixture(AmbetterUrl, "2026-08-31_fidelis-ex_in-network.json");
         ServeFixture(EssentialUrl, "2026-08-31_fidelis-es_in-network.json");
+        ServeFixture(AmbetterAllowedUrl, "2026-08-31_fidelis-ex_allowed-amounts.json");
+        ServeFixture(EssentialAllowedUrl, "2026-08-31_fidelis-es_allowed-amounts.json");
     }
 
     /// <summary>Every request seen: URL and whether it was a conditional (If-None-Match) re-check.</summary>
@@ -59,12 +63,20 @@ public sealed class FixtureHttpHandler : HttpMessageHandler
     /// <summary>Requests to this URL hang until the test ends, so the app stays in its "still loading" state.</summary>
     public void Hold(string url) => _held[url] = true;
 
+    /// <summary>Completes when the app first requests this URL, so a test can act at that point without polling.</summary>
+    public Task WhenRequested(string url) => Requested(url).Task;
+
     private readonly ConcurrentDictionary<string, bool> _held = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, TaskCompletionSource> _requested = new(StringComparer.OrdinalIgnoreCase);
+
+    private TaskCompletionSource Requested(string url) =>
+        _requested.GetOrAdd(url, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var url = request.RequestUri!.ToString();
         Requests.Enqueue((url, request.Headers.IfNoneMatch.Count > 0));
+        Requested(url).TrySetResult();
 
         if (_held.ContainsKey(url))
         {

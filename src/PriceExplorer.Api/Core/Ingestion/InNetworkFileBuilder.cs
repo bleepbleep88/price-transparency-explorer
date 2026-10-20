@@ -385,20 +385,25 @@ internal sealed class InNetworkFileBuilder
         var places = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var raw in serviceCodes)
         {
-            var value = (raw ?? "").Trim().ToUpperInvariant();
-            if (value.Length == 0)
+            var value = NormalizePlace(raw);
+            if (value.Length > 0)
             {
-                continue;
+                places.Add(Intern(value));
             }
-
-            // Place-of-service codes are two digits; "2" written as a number becomes "02".
-            places.Add(Intern(value.Length == 1 && char.IsAsciiDigit(value[0]) ? "0" + value : value));
         }
 
         return [.. places];
     }
 
-    private static string NormalizeModifiers(List<string?>? modifiers)
+    /// <summary>Place-of-service codes are two digits; "2" written as a number becomes "02". "" when blank.</summary>
+    internal static string NormalizePlace(string? raw)
+    {
+        var value = (raw ?? "").Trim().ToUpperInvariant();
+        return value.Length == 1 && char.IsAsciiDigit(value[0]) ? "0" + value : value;
+    }
+
+    /// <summary>Sorted, upper-case, comma-separated; "" when there are none.</summary>
+    internal static string NormalizeModifiers(List<string?>? modifiers)
     {
         if (modifiers is null || modifiers.Count == 0)
         {

@@ -38,7 +38,8 @@ async function copyUrl() {
     </div>
     <p class="text-body-medium">
       Every row links to its source: the magnifier in the Source column shows the file, the code and rate as published, the
-      JSON path to the exact price, and the file's SHA-256.
+      JSON path to the exact price, and the file's SHA-256. The sources page lists every file, how it was cleaned and what
+      was set aside.
     </p>
     <div>
       <p class="text-body-small text-medium-emphasis mb-1">This search as an API request</p>
@@ -57,6 +58,9 @@ async function copyUrl() {
       <p class="d-sr-only" role="status" data-testid="copy-status">{{ copied ? 'Copied the API request' : '' }}</p>
     </div>
     <div class="d-flex flex-wrap ga-2">
+      <v-btn :to="{ name: 'sources' }" variant="tonal" color="primary" size="small" data-testid="lens-sources-link">
+        Sources and data quality
+      </v-btn>
       <v-btn
         v-for="link in API_REFERENCE_LINKS"
         :key="link.href"

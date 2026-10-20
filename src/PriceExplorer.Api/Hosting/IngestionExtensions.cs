@@ -24,6 +24,8 @@ internal static class IngestionExtensions
         services.AddSingleton<SnapshotStatisticsBuilder>();
         services.AddSingleton<FileDownloader>();
         services.AddSingleton<TableOfContentsReader>();
+        services.AddSingleton<AllowedAmountWriter>();
+        services.AddSingleton<AllowedAmountLoader>();
         services.AddSingleton<IngestionCoordinator>();
         services.AddHostedService<IngestionService>();
 
