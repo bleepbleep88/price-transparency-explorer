@@ -149,7 +149,7 @@ public sealed class ProviderDirectoryApiTests(ExplorerApiFactory factory) : ICla
 
         rows.Should().NotBeEmpty().And.OnlyContain(row => row.GetProperty("profile").GetProperty("locations")[0].GetString() == "Manhattan, NY");
         outsideNyc.Should().NotBeEmpty().And.OnlyContain(row =>
-            row.GetProperty("profile").GetProperty("locations")[0].GetString()!.EndsWith(", NY · Ulster County", StringComparison.Ordinal));
+            row.GetProperty("profile").GetProperty("locations")[0].GetString()!.EndsWith(", NY (Ulster County)", StringComparison.Ordinal));
     }
 
     [Fact(Timeout = 60_000)]
@@ -200,6 +200,8 @@ public sealed class ProviderDirectoryApiTests(ExplorerApiFactory factory) : ICla
             .Should().BeEquivalentTo(["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]);
         reference.GetProperty("locations").EnumerateArray().Select(l => l.GetProperty("label").GetString())
             .Should().Contain("Monroe").And.HaveCount(62, "New York has 62 counties, five of them the boroughs");
+        var brooklyn = reference.GetProperty("locations").EnumerateArray().Single(l => l.GetProperty("label").GetString() == "Brooklyn");
+        brooklyn.GetProperty("county").GetString().Should().Be("Kings County", "the picker finds a borough by its county name too");
     }
 
     [Fact(Timeout = 60_000)]

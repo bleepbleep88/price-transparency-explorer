@@ -4,7 +4,7 @@
 -- handler. Per row: one 'totals' line (NPIs; how many the directory has; active individuals; deactivated; active imaging
 -- readers and cardiologists, for the imaging flag), then one line per specialty and per place, with their NPI counts. Matches marks the specialties and places that meet the search's
 -- specialty and location filters, so they can be listed first. Places read "Manhattan, NY" in New York City and
--- "Rome, NY · Oneida County" elsewhere, so a county filter visibly matches.
+-- "Rome, NY (Oneida County)" elsewhere, so a county filter visibly matches.
 WITH page(row_index, provider_key, rate_id) AS (
     VALUES {rows}
 ),
@@ -62,7 +62,7 @@ SELECT
     CAST(row_index AS BIGINT),
     'place',
     CASE WHEN coalesce(borough, '') <> '' THEN borough || ', NY'
-         WHEN coalesce(county, '') <> '' THEN city || ', ' || state || ' · ' || county
+         WHEN coalesce(county, '') <> '' THEN city || ', ' || state || ' (' || county || ')'
          ELSE city || ', ' || state END,
     NULL, count(*), 0, 0, 0, 0, 0, bool_or(matches_county)
 FROM described

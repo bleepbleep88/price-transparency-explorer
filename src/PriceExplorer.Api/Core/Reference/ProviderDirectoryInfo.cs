@@ -12,6 +12,7 @@ namespace PriceExplorer.Api.Core.Reference;
 public sealed partial class ProviderDirectoryInfo
 {
     private volatile DirectorySource? _source;
+    private volatile IReadOnlyList<LocationOption> _locations = [];
 
     /// <summary>Null until a directory loads, and when the file is missing or unreadable.</summary>
     public DirectorySource? Source => _source;
@@ -19,7 +20,14 @@ public sealed partial class ProviderDirectoryInfo
     /// <summary>A directory with at least one NPI is loaded, so rows can say who is behind them.</summary>
     public bool IsLoaded => _source is { NpisLoaded: > 0 };
 
-    internal void Set(DirectorySource? source) => _source = source;
+    /// <summary>New York counties and NYC boroughs in the directory, for the location filter (Locations.sql). Empty until it loads.</summary>
+    public IReadOnlyList<LocationOption> Locations => _locations;
+
+    internal void Set(DirectorySource? source, IReadOnlyList<LocationOption>? locations = null)
+    {
+        _locations = locations ?? [];
+        _source = source;
+    }
 
     /// <summary>
     /// A loaded directory of <paramref name="npisLoaded"/> NPIs, described by the source file next to it. Without a

@@ -3,6 +3,7 @@ using DuckDB.NET.Data;
 using Microsoft.Extensions.Options;
 using PriceExplorer.Api.Configuration;
 using PriceExplorer.Api.Core.Data;
+using PriceExplorer.Api.Core.Models.Rates;
 
 namespace PriceExplorer.Api.Core.Reference;
 
@@ -38,7 +39,9 @@ internal sealed class ReferenceDataLoader(
                     SELECT * FROM read_csv('{path.Replace("'", "''", StringComparison.Ordinal)}', header = true, columns = {DirectoryColumns})
                     """);
                 var count = await connection.ExecuteScalarAsync<long>("SELECT count(*) FROM provider_directory");
-                directoryInfo.Set(ProviderDirectoryInfo.Describe(SourcePathFor(path), count));
+                // The locations list can't change until the next startup, so it's read once here.
+                var locations = (await connection.QueryAsync<LocationOption>(SqlFile.For<ReferenceDataLoader>("Locations.sql"))).ToList();
+                directoryInfo.Set(ProviderDirectoryInfo.Describe(SourcePathFor(path), count), locations);
                 logger.LogInformation("Reference: provider directory loaded ({Count} NPIs) from {Path}", count, path);
             }
             catch (DuckDBException ex)

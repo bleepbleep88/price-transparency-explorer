@@ -103,8 +103,9 @@ public sealed record DirectorySource(string? Release, DateTimeOffset? BuiltAt, l
 /// <summary>A New York county or NYC borough where NPIs in the files practice.</summary>
 /// <param name="Label">What the location filter accepts: "Manhattan", "Monroe".</param>
 /// <param name="Npis">NPIs practicing there.</param>
-public sealed record LocationOption(string Label, bool IsBorough, long Npis);
+/// <param name="County">The county's own name, which the filter accepts too: "Kings County" for Brooklyn, "Monroe County".</param>
+public sealed record LocationOption(string Label, bool IsBorough, long Npis, string County);
 
-/// <param name="Group">The NUCC grouping, e.g. "Allopathic &amp; Osteopathic Physicians".</param>
+/// <param name="Group">The NUCC grouping, e.g. "Hospitals" or "Ambulatory Health Care Facilities".</param>
 /// <param name="Npis">NPIs in the files with this specialty.</param>
 public sealed record SpecialtySuggestion(string Specialty, string? Group, long Npis);

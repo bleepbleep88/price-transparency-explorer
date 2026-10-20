@@ -103,6 +103,10 @@ public sealed class ApiContractTests(ExplorerApiFactory factory) : IClassFixture
 
         document.GetProperty("paths").GetProperty("/api/v1/snapshots/{snapshotId}/plans").GetProperty("get")
             .GetProperty("responses").TryGetProperty("400", out _).Should().BeTrue();
+
+        // The XML-comment generator copies entities as written, so doc comments must not use them.
+        document.GetRawText().Should().NotContain("&amp;").And.NotContain("&lt;").And.NotContain("&gt;");
+        search.GetProperty("summary").GetString().Should().Contain("specialty").And.Contain("New York county");
     }
 
     private async Task<HttpResponseMessage> GetAsync(string url, CancellationToken ct, string accept = "application/json")

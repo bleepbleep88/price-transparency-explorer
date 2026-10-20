@@ -176,7 +176,7 @@ public sealed record RateRow(
 /// <param name="Individuals">Active NPIs registered to individual clinicians; the others are organizations or deactivated.</param>
 /// <param name="Deactivated">NPIs deactivated in the registry.</param>
 /// <param name="Specialties">Each specialty with its NPI count: those matching the specialty filter first, then the most NPIs.</param>
-/// <param name="Locations">Up to 3 practice places ("Manhattan, NY", "Rome, NY · Oneida County"): those in the filtered
+/// <param name="Locations">Up to 3 practice places ("Manhattan, NY", "Rome, NY (Oneida County)"): those in the filtered
 /// location first, then the most NPIs.</param>
 /// <param name="LocationCount">How many places there are in all.</param>
 public sealed record ProviderProfile(
@@ -197,7 +197,7 @@ public sealed record ProviderProfile(
     public int CardiacReaders { get; init; }
 }
 
-/// <param name="Group">The NUCC grouping, e.g. "Allopathic &amp; Osteopathic Physicians".</param>
+/// <param name="Group">The NUCC grouping, e.g. "Hospitals" or "Ambulatory Health Care Facilities".</param>
 public sealed record SpecialtyCount(string Specialty, string? Group, int Npis);
 
 /// <summary>A "check this" note on a row.</summary>
