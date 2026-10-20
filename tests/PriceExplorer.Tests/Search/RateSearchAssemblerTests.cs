@@ -217,6 +217,43 @@ public sealed class RateSearchAssemblerTests
         row.OtherNames.Should().Equal("Bellevue Hospital Center");
     }
 
+    [Theory]
+    [InlineData("0490", "24", "per facility charge", false)]                          // ambulatory surgery: the center's charge for the case
+    [InlineData("0636", "22", "per HCPCS unit (see the code's description)", true)]   // pharmacy line: a price per unit
+    public void A_drug_on_a_revenue_code_line_is_priced_per_unit_unless_the_line_is_a_case_rate(string revenueCode, string pos, string unit, bool perUnit)
+    {
+        var group = Assemble([Fact(code: "J0585", codeType: "HCPCS", billingCode: revenueCode, pos: pos)]).Groups.Single();
+
+        group.Unit.Should().Be(unit);
+        group.PerUnit.Should().Be(perUnit);
+    }
+
+    [Fact]
+    public void A_drug_priced_per_unit_at_a_health_center_keeps_its_unit_and_skips_the_per_visit_note()
+    {
+        var group = Assemble([Fact(code: "J9190", codeType: "HCPCS", billingCode: "0529", pos: "50")]).Groups.Single();
+
+        group.SettingKey.Should().Be("fqhc");
+        group.Unit.Should().Be("per HCPCS unit (see the code's description)");
+        group.Notes.Should().NotContain(note => note.Contains("all-inclusive"));
+    }
+
+    [Fact]
+    public void A_row_points_to_its_whole_tax_id_rate_when_the_rate_it_shows_is_another()
+    {
+        var facts = new[]
+        {
+            Fact(provider: "161078102", rate: 84m, rateId: 18, npis: 5),
+            Fact(provider: "161078102", rate: 90m, rateId: 4, npis: 0, wholeTaxId: true),
+        };
+
+        var row = Assemble(facts).Rows.Items.Single();
+
+        row.FirstRateId.Should().Be(18, "84 is the rate most of its NPIs get");
+        row.EinLevel.Should().BeTrue();
+        row.WholeTaxIdRateId.Should().Be(4);
+    }
+
     [Fact]
     public void Two_fee_schedules_splitting_the_providers_evenly_are_both_named()
     {
@@ -349,6 +386,8 @@ public sealed class RateSearchAssemblerTests
         decimal rate = 100m,
         long? rateId = null,
         string code = "45378",
+        string codeType = "CPT",
+        string? billingCode = null,
         string billingClass = "institutional",
         string pos = "24",
         string modifiers = "",
@@ -364,11 +403,11 @@ public sealed class RateSearchAssemblerTests
             RateId: rateId ?? Interlocked.Increment(ref _nextRateId) + 1000,
             ProductKey: "ambetter",
             ProductLabel: "Ambetter",
-            CodeType: "CPT",
+            CodeType: codeType,
             Code: code,
-            CodeSource: "billing_code",
-            BillingCodeType: "CPT",
-            BillingCode: code,
+            CodeSource: billingCode is null ? "billing_code" : "additional_information",
+            BillingCodeType: billingCode is null ? codeType : "RC",
+            BillingCode: billingCode ?? code,
             BillingClass: billingClass,
             NegotiatedType: "negotiated",
             Modifiers: modifiers,

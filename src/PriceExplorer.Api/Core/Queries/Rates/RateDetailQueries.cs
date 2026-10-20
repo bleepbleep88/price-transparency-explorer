@@ -35,8 +35,7 @@ internal static class InputRules
 {
     /// <summary>An EIN (dash optional) or a provider key from search results ("u…" for masked tax IDs, "type:value").</summary>
     public static bool IsProviderKey(string? value) =>
-        value is not null && !HasControlCharacters(value)
-        && (value.Contains(':', StringComparison.Ordinal) || ProviderKeys.TryNormalizeEinFilter(value, out _));
+        value is not null && !HasControlCharacters(value) && ProviderKeys.TryNormalizeEinFilter(value, out var key) && key is not null;
 
     /// <summary>Control characters (NUL included) can't be bound into a DuckDB string parameter, so they're rejected up front.</summary>
     public static bool HasControlCharacters(string value) => value.Any(char.IsControl);

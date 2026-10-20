@@ -50,6 +50,7 @@ internal static class ApiExtensions
             var problem = new ValidationProblemDetails(errors)
             {
                 Status = StatusCodes.Status400BadRequest,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.1",
                 Title = "Some search inputs need fixing",
                 Extensions =
                 {

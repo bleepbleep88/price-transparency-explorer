@@ -55,7 +55,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             if (search.Group is { } group && assembled.Groups.All(shown => shown.Key != group))
             {
                 hints.Add(Hint("group_not_in_results", "info",
-                    $"The comparison group you picked has no rates {(search.ProviderFilterActive ? $"for {FilteredProviders} " : "")}" +
+                    $"The comparison group you picked has no rates {(search.ProviderFilterActive ? $"for {FilterLabel()} " : "")}" +
                     $"under these filters. {Plural(assembled.Groups.Count, "other group")} {(assembled.Groups.Count == 1 ? "does" : "do")}.",
                     [Link("Show all groups", ("group", null))]));
             }
@@ -76,9 +76,10 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
 
         if (search.ProviderFilterActive && !facts.Any(fact => fact.FilterMatch))
         {
-            // When the provider's rates under a searched revenue code are filed under procedure codes, the revenue code
-            // hint already says where they are; "has no rate" would be wrong.
-            if (revenue is not { ProviderScoped: true })
+            // When all the provider's rates under a searched revenue code are filed under procedure codes, the revenue code
+            // hint already says where they are, and "has no rate" would be wrong. When it also bills the revenue code
+            // directly, the provider hints are what lead to those rates.
+            if (revenue is not { ProviderScoped: true, ProviderHasDirect: false })
             {
                 hints.AddRange(await ProviderAsync(facts, code));
             }
@@ -128,7 +129,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         var directRevenue = searchable.Where(kind => kind.CodeType == BillingCodes.RevenueCode).ToList();
         var revenue = await RevenueCodeProceduresAsync(
             kinds.Where(kind => kind.CodeType == BillingCodes.RevenueCode).Select(kind => kind.Code).ToList(),
-            scope => directRevenue.Any(kind => scope.HasProvider ? kind.ForProvider && !scope.Relaxed : kind.InProduct),
+            scope => directRevenue.Any(kind => scope.HasProvider ? !scope.Relaxed && kind.ForProviderInProduct : kind.InProduct),
             lead: searchable.Count == 0 ? $"No {type} rates for {search.Code}." : null);
         if (revenue is not null)
         {
@@ -158,13 +159,9 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             "so inpatient stays (billed by DRG) and many specialty codes won't appear.";
         if (similar.Count > 0)
         {
-            message += providerScoped
-                ? search.IdFilter
-                    ? " Codes this provider has that start the same way:"
-                    : $" Codes that start the same way, for providers whose name contains \"{search.NameTyped}\":"
-                : search.ProviderFilterActive
-                    ? $" Codes that start the same way (none for {SearchedProviders}):"
-                    : " Codes that start the same way:";
+            message += providerScoped ? $" Codes that start the same way, for {FilterLabel()}:"
+                : search.ProviderFilterActive ? $" Codes that start the same way (none for {FilterLabel()}):"
+                : " Codes that start the same way:";
         }
 
         (string Key, string? Value)[] clear = providerScoped || !search.ProviderFilterActive ? ClearNarrowing : [.. ClearNarrowing, .. ClearProvider];
@@ -179,14 +176,14 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
     /// </summary>
     private async Task<(List<SimilarCodeRow> Rows, bool ProviderScoped)> SimilarCodesAsync()
     {
-        foreach (var prefix in SimilarPrefixes())
+        foreach (var (prefix, codeType) in SimilarPrefixes())
         {
-            if (search.ProviderFilterActive && await SimilarAsync(prefix, forProvider: true) is { Count: > 0 } own)
+            if (search.ProviderFilterActive && await SimilarAsync(prefix, codeType, forProvider: true) is { Count: > 0 } own)
             {
                 return (own, true);
             }
 
-            if (await SimilarAsync(prefix, forProvider: false) is { Count: > 0 } everyone)
+            if (await SimilarAsync(prefix, codeType, forProvider: false) is { Count: > 0 } everyone)
             {
                 return (everyone, false);
             }
@@ -196,27 +193,33 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
     }
 
     /// <summary>
-    /// The first 3 characters as typed, then each zero-padded form without its last digit, so every suggestion starts
-    /// like something the input can mean ("999": 999, then 099 for revenue code 0999, then 0099). A revenue code search
-    /// only uses the revenue code.
+    /// The first 3 characters as typed, in the type asked for (any type when none was); then each zero-padded form
+    /// without its last digit, within the code type it stands for: a 4-digit form is a revenue code, a 5-digit one a
+    /// CPT code ("4537" suggests 4537x first; "999" never suggests anesthesia codes 009xx).
     /// </summary>
-    private IEnumerable<string> SimilarPrefixes() =>
-        search.CodeType == BillingCodes.RevenueCode
-            ? search.Candidates.Select(form => form[..Math.Min(3, form.Length)]).Distinct(StringComparer.Ordinal)
-            : search.Candidates
-                .Where(form => form.Length > search.Code.Length)
-                .OrderBy(form => form.Length)
-                .Select(form => form[..^1])
-                .Prepend(search.Code[..Math.Min(3, search.Code.Length)])
-                .Distinct(StringComparer.Ordinal);
+    private IEnumerable<(string Prefix, string? CodeType)> SimilarPrefixes()
+    {
+        if (search.CodeType == BillingCodes.RevenueCode)
+        {
+            return search.Candidates.Select(form => (form[..Math.Min(3, form.Length)], (string?)BillingCodes.RevenueCode)).Distinct();
+        }
 
-    private async Task<List<SimilarCodeRow>> SimilarAsync(string prefix, bool forProvider) =>
+        var padded = search.Candidates
+            .Where(form => form.Length > search.Code.Length)
+            .OrderBy(form => form.Length)
+            .Select(form => (Prefix: form[..^1], CodeType: (string?)(form.Length == 4 ? BillingCodes.RevenueCode : BillingCodes.Cpt)))
+            .Where(form => search.CodeType is null || form.CodeType == search.CodeType);
+        return padded.Prepend((search.Code[..Math.Min(3, search.Code.Length)], search.CodeType)).Distinct();
+    }
+
+    private async Task<List<SimilarCodeRow>> SimilarAsync(string prefix, string? codeType, bool forProvider) =>
         (await connection.QueryAsync<SimilarCodeRow>(
             SqlFile.For<SearchHints>("SimilarCodes.sql"),
             new
             {
                 snapshotId = snapshot.SnapshotId,
                 prefix,
+                codeType,
                 npi = forProvider ? search.Npi : null,
                 ein = forProvider ? search.Ein : null,
                 provider = forProvider ? search.Name : null,
@@ -319,13 +322,14 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             var scoped = await ProceduresAsync(revenueCodes, scope);
             if (scoped.Count > 0)
             {
-                return new RevenueHint(ProviderRevenueHint(scoped, scope, direct(scope), lead), ProviderScoped: true);
+                var hasDirect = direct(scope);
+                return new RevenueHint(ProviderRevenueHint(scoped, scope, hasDirect, lead), ProviderScoped: true, ProviderHasDirect: hasDirect);
             }
         }
 
         var market = new RevenueScope(null, null, null, search.Product);
         var rows = await ProceduresAsync(revenueCodes, market);
-        return rows.Count == 0 ? null : new RevenueHint(MarketRevenueHint(rows, direct(market), lead), ProviderScoped: false);
+        return rows.Count == 0 ? null : new RevenueHint(MarketRevenueHint(rows, direct(market), lead), ProviderScoped: false, ProviderHasDirect: false);
     }
 
     /// <summary>
@@ -377,7 +381,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         if (!scope.Relaxed)
         {
             var whose = search.IdFilter
-                ? $"for {IdLabel()}"
+                ? $"for {FilterLabel()}"
                 : $"for providers whose name contains \"{search.NameTyped}\" ({Plural(first.Providers, "tax ID")})";
             // With rates billed directly under the revenue code too (shown as rows), these are the others, not all of them.
             message = (direct, total == 1) switch
@@ -392,17 +396,22 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         }
         else
         {
-            // Relaxing a filter found them: say where they are, and which filter hides them.
-            var subject = search.IdFilter ? IdLabel(sentenceStart: true) : $"Providers whose name contains \"{search.NameTyped}\"";
-            var has = search.IdFilter ? "has" : "have";
-            message = $"{subject} {has} {Plural(total, direct ? "more facility rate" : "facility rate")} under {label}";
+            // Relaxing a filter found them: count exactly those (rates filed under procedure codes, within what the scope
+            // still filters on), say where they are, and which filter hides them.
+            var subject = scope.Npi is not null || scope.Ein is not null
+                ? FilterLabel(scope.Npi, scope.Ein, scope.Name, sentenceStart: true)
+                : $"Providers whose name contains \"{search.NameTyped}\"";
+            var has = subject.StartsWith("Providers", StringComparison.Ordinal) ? "have" : "has";
+            message = $"{subject} {has} {Plural(total, "facility rate")} under {label} filed under the procedure code in the notes field " +
+                (total == 1 ? $"({only})" : $"({Plural(codes, "code")})");
             if (scope.OtherEin)
             {
                 message += $", listed under {DescribeTaxIds(first.TaxIds, out _)}, not under {TaxIdLabel(search.Ein!)}";
             }
-            else if (scope.OtherProduct && !scope.OtherName)
+
+            if (scope.OtherProduct)
             {
-                message += $", {(total == 1 ? "in" : "all in")} {first.Products}";
+                message += $", in {first.Products}";
             }
 
             if (scope.OtherName)
@@ -410,9 +419,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
                 message += $", but none under a name containing \"{search.NameTyped}\"";
             }
 
-            message += total == 1
-                ? $". It is filed under the procedure code in its notes field ({only})."
-                : $". They're filed under the procedure code in the notes field ({Plural(codes, "code")}).";
+            message += ".";
             if (scope.OtherEin)
             {
                 message += " Contracts are signed per tax ID, so the NPI and EIN must match.";
@@ -453,7 +460,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         };
         if (search.ProviderFilterActive)
         {
-            message += total == 1 ? $" It isn't from {SearchedProviders}." : $" None of them are from {SearchedProviders}.";
+            message += total == 1 ? $" It isn't from {FilterLabel()}." : $" None of them are from {FilterLabel()}.";
         }
 
         if (total > 1)
@@ -494,7 +501,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         var first = rows[0];
         var where = otherProduct ? $", {(total == 1 ? "in" : "all in")} {first.Products}" : "";
         var message = $"Providers whose name contains \"{search.NameTyped}\" ({Plural(first.Providers, "tax ID")}) have " +
-            $"{Plural(total, "facility rate")} under {label}{where}, {(total == 1 ? "not" : "none")} listed for {IdLabel()}. " +
+            $"{Plural(total, "facility rate")} under {label}{where}, {(total == 1 ? "not" : "none")} listed for {FilterLabel(search.Npi, search.Ein, null, sentenceStart: false)}. " +
             (total == 1
                 ? $"It is filed under the procedure code in its notes field ({first.CodeType} {first.Code}). Search it:"
                 : $"They're filed under the procedure code in the notes field ({Plural(codes, "code")}). Search one to see them:");
@@ -549,10 +556,12 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             else
             {
                 var message = $"No provider whose name contains \"{search.NameTyped}\" has a rate for {codeLabel}.";
+                // The label names one kind of code, so the link searches exactly that kind.
+                (string Key, string? Value)[] exactCode = code is null ? [] : [("code", code.Code), ("codeType", code.CodeType)];
                 hints.Add(idProblem
                     // The NPI/EIN fails too, so clearing only the name would still find nothing.
                     ? Hint("provider_name_no_match", "info", message,
-                        [Link($"Search {codeLabel} for all providers", [.. ClearProvider, .. ClearNarrowing])])
+                        [Link($"Search {codeLabel} for all providers", [.. exactCode, .. ClearProvider, .. ClearNarrowing])])
                     : Hint("provider_name_no_match", "info", message, [ClearNameLink(facts)]));
             }
         }
@@ -561,7 +570,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         {
             // Both match on their own, but never in the same provider group.
             hints.Add(Hint("provider_name_no_match", "info",
-                $"{IdLabel(sentenceStart: true)} has rates for {codeLabel}, but not under a name containing \"{search.NameTyped}\".",
+                $"{FilterLabel(search.Npi, search.Ein, null, sentenceStart: true)} has rates for {codeLabel}, but not under a name containing \"{search.NameTyped}\".",
                 [ClearNameLink(facts)]));
         }
 
@@ -664,7 +673,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
             .ToList();
 
         return Hint("filters_hide_results", "info",
-            $"This code has rates{(search.ProviderFilterActive ? $" for {FilteredProviders}" : "")}, but none match the filters ({string.Join(", ", applied)}). Settings with rates:",
+            $"This code has rates{(search.ProviderFilterActive ? $" for {FilterLabel()}" : "")}, but none match the filters ({string.Join(", ", applied)}). Settings with rates:",
             settings);
     }
 
@@ -680,16 +689,25 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         await connection.QuerySingleAsync<ProviderLookupRow>(
             SqlFile.For<SearchHints>("ProviderLookup.sql"), new { snapshotId = snapshot.SnapshotId, codes = search.Candidates, npi, ein });
 
-    /// <summary>Who the provider filters name: one provider for an NPI or EIN, possibly many for a name.</summary>
-    private string FilteredProviders => search.IdFilter ? "this provider" : $"providers whose name contains \"{search.NameTyped}\"";
+    /// <summary>The provider filters in effect, all of them: "NPI 1003008038 under EIN 11-3613997 with a name containing \"x\"".</summary>
+    private string FilterLabel() => FilterLabel(search.Npi, search.Ein, search.Name, sentenceStart: false);
 
-    /// <summary>Who a market-wide hint's rates are not from: the NPI or EIN searched, or the name.</summary>
-    private string SearchedProviders => search.IdFilter ? IdLabel() : $"providers whose name contains \"{search.NameTyped}\"";
+    private string FilterLabel(long? npi, string? ein, string? name, bool sentenceStart)
+    {
+        var named = name is null ? "" : $"with a name containing \"{search.NameTyped}\"";
+        if (npi is null && ein is null)
+        {
+            return $"{(sentenceStart ? "Providers" : "providers")} whose name contains \"{search.NameTyped}\"";
+        }
 
-    private string IdLabel(bool sentenceStart = false) =>
-        search.NpiText is { } npi ? $"NPI {npi}"
-        : search.Ein is { } ein ? TaxIdLabel(ein, sentenceStart)
-        : sentenceStart ? "This provider" : "this provider";
+        var id = npi is not null ? $"NPI {search.NpiText}" : TaxIdLabel(ein!, sentenceStart);
+        if (npi is not null && ein is not null)
+        {
+            id += $" under {TaxIdLabel(ein)}";
+        }
+
+        return named.Length == 0 ? id : $"{id} {named}";
+    }
 
     /// <summary>"EIN 11-3471596"; "this tax ID" for a masked key; "tax ID npi:1234567890" for a tax ID that isn't an EIN.</summary>
     private static string TaxIdLabel(string key, bool sentenceStart = false) =>
@@ -774,7 +792,8 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
         return new HintLink(label, values);
     }
 
-    private sealed record RevenueHint(SearchHint Hint, bool ProviderScoped);
+    /// <param name="ProviderHasDirect">The provider (in the scope found) also bills the revenue code directly.</param>
+    private sealed record RevenueHint(SearchHint Hint, bool ProviderScoped, bool ProviderHasDirect);
 
     /// <summary>Which provider filters a revenue code lookup applies, and which of the searched ones it dropped.</summary>
     private sealed record RevenueScope(long? Npi, string? Ein, string? Name, string? Product)
@@ -794,7 +813,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
     /// <summary>A kind of code to offer, and whether the filtered provider has rates under it.</summary>
     private sealed record KindOption(CodeKind Kind, bool ForProvider);
 
-    private sealed record CodeKindRow(string CodeType, string Code, bool Searchable, bool ForProvider, bool InProduct);
+    private sealed record CodeKindRow(string CodeType, string Code, bool Searchable, bool ForProvider, bool InProduct, bool ForProviderInProduct);
 
     private sealed record SimilarCodeRow(string CodeType, string Code, long Rates, string? Name);
 

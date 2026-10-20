@@ -12,6 +12,7 @@ public sealed class StatusController(ISender sender) : ControllerBase
 {
     /// <summary>What the loader is doing now and whether data can be queried.</summary>
     [HttpGet]
+    [ProducesResponseType<IngestionStatusSnapshot>(StatusCodes.Status200OK, "application/json")]
     public Task<IngestionStatusSnapshot> Get(CancellationToken cancellationToken) =>
         sender.Send(new GetIngestionStatusQuery(), cancellationToken);
 

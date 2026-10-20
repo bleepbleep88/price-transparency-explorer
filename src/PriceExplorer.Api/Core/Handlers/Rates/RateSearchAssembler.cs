@@ -137,11 +137,12 @@ internal static class RateSearchAssembler
             full && p90 is { } top ? RateStatistics.Ratio(top, p10) : null);
 
         var category = ServiceCategories.Classify(group.CodeType, group.Code);
-        // A drug or unit-priced code named in the notes of a facility rate filed under a revenue code is a facility charge,
-        // not a price per unit (J0585 under revenue code 0490 is a surgery center's charge, not Botox per unit).
-        var perUnit = category.PerUnit && !group.FiledUnderRevenueCode;
-        var unit = group.Setting.Key is "fqhc" or "rhc" ? ServiceCategories.PerVisitAllInclusive
-            : category.PerUnit && !perUnit ? "per facility charge"
+        // A drug named in the notes of a surgery or room revenue code line is that facility's charge for the case, not a
+        // price per unit (J0585 under revenue code 0490 is a surgery center's charge, not Botox per unit). Pharmacy and
+        // clinic lines keep their per-unit price (J9190 at $2.01 under a clinic revenue code).
+        var perUnit = category.PerUnit && !group.FiledAsCaseRate;
+        var unit = category.PerUnit && !perUnit ? "per facility charge"
+            : group.Setting.Key is "fqhc" or "rhc" && !perUnit ? ServiceCategories.PerVisitAllInclusive
             : category.Unit;
         var modifiers = group.Modifiers.Length == 0
             ? []
@@ -200,7 +201,7 @@ internal static class RateSearchAssembler
             ListedRates: level == "list" ? values : [],
             Highlights: highlights,
             MatchedProviders: providerFilterActive ? group.Providers.Values.Count(provider => provider.Matched) : 0,
-            Notes: NotesFor(group, category, catalog, values));
+            Notes: NotesFor(group, category, perUnit, catalog, values));
     }
 
     private static IEnumerable<RateRow> RowsFor(GroupAccumulator accumulator, RateGroup group, bool providerFilterActive)
@@ -246,7 +247,8 @@ internal static class RateSearchAssembler
                 RateCount: view.RateIds.Count,
                 FirstRateId: view.SourceRateId,
                 Matched: provider.Matched,
-                RateIds: view.RateIds);
+                RateIds: view.RateIds,
+                WholeTaxIdRateId: view.WholeTaxIdRateId);
         }
     }
 
@@ -292,7 +294,8 @@ internal static class RateSearchAssembler
         return new SearchQuality(published, occurrencesByRate.Count, published - occurrencesByRate.Count, multiple.Count, masked.Count, wholeTin.Count);
     }
 
-    private static List<string> NotesFor(GroupAccumulator group, ServiceCategory category, ReferenceCatalog catalog, IReadOnlyList<decimal> values)
+    private static List<string> NotesFor(
+        GroupAccumulator group, ServiceCategory category, bool perUnit, ReferenceCatalog catalog, IReadOnlyList<decimal> values)
     {
         var notes = new List<string>();
 
@@ -327,7 +330,8 @@ internal static class RateSearchAssembler
             }
         }
 
-        if (group.Setting.Note is { } settingNote)
+        // A clinic's all-inclusive visit note doesn't apply to a drug or supply priced per unit there.
+        if (group.Setting.Note is { } settingNote && !perUnit)
         {
             notes.Add(settingNote);
         }
@@ -337,10 +341,10 @@ internal static class RateSearchAssembler
         {
             var codes = string.Join(", ", facilityRows.Select(b => $"{b.Code} ({catalog.RevenueCodeLabel(b.Code)})"));
             notes.Add($"The plan files these facility rates under revenue code{(facilityRows.Count == 1 ? "" : "s")} {codes}, naming {group.CodeType} {group.Code} in the notes field" +
-                (category.PerUnit && group.FiledUnderRevenueCode ? $": they are facility charges, not prices {category.Unit}." : "."));
+                (category.PerUnit && !perUnit ? $": they are facility charges for the case, not prices {category.Unit}." : "."));
         }
 
-        if (category.PerUnit && !group.FiledUnderRevenueCode)
+        if (perUnit)
         {
             notes.Add($"Priced {category.Unit}, not per visit or procedure.");
         }
@@ -366,6 +370,8 @@ internal static class RateSearchAssembler
         _ => $"{billingCodeType} {billingCode}",
     };
 
+    private static readonly HashSet<string> CaseRateRevenueCodes = new(["036", "045", "049", "071", "075", "076", "079"], StringComparer.Ordinal);
+
     private sealed class GroupAccumulator(string key, RateFactRow first, string feeType, SettingInfo setting)
     {
         public string Key { get; } = key;
@@ -380,9 +386,14 @@ internal static class RateSearchAssembler
         public SortedSet<string> Places { get; } = new(StringComparer.Ordinal);
         public SortedSet<(string Type, string Code)> BilledAs { get; } = [];
 
-        /// <summary>Every rate in the group is filed under a revenue code, with this code only in the notes field.</summary>
-        public bool FiledUnderRevenueCode =>
-            CodeType != BillingCodes.RevenueCode && BilledAs.All(billed => billed.Type == BillingCodes.RevenueCode);
+        /// <summary>
+        /// Every rate in the group is filed under a surgery or room revenue code (operating room 036x, emergency room 045x,
+        /// ambulatory surgery 049x, recovery 071x, GI services 075x, treatment and observation rooms 076x, lithotripsy
+        /// 079x), with this code only in the notes field: a charge for the case, not for the item named.
+        /// </summary>
+        public bool FiledAsCaseRate =>
+            CodeType != BillingCodes.RevenueCode
+            && BilledAs.All(billed => billed.Type == BillingCodes.RevenueCode && CaseRateRevenueCodes.Contains(billed.Code[..3]));
         public Dictionary<long, int> RateIds { get; } = [];
         public Dictionary<string, ProviderAccumulator> Providers { get; } = new(StringComparer.Ordinal);
 
@@ -535,9 +546,10 @@ internal static class RateSearchAssembler
     /// <param name="SourceRateId">The rate carrying <paramref name="Value"/> that lists the most NPIs (shown in the source drawer).</param>
     /// <param name="LargestNpiCount">NPIs under the largest single rate: a lower bound until the handler counts them exactly.</param>
     /// <param name="WholeTaxId">At least one of the rates comes from a contract with the whole tax ID (npi [0]).</param>
+    /// <param name="WholeTaxIdRateId">Such a whole-tax-ID rate, when <paramref name="SourceRateId"/> isn't one.</param>
     private sealed record RateView(
         decimal Value, decimal Low, decimal High, long SourceRateId, IReadOnlyList<long> RateIds, int Occurrences, int LargestNpiCount,
-        bool WholeTaxId)
+        bool WholeTaxId, long? WholeTaxIdRateId)
     {
         public static RateView Of(IEnumerable<RateEntry> entries)
         {
@@ -552,7 +564,8 @@ internal static class RateSearchAssembler
                 list.Select(entry => entry.RateId).ToList(),
                 list.Sum(entry => entry.Occurrences),
                 list.Max(entry => entry.NpiCount),
-                list.Any(entry => entry.WholeTaxId));
+                list.Any(entry => entry.WholeTaxId),
+                source.WholeTaxId ? null : list.FirstOrDefault(entry => entry.WholeTaxId)?.RateId);
         }
     }
 }

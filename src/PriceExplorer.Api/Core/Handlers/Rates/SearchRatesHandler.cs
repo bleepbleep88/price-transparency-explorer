@@ -30,7 +30,8 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
 
         var codeInfo = await DescribeCodeAsync(connection, snapshot, facts, assembled.Groups, search.CodeType);
         var hints = await new SearchHints(connection, snapshot, catalog, search).ForAsync(facts, assembled, codeInfo);
-        hints = await new HintLinkChecker(connections, snapshot, catalog, logger).KeepLinksThatFindRatesAsync(request, hints, cancellationToken);
+        hints = await new HintLinkChecker(connections, snapshot, catalog, logger)
+            .KeepLinksThatFindRatesAsync(request, search, facts, hints, cancellationToken);
 
         var echo = new RateSearchEcho(
             search.Code, search.Candidates, search.CodeType, search.NpiText, search.Ein,
@@ -61,14 +62,18 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
             facts = facts.Where(fact => fact.CodeType == search.CodeType).ToList();
         }
 
-        var assembled = RateSearchAssembler.Assemble(
+        return (facts, Assemble(facts, search, sort, page, pageSize, catalog));
+    }
+
+    /// <summary>Groups and rows for a search's facts under its narrowing filters.</summary>
+    internal static AssembledSearch Assemble(
+        IReadOnlyList<RateFactRow> facts, SearchContext search, string sort, int page, int pageSize, ReferenceCatalog catalog) =>
+        RateSearchAssembler.Assemble(
             facts,
             new AssemblyOptions(
                 search.Product, search.Setting, search.FeeType, search.CodeType, search.Group,
                 search.ProviderFilterActive, sort, page, pageSize),
             catalog);
-        return (facts, assembled);
-    }
 
     /// <summary>Exact distinct-NPI counts for the rows on this page (the assembler only sees per-rate counts).</summary>
     private static async Task<RateRowsPage> CountRowNpisAsync(DuckDBConnection connection, RateRowsPage page)
@@ -110,6 +115,7 @@ public sealed class SearchRatesHandler(DuckDbConnectionFactory connections, Refe
             .ThenByDescending(group => group.Key.CodeType == codeType)
             .ThenByDescending(group => group.Any(fact => fact.FilterMatch))
             .ThenByDescending(group => group.Any(fact => fact.IdMatch))
+            .ThenByDescending(group => group.Any(fact => fact.NpiMatch))
             .ThenByDescending(group => group.Select(fact => fact.ProviderKey).Distinct().Count())
             .ThenBy(group => group.Key.CodeType, StringComparer.Ordinal)
             .Select(group => group.Key)

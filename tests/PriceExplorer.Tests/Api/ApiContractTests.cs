@@ -66,6 +66,9 @@ public sealed class ApiContractTests(ExplorerApiFactory factory) : IClassFixture
         using var badRoute = await GetAsync("/api/v1/rates/abc/source", ct, accept);
 
         (await ErrorsAsync(invalid)).Should().ContainKey("code");
+        using var badBinding = await GetAsync("/api/v1/rates?code=45378&page=abc", ct, accept);
+        (await ProblemAsync(badBinding, HttpStatusCode.BadRequest)).GetProperty("type").GetString()
+            .Should().Be("https://tools.ietf.org/html/rfc9110#section-15.5.1", "binding errors have the same shape as validator errors");
         var notFound = await ProblemAsync(missingRate, HttpStatusCode.NotFound);
         notFound.GetProperty("code").GetString().Should().Be("rate_not_found");
         notFound.GetProperty("type").GetString().Should().Be("https://tools.ietf.org/html/rfc9110#section-15.5.5");
@@ -88,6 +91,11 @@ public sealed class ApiContractTests(ExplorerApiFactory factory) : IClassFixture
             .Should().Equal("application/problem+json");
         search.GetProperty("responses").GetProperty("200").GetProperty("content").EnumerateObject().Select(c => c.Name)
             .Should().Equal("application/json");
+        foreach (var typeahead in new[] { "/api/v1/codes", "/api/v1/providers" })
+        {
+            document.GetProperty("paths").GetProperty(typeahead).GetProperty("get").GetProperty("parameters").EnumerateArray()
+                .Single(p => p.GetProperty("name").GetString() == "q").GetProperty("required").GetBoolean().Should().BeTrue(typeahead);
+        }
 
         var linkValues = document.GetProperty("components").GetProperty("schemas").GetProperty("HintLink")
             .GetProperty("properties").GetProperty("query").GetProperty("additionalProperties").GetProperty("type");

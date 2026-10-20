@@ -126,6 +126,10 @@ public sealed record RateRowsPage(int Total, int Page, int PageSize, IReadOnlyLi
 /// the median), or "typical". Null for small groups.</param>
 /// <param name="NpiCount">Distinct NPIs the provider lists under the row's rates.</param>
 /// <param name="FirstRateId">The rate shown in the source drawer: the one carrying <paramref name="Rate"/>.</param>
+/// <param name="WholeTaxIdRateId">
+/// When <paramref name="EinLevel"/> comes from a whole-tax-ID contract other than <paramref name="FirstRateId"/>, that rate, so the
+/// drawer can show the contract the flag describes. Null otherwise.
+/// </param>
 /// <param name="RateIds">Every rate behind the row (for the NPI list, which accepts up to 300 more besides its own).</param>
 public sealed record RateRow(
     string GroupKey,
@@ -148,7 +152,8 @@ public sealed record RateRow(
     int RateCount,
     long FirstRateId,
     bool Matched,
-    IReadOnlyList<long> RateIds);
+    IReadOnlyList<long> RateIds,
+    long? WholeTaxIdRateId);
 
 /// <param name="Kind">Stable identifier the UI can switch on, e.g. "code_not_found", "npi_check_digit".</param>
 /// <param name="Severity">"info" or "warning".</param>

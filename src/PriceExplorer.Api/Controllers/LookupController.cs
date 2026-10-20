@@ -11,6 +11,9 @@ namespace PriceExplorer.Api.Controllers;
 public sealed class LookupController(ISender sender) : ControllerBase
 {
     /// <summary>Codes with rates in the snapshot, matched by code (leading zeros optional) or published name.</summary>
+    /// <param name="q">Required. 1 to 60 characters: a code (45378, 0490, J0585) or words from its name.</param>
+    /// <param name="snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
+    /// <param name="limit">How many suggestions, 1 to 50.</param>
     [HttpGet("codes")]
     [ProducesResponseType<IReadOnlyList<CodeSuggestion>>(StatusCodes.Status200OK, "application/json")]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
@@ -21,6 +24,9 @@ public sealed class LookupController(ISender sender) : ControllerBase
         sender.Send(new SuggestCodesQuery(q, snapshot, limit), cancellationToken);
 
     /// <summary>Providers matched by business name or exact EIN.</summary>
+    /// <param name="q">Required. At least 2 characters of a business name, or an EIN.</param>
+    /// <param name="snapshot">Optional snapshot id; defaults to the newest loaded snapshot.</param>
+    /// <param name="limit">How many suggestions, 1 to 50.</param>
     [HttpGet("providers")]
     [ProducesResponseType<IReadOnlyList<ProviderSuggestion>>(StatusCodes.Status200OK, "application/json")]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]

@@ -1,5 +1,6 @@
--- Codes in this snapshot that start like the one searched for (suggestions when nothing matched). With provider filters,
--- only codes that provider has rates for (NPI, EIN and name in the same provider group, as in SearchRates.sql).
+-- Codes in this snapshot that start like the one searched for (suggestions when nothing matched), optionally of one code
+-- type. With provider filters, only codes that provider has rates for (NPI, EIN and name in the same provider group, as in
+-- SearchRates.sql).
 WITH target_files AS (
     SELECT file_id
     FROM source_files
@@ -10,6 +11,7 @@ candidates AS (
     FROM rates r
     JOIN target_files tf ON tf.file_id = r.file_id
     WHERE starts_with(r.code, $prefix)
+      AND ($codeType::VARCHAR IS NULL OR r.code_type = $codeType::VARCHAR)
       AND (r.expiration_date IS NULL OR r.expiration_date >= current_date)
       AND (($npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL) OR EXISTS (
           SELECT 1

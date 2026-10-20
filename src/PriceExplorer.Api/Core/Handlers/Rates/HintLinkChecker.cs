@@ -9,7 +9,9 @@ namespace PriceExplorer.Api.Core.Handlers.Rates;
 /// <summary>
 /// Runs the search behind every hint link and drops the links that find no rows, so a hint never sends someone to an
 /// empty page. Hints are built to lead somewhere; filters combine in many ways, and this keeps that promise for all of
-/// them. A dropped link is logged as a warning, since it means a hint was built wrong.
+/// them. A dropped link is logged as a warning, since it means a hint was built wrong. A link that only changes the
+/// narrowing filters (setting, fee type, product, group, code type) reuses the current search's facts, so most checks
+/// cost no query at all.
 /// </summary>
 internal sealed class HintLinkChecker(DuckDbConnectionFactory connections, ResolvedSnapshot snapshot, ReferenceCatalog catalog, ILogger logger)
 {
@@ -20,7 +22,8 @@ internal sealed class HintLinkChecker(DuckDbConnectionFactory connections, Resol
     private static readonly HashSet<string> Keys =
         new(["code", "codeType", "npi", "ein", "provider", "product", "setting", "feeType", "group"], StringComparer.Ordinal);
 
-    public async Task<List<SearchHint>> KeepLinksThatFindRatesAsync(SearchRatesQuery request, List<SearchHint> hints, CancellationToken cancellationToken)
+    public async Task<List<SearchHint>> KeepLinksThatFindRatesAsync(
+        SearchRatesQuery request, SearchContext search, IReadOnlyList<RateFactRow> facts, List<SearchHint> hints, CancellationToken cancellationToken)
     {
         var links = hints.SelectMany(hint => hint.Links).ToList();
         if (links.Count == 0)
@@ -33,7 +36,7 @@ internal sealed class HintLinkChecker(DuckDbConnectionFactory connections, Resol
         await Parallel.ForEachAsync(
             targets,
             new ParallelOptions { MaxDegreeOfParallelism = Parallelism, CancellationToken = cancellationToken },
-            async (target, token) => findsRates[target] = await FindsRatesAsync(target, token));
+            async (target, token) => findsRates[target] = await FindsRatesAsync(target, search, facts, token));
 
         return hints.Select(hint =>
         {
@@ -76,13 +79,29 @@ internal sealed class HintLinkChecker(DuckDbConnectionFactory connections, Resol
         };
     }
 
-    private async Task<bool> FindsRatesAsync(SearchRatesQuery target, CancellationToken cancellationToken)
+    private async Task<bool> FindsRatesAsync(
+        SearchRatesQuery target, SearchContext current, IReadOnlyList<RateFactRow> facts, CancellationToken cancellationToken)
     {
+        var context = SearchContext.From(target);
+        if (SameFacts(context, current))
+        {
+            // Same code forms and provider filters: the facts are the same, only the grouping options differ.
+            return SearchRatesHandler.Assemble(facts, context, "rate", page: 1, pageSize: 1, catalog).Rows.Total > 0;
+        }
+
         await using var connection = await connections.OpenAsync(cancellationToken);
-        var (_, assembled) = await SearchRatesHandler.RunAsync(
-            connection, snapshot, SearchContext.From(target), "rate", page: 1, pageSize: 1, catalog);
+        var (_, assembled) = await SearchRatesHandler.RunAsync(connection, snapshot, context, "rate", page: 1, pageSize: 1, catalog);
         return assembled.Rows.Total > 0;
     }
+
+    /// <summary>The facts a search finds depend on its code forms, its provider filters and whether its code type is foreign.</summary>
+    private static bool SameFacts(SearchContext target, SearchContext current) =>
+        target.Candidates.SequenceEqual(current.Candidates, StringComparer.Ordinal)
+        && target.Npi == current.Npi
+        && target.Ein == current.Ein
+        && target.Name == current.Name
+        && target.ForeignCodeType == current.ForeignCodeType
+        && (!target.ForeignCodeType || target.CodeType == current.CodeType);
 
     /// <summary>"… (12 codes). Most common:" without its links reads "… (12 codes)."</summary>
     private static string WithoutLeadIn(string message)

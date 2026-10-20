@@ -87,8 +87,8 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
         Kinds(result).Should().Equal("revenue_code_procedures");
         var hint = Hint(result, "revenue_code_procedures");
         hint.GetProperty("message").GetString().Should().Be(
-            "EIN 46-0857425 has 1 facility rate under revenue code 0490 (Ambulatory surgery), in Ambetter from Fidelis Care. " +
-            "It is filed under the procedure code in its notes field (CPT 45378). Search it:");
+            "EIN 46-0857425 has 1 facility rate under revenue code 0490 (Ambulatory surgery) filed under the procedure code in the notes " +
+            "field (CPT 45378), in Ambetter from Fidelis Care. Search it:");
         var link = hint.GetProperty("links").EnumerateArray().Single().GetProperty("query");
         link.GetProperty("code").GetString().Should().Be("45378");
         link.GetProperty("product").ValueKind.Should().Be(JsonValueKind.Null);
@@ -104,9 +104,9 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
         Kinds(result).Should().Equal("revenue_code_procedures");
         var hint = Hint(result, "revenue_code_procedures");
         hint.GetProperty("message").GetString().Should().Be(
-            "NPI 1174873780 has 1 facility rate under revenue code 0490 (Ambulatory surgery), listed under Yorkville Endoscopy, LLC, " +
-            "EIN 46-0857425, not under EIN 11-3471596. It is filed under the procedure code in its notes field (CPT 45378). " +
-            "Contracts are signed per tax ID, so the NPI and EIN must match. Search it:");
+            "NPI 1174873780 has 1 facility rate under revenue code 0490 (Ambulatory surgery) filed under the " +
+            "procedure code in the notes field (CPT 45378), listed under Yorkville Endoscopy, LLC, EIN 46-0857425, not under " +
+            "EIN 11-3471596. Contracts are signed per tax ID, so the NPI and EIN must match. Search it:");
         hint.GetProperty("links")[0].GetProperty("query").GetProperty("ein").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
@@ -118,7 +118,8 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
 
         var hint = Hint(result, "revenue_code_procedures");
         hint.GetProperty("message").GetString().Should().StartWith(
-            "EIN 46-0857425 has 1 facility rate under revenue code 0490 (Ambulatory surgery), but none under a name containing \"zzz\".");
+            "EIN 46-0857425 has 1 facility rate under revenue code 0490 (Ambulatory surgery) filed under the procedure code in the " +
+            "notes field (CPT 45378), but none under a name containing \"zzz\".");
         hint.GetProperty("links")[0].GetProperty("query").GetProperty("provider").ValueKind.Should().Be(JsonValueKind.Null);
         Kinds(result).Should().NotContain("provider_no_rate");
     }
@@ -158,7 +159,7 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
 
         result.GetProperty("rows").GetProperty("total").GetInt32().Should().Be(0);
         var hint = Hint(result, "group_not_in_results");
-        hint.GetProperty("message").GetString().Should().StartWith("The comparison group you picked has no rates for this provider");
+        hint.GetProperty("message").GetString().Should().StartWith("The comparison group you picked has no rates for NPI 1174873780");
         hint.GetProperty("links")[0].GetProperty("query").GetProperty("group").ValueKind.Should().Be(JsonValueKind.Null);
     }
 
@@ -178,7 +179,7 @@ public sealed class SearchHintTests(ExplorerApiFactory factory) : IClassFixture<
         var own = Hint(await SearchAsync(ct, new() { ["code"] = "45399", ["npi"] = YorkvilleNpi }), "code_not_found");
         var others = Hint(await SearchAsync(ct, new() { ["code"] = "45399", ["npi"] = "1649596081" }), "code_not_found");
 
-        own.GetProperty("message").GetString().Should().EndWith("Codes this provider has that start the same way:");
+        own.GetProperty("message").GetString().Should().EndWith("Codes that start the same way, for NPI 1174873780:");
         own.GetProperty("links")[0].GetProperty("query").TryGetProperty("npi", out _).Should().BeFalse("the link keeps the NPI");
         others.GetProperty("message").GetString().Should().EndWith("Codes that start the same way (none for NPI 1649596081):");
         others.GetProperty("links")[0].GetProperty("query").GetProperty("npi").ValueKind.Should().Be(JsonValueKind.Null);

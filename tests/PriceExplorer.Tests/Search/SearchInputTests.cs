@@ -87,6 +87,14 @@ public sealed class SearchInputTests
     }
 
     [Theory]
+    [InlineData("EIN: 11-3471596", "113471596")]
+    [InlineData("u0123456789AB", "u0123456789ab")]
+    [InlineData("npi:1234567890", "npi:1234567890")]
+    [InlineData("x:" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", null)]   // too long for a key
+    public void Provider_keys_normalize_to_what_the_database_stores(string input, string? expected) =>
+        ProviderKeys.NormalizeKey(input).Should().Be(expected);
+
+    [Theory]
     [InlineData("J0585", "drugs", true)]
     [InlineData("Q0138", "drugs", true)]    // ferumoxytol
     [InlineData("Q5101", "drugs", true)]    // a biosimilar
@@ -144,8 +152,14 @@ public sealed class SearchInputTests
     [InlineData("11-3471596", true)]
     [InlineData("113471596", true)]
     [InlineData("u0123456789ab", true)]   // provider key for a masked tax ID
+    [InlineData("EIN: 11-3471596", true)] // a labelled EIN is that EIN
+    [InlineData("tin #113471596", true)]
+    [InlineData("ein:12345", true)]       // key of a tax ID whose published value isn't a valid EIN
     [InlineData("1134715", false)]
     [InlineData("ab-cdefghi", false)]
+    [InlineData(":", false)]
+    [InlineData("EIN: abc", false)]
+    [InlineData("Tax ID: 113471596 please", false)]
     public void Ein_accepts_nine_digits_or_a_provider_key(string ein, bool valid)
     {
         var result = _validator.TestValidate(new SearchRatesQuery("45378", Ein: ein));

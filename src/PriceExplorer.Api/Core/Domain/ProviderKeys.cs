@@ -28,7 +28,10 @@ internal static partial class ProviderKeys
     public static string MaskedKey(string ein, byte[] secret) =>
         "u" + Convert.ToHexStringLower(HMACSHA256.HashData(secret, Encoding.ASCII.GetBytes(ein)))[..12];
 
-    /// <summary>Accepts "11-3471596", "113471596", or an opaque key; returns the value to match on.</summary>
+    /// <summary>
+    /// Accepts an EIN ("11-3471596", "113471596", "EIN: 11-3471596") or a provider key from results (an opaque "u…" key,
+    /// or "type:value" for a tax ID that isn't an EIN); returns the value to match on. Blank input is valid (no filter).
+    /// </summary>
     public static bool TryNormalizeEinFilter(string? input, out string? value)
     {
         value = null;
@@ -44,34 +47,34 @@ internal static partial class ProviderKeys
             return true;
         }
 
-        if (!trimmed.All(c => char.IsAsciiDigit(c) || c is '-' or ' '))
+        var unlabeled = EinLabel().Replace(trimmed, "", 1);
+        if (unlabeled.Length > 0 && unlabeled.All(c => char.IsAsciiDigit(c) || c is '-' or ' ') && Ein.Normalize(unlabeled) is { } ein)
         {
-            return false;
+            value = ein;
+            return true;
         }
 
-        value = Ein.Normalize(trimmed);
-        return value is not null;
+        // "ein:12345": the key of a tax ID whose published value isn't a valid EIN.
+        if (TypedKey().IsMatch(trimmed))
+        {
+            value = trimmed;
+            return true;
+        }
+
+        return false;
     }
 
-    /// <summary>
-    /// A provider key from a result row: a 9-digit EIN, an opaque "u…" key, or "type:value" for a tax ID that isn't an
-    /// EIN. Null for blank or invalid input (validators reject invalid input first).
-    /// </summary>
-    public static string? NormalizeKey(string? input)
-    {
-        if (string.IsNullOrWhiteSpace(input))
-        {
-            return null;
-        }
-
-        if (input.Contains(':', StringComparison.Ordinal))
-        {
-            return input.Trim();
-        }
-
-        return TryNormalizeEinFilter(input, out var value) ? value : null;
-    }
+    /// <summary>A provider key or EIN as <see cref="TryNormalizeEinFilter"/> reads it; null when blank or invalid.</summary>
+    public static string? NormalizeKey(string? input) => TryNormalizeEinFilter(input, out var value) ? value : null;
 
     [GeneratedRegex("^[uU][0-9a-fA-F]{12}$")]
     private static partial Regex OpaqueKey();
+
+    /// <summary>"ein:", "TIN #" and the like in front of a typed number.</summary>
+    [GeneratedRegex(@"^(?:EIN|TIN)\s*[:#]?\s*", RegexOptions.IgnoreCase)]
+    private static partial Regex EinLabel();
+
+    /// <summary>The key of a tax ID that isn't a valid EIN: its tax ID type, a colon, and the value as published.</summary>
+    [GeneratedRegex("^[a-z]{2,5}:[A-Za-z0-9-]{1,30}$")]
+    private static partial Regex TypedKey();
 }
