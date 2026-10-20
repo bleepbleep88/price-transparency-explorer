@@ -1,6 +1,8 @@
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using PriceExplorer.Api.Core.Data;
+using PriceExplorer.Api.Core.Ingestion;
+using PriceExplorer.Api.Core.Queries.Statistics;
 using PriceExplorer.Tests.Support;
 using static PriceExplorer.Tests.Support.TicFileBuilder;
 
@@ -51,6 +53,45 @@ public sealed class SavedValuesTests
             .Should().Be(0, "the full number is never copied into the saved values");
     }
 
+    [Fact(Timeout = 60_000)]
+    public async Task Expired_rates_are_left_out_and_the_next_end_date_rebuilds_the_statistics_once_it_passes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var factory = ServingEssential(File(
+            [Minkowitz, CountyClinicWholeTin],
+            [
+                Item("CPT", "88305", "Tissue exam by pathologist", "[1]",
+                    Price(rate: "41.50", serviceCode: "[\"11\"]", billingClass: "professional", expiration: "2098-06-30")),
+                Item("CPT", "88305", "Tissue exam by pathologist", "[2]",
+                    Price(rate: "55.00", serviceCode: "[\"11\"]", billingClass: "professional", expiration: "2099-12-31")),
+                Item("CPT", "88305", "Tissue exam by pathologist", "[1]",
+                    Price(rate: "39.00", serviceCode: "[\"11\"]", billingClass: "professional", expiration: "2020-01-01")),
+            ]));
+
+        var saved = await SearchComparison.SavedEqualsSearchAsync(factory, "88305", ct);
+
+        saved.Groups.Single().Providers.Select(value => value.Value).Should().BeEquivalentTo([41.50m, 55.00m],
+            "the rate that ended in 2020 is in neither search nor the saved statistics");
+        (await ExpiresOnAsync(factory, ct)).Should().Be("2098-06-30", "the earliest end date among the rates still shown");
+
+        // When that day passes, search stops showing the rate, so the next check rebuilds the statistics.
+        await using (var connection = await factory.Services.GetRequiredService<DuckDbConnectionFactory>().OpenAsync(ct))
+        {
+            await connection.ExecuteAsync("UPDATE stats_builds SET expires_on = DATE '2020-01-02'");
+        }
+
+        await factory.Services.GetRequiredService<IngestionCoordinator>().BuildStatisticsAsync(ct);
+
+        (await factory.SendAsync(new GetGroupStatsQuery(Codes: ["88305"]), ct)).BuiltAt.Should().BeAfter(saved.BuiltAt!.Value);
+        (await ExpiresOnAsync(factory, ct)).Should().Be("2098-06-30");
+    }
+
     private static ExplorerApiFactory ServingEssential(string json) =>
         ExplorerApiFactory.With(http => http.ServeJson(FixtureHttpHandler.EssentialUrl, json));
+
+    private static async Task<string?> ExpiresOnAsync(ExplorerApiFactory factory, CancellationToken ct)
+    {
+        await using var connection = await factory.Services.GetRequiredService<DuckDbConnectionFactory>().OpenAsync(ct);
+        return await connection.ExecuteScalarAsync<string?>("SELECT CAST(expires_on AS VARCHAR) FROM stats_builds");
+    }
 }

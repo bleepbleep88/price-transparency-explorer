@@ -72,10 +72,7 @@ internal sealed class SnapshotStatisticsBuilder(DuckDbConnectionFactory connecti
         stopwatch.Stop();
         await connection.ExecuteAsync("DELETE FROM stats_builds WHERE snapshot_id = $snapshotId", args, transaction);
         await connection.ExecuteAsync(
-            """
-            INSERT INTO stats_builds (snapshot_id, rate_files, code_version, built_at, build_ms, code_count, group_count, value_count)
-            VALUES ($snapshotId, $rateFiles, $codeVersion, $builtAt, $buildMs, $codeCount, $groupCount, $valueCount)
-            """,
+            SqlFile.For<SnapshotStatisticsBuilder>("SaveStatisticsBuild.sql"),
             new
             {
                 snapshotId = snapshot.SnapshotId,

@@ -219,11 +219,13 @@ CREATE TABLE IF NOT EXISTS provider_values (
 );
 
 -- One row per snapshot with saved statistics: what they were built from. A snapshot is rebuilt when a rate file is
--- saved again (its loaded_at changes) or the app's code changes; a restart with unchanged files keeps them.
+-- saved again (its loaded_at changes), the app's code changes, or a rate they include passes its expiration date
+-- (search stops showing it that day); a restart with none of these keeps them.
 CREATE TABLE IF NOT EXISTS stats_builds (
     snapshot_id    INTEGER NOT NULL,
     rate_files     VARCHAR NOT NULL,  -- each saved rate file as file_id@loaded_at
     code_version   VARCHAR NOT NULL,  -- the app build (module version id) whose search code built them
+    expires_on     DATE,              -- the earliest expiration date among the rates they include; NULL = none ends
     built_at       TIMESTAMP NOT NULL,
     build_ms       INTEGER NOT NULL,
     code_count     INTEGER NOT NULL,
