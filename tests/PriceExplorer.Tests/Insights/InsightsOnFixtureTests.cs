@@ -11,7 +11,9 @@ namespace PriceExplorer.Tests.Insights;
 /// </summary>
 public sealed class InsightsOnFixtureTests(ExplorerApiFactory factory) : IClassFixture<ExplorerApiFactory>
 {
-    [Fact(Timeout = 120_000)]
+    // One scorecard and one search per code for every provider, one after another: about 16 s alone, but past two
+    // minutes when the whole suite runs in parallel on a busy machine.
+    [Fact(Timeout = 300_000)]
     public async Task Every_providers_scorecard_matches_the_search_for_its_ein_group_by_group()
     {
         var ct = TestContext.Current.CancellationToken;

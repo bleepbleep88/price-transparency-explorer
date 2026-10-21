@@ -93,6 +93,35 @@ public sealed class ProductComparisonTests(InsightsApiFactory factory) : IClassF
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task Health_center_pairs_are_left_out_unless_asked_for_and_counted_under_every_filter()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var plain = await GetAsync("/api/v1/insights/compare", ct);
+        var all = await GetAsync("/api/v1/insights/compare?includeHealthCenters=true", ct);
+        var surgery = await GetAsync("/api/v1/insights/compare?category=surgery", ct);
+        var asked = await GetAsync("/api/v1/insights/compare?setting=fqhc", ct);
+
+        // H31–H35's CPT 86235: 5 pairs, 4 the same and H31 at 1.50 against 25.
+        plain.GetProperty("healthCenters").GetInt32().Should().Be(5);
+        plain.GetProperty("summary").GetProperty("pairs").GetInt32().Should().Be(15);
+        plain.GetProperty("pairs").GetProperty("items").EnumerateArray().Select(pair => pair.GetProperty("settingKey").GetString())
+            .Should().NotContain("fqhc");
+        plain.GetProperty("notes").EnumerateArray().Select(note => note.GetString())
+            .Should().Contain(note => note!.StartsWith("5 prices at health centers left out", StringComparison.Ordinal));
+
+        all.GetProperty("query").GetProperty("includeHealthCenters").GetBoolean().Should().BeTrue();
+        var summary = all.GetProperty("summary");
+        (summary.GetProperty("pairs").GetInt32(), summary.GetProperty("identical").GetInt32(), summary.GetProperty("lower").GetInt32())
+            .Should().Be((20, plain.GetProperty("summary").GetProperty("identical").GetInt32() + 4, plain.GetProperty("summary").GetProperty("lower").GetInt32() + 1));
+        all.GetProperty("pairs").GetProperty("items")[0].GetProperty("code").GetString().Should().Be("86235", "1.50 against 25 is the biggest difference");
+
+        surgery.GetProperty("healthCenters").GetInt32().Should().Be(0, "86235 is a lab test, never surgery");
+        // Picking the health-center setting is asking for them.
+        (asked.GetProperty("query").GetProperty("includeHealthCenters").GetBoolean(), asked.GetProperty("summary").GetProperty("pairs").GetInt32())
+            .Should().Be((true, 5));
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task Figures_need_5_providers_and_the_10_to_90_range_needs_10()
     {
         var five = (await GetAsync("/api/v1/insights/compare?setting=asc", TestContext.Current.CancellationToken)).GetProperty("summary");

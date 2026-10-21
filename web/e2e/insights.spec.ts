@@ -78,6 +78,22 @@ test('compare plans leads with how often the price is the same, then the biggest
   await expect(page).toHaveURL(/[?&]ein=/)
   await expect(page).toHaveURL(/[?&]group=/)
 
+  // Health centers are left out until the switch adds them; Details says why.
+  await page.goto('/insights/compare')
+  await expect(page.getByTestId('compare-pair').first()).toBeVisible()
+  await expect(page.getByTestId('compare-pairs')).not.toContainText('Health center')
+  const healthCenters = page.getByTestId('health-centers')
+  await expect(healthCenters).toContainText(/^Include health centers \([\d,]+\)$/)
+  const before = await page.getByTestId('compare-same').innerText()
+  await page.getByTestId('compare-details-toggle').click()
+  await expect(page.getByTestId('compare-health-reason')).toHaveText(
+    "Health centers are paid by visit rules the files don't explain, so price differences there aren't like for like.",
+  )
+  await healthCenters.locator('input').check()
+  await expect(page).toHaveURL(/[?&]includeHealthCenters=true(&|$)/)
+  await expect(page.getByTestId('compare-same')).not.toHaveText(before)
+  await expect(page.getByTestId('compare-pairs')).toContainText('Health center')
+
   // Under 5 places there's no share to give: each price is listed instead.
   await page.goto('/insights/compare?category=other')
   await expect(page.getByTestId('compare-few')).toContainText(/Only [1-4] places?/)

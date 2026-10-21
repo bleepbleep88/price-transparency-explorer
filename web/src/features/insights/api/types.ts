@@ -188,6 +188,8 @@ export interface ProductComparison {
     category: string | null
     setting: string | null
     includeFacilityCharges: boolean
+    /** On when asked for, or when the setting asked for is a health center. */
+    includeHealthCenters: boolean
     sort: CompareSort
     page: number
     pageSize: number
@@ -197,6 +199,8 @@ export interface ProductComparison {
   products: ProductRef[]
   categories: CategoryOption[]
   facilityCharges: number
+  /** Pairs at health centers (FQHC, RHC) under the other filters: what includeHealthCenters adds. */
+  healthCenters: number
   /** Middle points need 5 distinct providers and the 10th/90th need 10; otherwise null. */
   summary: {
     pairs: number

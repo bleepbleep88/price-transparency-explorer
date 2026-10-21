@@ -182,6 +182,9 @@ public sealed record ScorecardGroup(
 /// <param name="Categories">Categories with pairs under the other filters, most pairs first.</param>
 /// <param name="FacilityCharges">Pairs of facility charges filed under a revenue code with no procedure named, under every
 /// filter (the category included): what includeFacilityCharges adds.</param>
+/// <param name="HealthCenters">Pairs at federally qualified health centers and rural health clinics, under every other
+/// filter: what includeHealthCenters adds. They're paid by visit rules the files don't explain, so they're left out by
+/// default.</param>
 /// <param name="Distribution">How many pairs fall in each band of the ratio, lowest band first.</param>
 /// <param name="ByCategory">The same summary per category of service, most pairs first.</param>
 /// <param name="Pairs">The pairs, biggest difference first unless sorted otherwise.</param>
@@ -194,6 +197,7 @@ public sealed record ProductComparison(
     IReadOnlyList<ProductRef> Products,
     IReadOnlyList<CategoryOption> Categories,
     int FacilityCharges,
+    int HealthCenters,
     ComparisonSummary Summary,
     IReadOnlyList<RatioBand> Distribution,
     IReadOnlyList<CategoryComparison> ByCategory,
@@ -206,6 +210,7 @@ public sealed record ProductComparisonEcho(
     string? Category,
     string? Setting,
     bool IncludeFacilityCharges,
+    bool IncludeHealthCenters,
     string Sort,
     int Page,
     int PageSize);

@@ -21,6 +21,12 @@ internal static class InsightSupport
     /// </summary>
     public static bool IsFacilityChargeOnly(string codeType) => codeType == BillingCodes.RevenueCode;
 
+    /// <summary>
+    /// A federally qualified health center or rural health clinic. They're paid by visit rules the files don't explain,
+    /// so their prices don't compare like for like across plans, test by test.
+    /// </summary>
+    public static bool IsHealthCenter(string? settingKey) => settingKey is "fqhc" or "rhc";
+
     /// <summary>The note every insight adds when it left facility charges with no procedure named out.</summary>
     public static string FacilityChargesLeftOut(int count, string what) =>
         $"{(count == 1 ? $"1 {what}" : $"{count:N0} {what}s")} of facility charges filed under a revenue code with no procedure named " +

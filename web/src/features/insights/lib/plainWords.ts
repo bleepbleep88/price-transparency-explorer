@@ -135,6 +135,9 @@ export function unitSuffix(item: { perUnit: boolean }): string {
 /** What a scorecard row for a facility charge with no procedure named says instead of a comparison. */
 export const FACILITY_CHARGE_MARK = 'Facility-only charge'
 
+/** Why Compare plans leaves health centers out by default, for Details. */
+export const HEALTH_CENTER_REASON = "Health centers are paid by visit rules the files don't explain, so price differences there aren't like for like."
+
 /** Why those charges are left out, for Details. */
 export const FACILITY_CHARGE_REASON =
   'Facility-only charges are filed under a hospital revenue code with no procedure named, like "RC 0360 Operating room". ' +

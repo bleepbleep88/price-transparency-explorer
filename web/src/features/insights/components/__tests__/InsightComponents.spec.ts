@@ -6,6 +6,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import type { ScorecardGroup, StatisticsBasis } from '../../api/types'
 import AnswerTile from '../AnswerTile.vue'
 import FacilityChargesSwitch from '../FacilityChargesSwitch.vue'
+import IncludeSwitch from '../IncludeSwitch.vue'
 import ScorecardExtremes from '../ScorecardExtremes.vue'
 import StatisticsNote from '../StatisticsNote.vue'
 
@@ -116,6 +117,17 @@ describe('FacilityChargesSwitch', () => {
     const none = mount(FacilityChargesSwitch, { props: { modelValue: false, count: 0 }, global: { plugins: plugins() } })
     expect(some.text()).toBe('Include facility-only charges (128)')
     expect(some.find('input').attributes('disabled')).toBeUndefined()
+    expect(none.find('input').attributes('disabled')).toBeDefined()
+  })
+})
+
+describe('IncludeSwitch', () => {
+  it('names what it adds with the count, and cannot be turned on with nothing to add', () => {
+    const some = mount(IncludeSwitch, { props: { modelValue: false, count: 312, label: 'Include health centers', testid: 'health-centers' }, global: { plugins: plugins() } })
+    const none = mount(IncludeSwitch, { props: { modelValue: false, count: 0, label: 'Include health centers', testid: 'health-centers' }, global: { plugins: plugins() } })
+    expect(some.text()).toBe('Include health centers (312)')
+    expect(some.find('[data-testid="health-centers"]').exists()).toBe(true)
+    expect(none.text()).toBe('Include health centers')
     expect(none.find('input').attributes('disabled')).toBeDefined()
   })
 })
