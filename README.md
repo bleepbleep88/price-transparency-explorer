@@ -62,7 +62,7 @@ Every page leads with one answer in plain words, like "Surgery center $511" or "
 - **A price here is what the plan pays, not what a patient pays.** Deductibles and coinsurance decide that.
 - **A provider is a tax ID.** Its clinicians (NPIs) are listed under it, and an NPI search shows that NPI's own price.
 - **C# instead of Go.** These are the patterns I ship every day. Each query and handler maps one-to-one to a Go handler.
-- **DuckDB instead of memory.** It's embedded, fast at the math, and keeps the data across restarts. There's no server to run.
+- **A database file instead of plain memory.** The brief allowed keeping the parsed data in memory. It goes into a DuckDB file instead: it runs inside the API (no server), does the math fast, and the data survives restarts.
 - **Three months, not one.** Price changes need more than one file. The brief's month is the middle one.
 - **Simple pages over complete ones.** The people reading prices aren't statisticians, so each page shows one answer and hides the rest.
 - **Scope.** One payer, outpatient and doctor rates only (what these files hold), no login.
