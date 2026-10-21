@@ -180,7 +180,14 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
 
               <!-- Visit levels side by side, and a drug's cost for a dose: each shows only when the search has them. -->
               <LevelLadder v-if="result.code?.levelFamily" :result="result" :params="params" />
-              <DoseCalculator v-if="result.code?.doseUnit" :result="result" :dose="params.dose" @dose="(dose) => replace({ dose })" />
+              <DoseCalculator
+                v-if="result.code?.doseUnit"
+                :result="result"
+                :dose="params.dose"
+                :plan="plan"
+                :group="lead?.key"
+                @dose="(dose) => replace({ dose })"
+              />
 
               <OutOfNetworkPanel v-if="showOutOfNetwork && outOfNetworkResult" :result="outOfNetworkResult" :params="params" />
 
