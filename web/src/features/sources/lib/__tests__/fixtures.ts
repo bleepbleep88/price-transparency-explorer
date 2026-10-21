@@ -88,3 +88,15 @@ export function sourceSnapshot(files: SourceFile[] = [sourceFile(), ALLOWED_FILE
     files,
   }
 }
+
+/** The real 2026-09-28 snapshot's in-network totals: 193,435 + 379,958 prices → 7,643 + 9,497 unique. */
+export function septemberSnapshot(): SourceSnapshot {
+  const ambetter = sourceFile({ fileId: 11, dates: { indexDate: '2026-09-28', fileLastUpdatedOn: '2026-10-06', httpLastModified: '2026-10-08T17:48:22+00:00' } }, { published: 193435, unique: 7643 })
+  const essential = sourceFile(
+    { fileId: 12, productKey: 'essential-plan', productLabel: 'Essential Plan', url: 'https://www.centene.com/2026-09-28_centene-management-company-llc_fidelis-es_in-network.json' },
+    { published: 379958, unique: 9497 },
+  )
+  const ambetterOon = { ...ALLOWED_FILE, fileId: 13, productKey: 'ambetter-from-fidelis-care', productLabel: 'Ambetter from Fidelis Care' }
+  const essentialOon = { ...ALLOWED_FILE, fileId: 14 }
+  return { ...sourceSnapshot([ambetter, essential, ambetterOon, essentialOon]), snapshotId: 2, indexDate: '2026-09-28', indexLastUpdatedOn: '2026-09-28' }
+}

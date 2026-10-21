@@ -1,94 +1,48 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { mdiOpenInNew } from '@mdi/js'
-import { megabytes, plural, shortDate, wholeNumber } from '@/lib/format'
+import { plural, shortDate, wholeNumber } from '@/lib/format'
 import type { SnapshotSummary } from '../api/types'
 import { usePlans } from '../composables/useRateQueries'
 
+// Which files are loaded, in one line: "Sep 28, 2026 files · 2 plans · 17,140 prices". The plans open a list.
 const props = defineProps<{ snapshot: SnapshotSummary }>()
 
 const plansOpen = ref(false)
 const plans = usePlans(() => (plansOpen.value ? props.snapshot.snapshotId : null))
 
-const statusColor: Record<string, string> = { loaded: 'success', partial: 'warning', failed: 'error', pending: 'default' }
-const totals = computed(() =>
-  props.snapshot.products.reduce(
-    (sum, product) => ({ published: sum.published + (product.pricesPublished ?? 0), unique: sum.unique + (product.uniqueRates ?? 0) }),
-    { published: 0, unique: 0 },
-  ),
-)
+const prices = computed(() => props.snapshot.products.reduce((sum, product) => sum + (product.uniqueRates ?? 0), 0))
+const unread = computed(() => props.snapshot.products.filter((product) => product.status === 'failed' || product.status === 'partial').length)
 </script>
 
 <template>
-  <v-card data-testid="dataset-snapshot">
-    <v-card-item>
-      <v-card-title class="text-wrap">What's loaded</v-card-title>
-      <v-card-subtitle class="text-wrap">
-        Snapshot {{ shortDate(snapshot.indexDate) }} from {{ snapshot.reportingEntityName ?? 'the plan' }}
-        <template v-if="snapshot.reportingEntityType">({{ snapshot.reportingEntityType }})</template>
-      </v-card-subtitle>
-    </v-card-item>
-
-    <v-card-text class="d-flex flex-column ga-3">
-      <p class="text-body-medium">
-        {{ wholeNumber(totals.published) }} published prices become
-        <strong>{{ wholeNumber(totals.unique) }} unique rates</strong> once exact duplicates are removed.
-      </p>
-
-      <v-sheet v-for="product in snapshot.products" :key="product.fileId" rounded="sm" border class="pa-3 d-flex flex-column ga-1">
-        <div class="d-flex align-center ga-2 flex-wrap">
-          <span class="text-title-small">{{ product.productLabel }}</span>
-          <v-chip :color="statusColor[product.status] ?? 'default'" size="x-small" variant="tonal">{{ product.status }}</v-chip>
-        </div>
-        <p class="text-body-medium text-medium-emphasis">
-          {{ plural(product.distinctPlanIds, 'plan ID') }} ({{ plural(product.planEntries, 'listed plan') }}) ·
-          {{ wholeNumber(product.distinctEins) }} tax IDs · {{ wholeNumber(product.distinctNpis) }} NPIs ·
-          {{ megabytes(product.contentLength) }}
-        </p>
-        <p class="text-body-medium text-medium-emphasis">
-          {{ wholeNumber(product.pricesPublished) }} prices → {{ wholeNumber(product.uniqueRates) }} unique rates
-        </p>
-        <p class="text-body-small text-medium-emphasis">
-          Dates: list of files {{ shortDate(snapshot.indexDate) }} · file says {{ shortDate(product.fileLastUpdatedOn) }} · server
-          {{ shortDate(product.httpLastModified) }}
-        </p>
-        <p v-if="product.warning || product.error" class="text-body-small text-warning">{{ product.warning ?? product.error }}</p>
-        <v-btn :href="product.url" target="_blank" rel="noopener" variant="text" size="small" :append-icon="mdiOpenInNew" class="px-0 align-self-start">
-          Rate file
-        </v-btn>
-      </v-sheet>
-
-      <div class="d-flex flex-wrap ga-2">
-        <v-btn variant="tonal" size="small" @click="plansOpen = true">See the plans</v-btn>
-        <v-btn :to="{ name: 'sources' }" variant="text" size="small">Sources and data quality</v-btn>
-        <v-btn :href="snapshot.indexUrl" target="_blank" rel="noopener" variant="text" size="small" :append-icon="mdiOpenInNew">
-          List of files
-        </v-btn>
-      </div>
-    </v-card-text>
+  <div class="dataset" data-testid="dataset-snapshot">
+    <p>
+      {{ shortDate(snapshot.indexDate) }} files ·
+      <button type="button" class="plans-link" data-testid="dataset-plans" @click="plansOpen = true">
+        {{ plural(snapshot.products.length, 'plan') }}
+      </button>
+      <template v-if="prices > 0"> · {{ wholeNumber(prices) }} prices</template>
+    </p>
+    <p v-if="unread" class="problem">{{ plural(unread, 'file') }} not fully loaded</p>
 
     <v-dialog v-model="plansOpen" max-width="720" scrollable>
-      <v-card title="Plans in this snapshot" subtitle="Every plan in a product shares that product's rates.">
+      <v-card title="Plans in these files">
         <v-card-text>
           <v-skeleton-loader v-if="plans.isPending.value" type="list-item@6" />
-          <template v-else-if="plans.data.value">
-            <section v-for="product in plans.data.value.products" :key="product.productKey" class="mb-4">
-              <h3 class="text-title-medium">{{ product.productLabel }}</h3>
-              <p class="text-body-small text-medium-emphasis mb-1">
-                {{ plural(product.planEntries, 'listed plan') }} under {{ plural(product.plans.length, 'plan ID') }}
-                (cost-sharing variants share an ID)
-              </p>
+          <div v-else-if="plans.data.value" class="d-flex flex-column ga-4">
+            <section v-for="product in plans.data.value.products" :key="product.productKey">
+              <h3 class="product-title">{{ product.productLabel }}</h3>
               <v-list density="compact" class="py-0">
                 <v-list-item
                   v-for="plan in product.plans"
                   :key="plan.planId ?? plan.names[0]"
-                  :title="`${plan.planIdType?.toUpperCase() ?? 'ID'} ${plan.planId ?? 'not stated'}`"
-                  :subtitle="plan.names.join(' · ')"
-                  lines="three"
+                  :title="plan.names.join(' · ')"
+                  :subtitle="`${plan.planIdType?.toUpperCase() ?? 'ID'} ${plan.planId ?? 'not stated'}`"
+                  lines="two"
                 />
               </v-list>
             </section>
-          </template>
+          </div>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
@@ -96,5 +50,39 @@ const totals = computed(() =>
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </v-card>
+  </div>
 </template>
+
+<style scoped>
+.dataset {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-background), var(--v-medium-emphasis-opacity));
+}
+
+.plans-link {
+  padding: 0;
+  font: inherit;
+  color: rgb(var(--v-theme-primary));
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.plans-link:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+.problem {
+  color: rgb(var(--v-theme-error));
+}
+
+.product-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+</style>

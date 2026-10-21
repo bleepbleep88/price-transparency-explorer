@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { mdiMapMarkerQuestionOutline } from '@mdi/js'
+import PageHeader from '@/components/simple/PageHeader.vue'
 </script>
 
 <template>
-  <v-container class="py-16" max-width="720">
-    <v-empty-state :icon="mdiMapMarkerQuestionOutline" text="That link doesn't match any page in the explorer.">
-      <template #headline>
-        <h1 class="text-headline-small">Page not found</h1>
-      </template>
-      <template #actions>
-        <v-btn color="primary" :to="{ name: 'search' }">Go to search</v-btn>
-      </template>
-    </v-empty-state>
+  <v-container class="not-found" max-width="960">
+    <PageHeader title="Page not found" subtitle="That link doesn't match a page." />
+    <v-btn color="primary" :to="{ name: 'search' }" class="align-self-start">Go to search</v-btn>
   </v-container>
 </template>
+
+<style scoped>
+.not-found {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-top: 40px;
+  padding-bottom: 40px;
+}
+</style>

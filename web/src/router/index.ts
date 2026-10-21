@@ -19,7 +19,7 @@ const router = createRouter({
       path: '/sources',
       name: 'sources',
       component: () => import('@/views/SourcesView.vue'),
-      meta: { title: 'Sources and data quality' },
+      meta: { title: 'Where the data comes from' },
     },
     {
       path: '/insights/gaps',
