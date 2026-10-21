@@ -92,11 +92,19 @@ export function priceMove(row: Pick<RateChange, 'kind' | 'from' | 'to'>): string
   return dollars(from) === dollars(to) ? `${money(from)} → ${money(to)}` : `${dollars(from)} → ${dollars(to)}`
 }
 
-/** How many new and gone rates are only listed differently; null when none are. */
+/** "5,855 new and 5,853 gone are the same provider and service, relabeled."; null when none are. */
 export function listedElsewhereSummary(counts: ChangeCounts): string | null {
   const parts: string[] = []
-  if (counts.newListedElsewhere) parts.push(`${wholeNumber(counts.newListedElsewhere)} of the new`)
-  if (counts.droppedListedElsewhere) parts.push(`${wholeNumber(counts.droppedListedElsewhere)} of the gone`)
+  if (counts.newListedElsewhere) parts.push(`${wholeNumber(counts.newListedElsewhere)} new`)
+  if (counts.droppedListedElsewhere) parts.push(`${wholeNumber(counts.droppedListedElsewhere)} gone`)
   if (!parts.length) return null
-  return `${joinAnd(parts)} rates are the same provider and service, listed with other modifiers or in another setting.`
+  return `${joinAnd(parts)} ${counts.newListedElsewhere + counts.droppedListedElsewhere === 1 ? 'is' : 'are'} the same provider and service, relabeled.`
+}
+
+/** How many relabeled rates the switch adds to the list, for the kind shown: new, gone, or both when no kind is picked. */
+export function relabeledCount(counts: ChangeCounts | null | undefined, kind: string | null | undefined): number {
+  if (!counts) return 0
+  if (kind === 'new') return counts.newListedElsewhere
+  if (kind === 'dropped') return counts.droppedListedElsewhere
+  return kind ? 0 : counts.newListedElsewhere + counts.droppedListedElsewhere
 }

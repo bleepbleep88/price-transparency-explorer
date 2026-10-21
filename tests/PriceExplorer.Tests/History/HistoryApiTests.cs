@@ -52,7 +52,8 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
         result.GetProperty("to").GetProperty("isLatest").GetBoolean().Should().BeTrue();
         result.GetProperty("current").GetBoolean().Should().BeTrue();
         result.GetProperty("products").EnumerateArray().Should().OnlyContain(product => product.GetProperty("compared").GetBoolean());
-        Counts(result).Should().Equal(5, 4, 1, 2, 1, 2, 1, 8);
+        // New and dropped leave out Delta's rate, relabeled into another setting; the listed-elsewhere counts say so.
+        Counts(result).Should().Equal(5, 4, 1, 1, 1, 1, 1, 8);
 
         // Biggest moves first, then new and dropped rates by amount.
         Rows(result).Select(Describe).Should().Equal(
@@ -62,9 +63,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
             "changed 44-3333333 45378 450.00→459.00 2.0",
             "changed 22-1111111 45378 610.00→620.00 1.6",
             "dropped 77-6666666 45378 800.00→",
-            "new 66-5555555 45378 →750.00",
-            "dropped 55-4444444 45378 700.00→",
-            "new 55-4444444 45378 →700.00");
+            "new 66-5555555 45378 →750.00");
     }
 
     [Fact(Timeout = 60_000)]
@@ -106,7 +105,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     [Fact(Timeout = 60_000)]
     public async Task A_provider_that_moves_to_another_setting_is_dropped_there_and_new_here_not_changed()
     {
-        var result = await GetAsync($"/api/v1/changes?code=45378&product={Ambetter}", TestContext.Current.CancellationToken);
+        var result = await GetAsync($"/api/v1/changes?code=45378&product={Ambetter}&includeListedElsewhere=true", TestContext.Current.CancellationToken);
         var delta = Rows(result).Where(row => row.GetProperty("ein").GetString() == Delta.Key).ToList();
 
         delta.Select(row => (row.GetProperty("kind").GetString(), row.GetProperty("groupKey").GetString()))
@@ -117,17 +116,19 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     }
 
     [Theory(Timeout = 60_000)]
-    [InlineData("false", 5, "dropped 77-6666666 45378 800.00→|new 66-5555555 45378 →750.00", 1, 0, 1, 0)]
-    [InlineData("true", 0, "dropped 55-4444444 45378 700.00→|new 55-4444444 45378 →700.00", 1, 1, 1, 1)]
-    public async Task New_and_dropped_rates_listed_elsewhere_can_be_left_out_or_shown_alone(
-        string listedElsewhere, int changed, string rows, int newCount, int newElsewhere, int droppedCount, int droppedElsewhere)
+    [InlineData("", "dropped 77-6666666 45378 800.00→|new 66-5555555 45378 →750.00", 1, 1, 1, 1)]
+    [InlineData("&includeListedElsewhere=true",
+        "dropped 55-4444444 45378 700.00→|dropped 77-6666666 45378 800.00→|new 55-4444444 45378 →700.00|new 66-5555555 45378 →750.00", 2, 1, 2, 1)]
+    public async Task New_and_dropped_rates_listed_elsewhere_are_left_out_unless_asked_for_and_counted_either_way(
+        string include, string rows, int newCount, int newElsewhere, int droppedCount, int droppedElsewhere)
     {
-        var result = await GetAsync($"/api/v1/changes?listedElsewhere={listedElsewhere}", TestContext.Current.CancellationToken);
+        var result = await GetAsync($"/api/v1/changes?sort=code{include}", TestContext.Current.CancellationToken);
 
-        string.Join('|', Rows(result).Where(row => row.GetProperty("kind").GetString() != "changed").Select(Describe)).Should().Be(rows);
-        Counts(result)[0].Should().Be(changed, "a changed rate is in the same group in both files, so it's never listed elsewhere");
+        string.Join('|', Rows(result).Where(row => row.GetProperty("kind").GetString() != "changed").Select(Describe).Order(StringComparer.Ordinal))
+            .Should().Be(rows);
+        Counts(result)[0].Should().Be(5, "a changed rate is in the same group in both files, so it's never listed elsewhere");
         Counts(result)[3..7].Should().Equal(newCount, newElsewhere, droppedCount, droppedElsewhere);
-        result.GetProperty("query").GetProperty("listedElsewhere").GetBoolean().Should().Be(listedElsewhere == "true");
+        result.GetProperty("query").GetProperty("includeListedElsewhere").GetBoolean().Should().Be(include.Length > 0);
     }
 
     [Fact(Timeout = 60_000)]
@@ -151,14 +152,15 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
 
     [Theory(Timeout = 60_000)]
     [InlineData("kind=changed&minChangePct=5", 3, "88-7777777|22-1111111|masked")]
-    [InlineData("kind=new", 2, "66-5555555|55-4444444")]
-    [InlineData("kind=dropped&code=45378", 2, "77-6666666|55-4444444")]
+    [InlineData("kind=new", 1, "66-5555555")]
+    [InlineData("kind=new&includeListedElsewhere=true", 2, "66-5555555|55-4444444")]
+    [InlineData("kind=dropped&code=45378", 1, "77-6666666")]
     [InlineData("product=essential-plan", 1, "22-1111111")]
     [InlineData("code=99213", 1, "88-7777777")]
     [InlineData("code=CPT%2099213&kind=changed", 1, "88-7777777")]
     [InlineData("sort=changePct&kind=changed", 5, "masked|22-1111111|44-3333333|22-1111111|88-7777777")]
     [InlineData("sort=-changePct&kind=changed&minChangePct=2", 4, "88-7777777|22-1111111|44-3333333|masked")]
-    [InlineData("sort=provider&kind=dropped", 2, "55-4444444|77-6666666")]
+    [InlineData("sort=provider&kind=dropped&includeListedElsewhere=true", 2, "55-4444444|77-6666666")]
     [InlineData("kind=increased", 4, "88-7777777|22-1111111|44-3333333|22-1111111")]
     [InlineData("kind=decreased", 1, "masked")]
     public async Task Filters_and_sorts_narrow_the_rows_and_counts(string filters, int total, string providers)
@@ -188,26 +190,26 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
         var all = await GetAsync("/api/v1/changes?kind=new", ct);
         var bigOnes = await GetAsync("/api/v1/changes?minChangePct=5", ct);
 
-        Counts(all).Should().Equal(5, 4, 1, 2, 1, 2, 1, 8);
-        Counts(bigOnes).Should().Equal(3, 2, 1, 2, 1, 2, 1, 8);
-        bigOnes.GetProperty("rows").GetProperty("total").GetInt32().Should().Be(7);
+        Counts(all).Should().Equal(5, 4, 1, 1, 1, 1, 1, 8);
+        Counts(bigOnes).Should().Equal(3, 2, 1, 1, 1, 1, 1, 8);
+        bigOnes.GetProperty("rows").GetProperty("total").GetInt32().Should().Be(5);
     }
 
     [Fact(Timeout = 60_000)]
     public async Task Pages_cover_every_change_once()
     {
         var ct = TestContext.Current.CancellationToken;
-        var whole = Rows(await GetAsync("/api/v1/changes?sort=code", ct)).Select(Describe).ToList();
+        var whole = Rows(await GetAsync("/api/v1/changes?sort=code&includeListedElsewhere=true", ct)).Select(Describe).ToList();
 
         var paged = new List<string>();
         for (var page = 1; page <= 5; page++)
         {
-            paged.AddRange(Rows(await GetAsync($"/api/v1/changes?sort=code&pageSize=2&page={page}", ct)).Select(Describe));
+            paged.AddRange(Rows(await GetAsync($"/api/v1/changes?sort=code&includeListedElsewhere=true&pageSize=2&page={page}", ct)).Select(Describe));
         }
 
         whole.Should().HaveCount(9);
         paged.Should().Equal(whole);
-        Rows(await GetAsync("/api/v1/changes?sort=code&pageSize=2&page=6", ct)).Should().BeEmpty();
+        Rows(await GetAsync("/api/v1/changes?sort=code&includeListedElsewhere=true&pageSize=2&page=6", ct)).Should().BeEmpty();
     }
 
     [Theory(Timeout = 60_000)]
@@ -221,7 +223,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     [InlineData("code=4537-8", "code")]
     [InlineData("from=1&to=1", "from")]
     [InlineData("to=0", "to")]
-    [InlineData("listedElsewhere=maybe", "listedElsewhere")]
+    [InlineData("includeListedElsewhere=maybe", "includeListedElsewhere")]
     public async Task Bad_change_inputs_are_400s_naming_the_field(string query, string field)
     {
         using var client = factory.CreateClient();

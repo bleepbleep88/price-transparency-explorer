@@ -31,7 +31,7 @@ export interface ChangesParams {
   kind?: ChangeFilter
   minChangePct?: number
   /** Leave out new and dropped rates the other file lists under other modifiers or another setting. */
-  hideListedElsewhere: boolean
+  includeListedElsewhere: boolean
   /** Add facility charges with no procedure named, which are left out by default as on the insights pages (decision 89). */
   includeFacilityCharges: boolean
   sort: ChangeSort
@@ -66,7 +66,7 @@ export function parseChangesQuery(query: LocationQuery): ChangesParams {
     code: first(query.code),
     kind: oneOf(CHANGE_KINDS, first(query.kind)),
     minChangePct: first(query.minChangePct) && minChangePct > 0 && minChangePct <= MAX_CHANGE_PCT ? minChangePct : undefined,
-    hideListedElsewhere: first(query.listedElsewhere) === 'false',
+    includeListedElsewhere: first(query.includeListedElsewhere) === 'true',
     includeFacilityCharges: first(query.includeFacilityCharges) === 'true',
     sort: oneOf(CHANGE_SORTS, first(query.sort)) ?? DEFAULT_CHANGE_SORT,
     page: positiveInteger(first(query.page)) ?? 1,
@@ -79,9 +79,8 @@ export function mergeChangesQuery(current: LocationQuery, patch: ChangesPatch): 
   const next: LocationQueryRaw = { ...current }
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue
-    const name = key === 'hideListedElsewhere' ? 'listedElsewhere' : key
-    if (value === null || value === '' || value === false) delete next[name]
-    else next[name] = key === 'hideListedElsewhere' ? 'false' : String(value)
+    if (value === null || value === '' || value === false) delete next[key]
+    else next[key] = String(value)
   }
   if (next.sort === DEFAULT_CHANGE_SORT) delete next.sort
   if (next.page === '1') delete next.page
@@ -98,8 +97,8 @@ export function toChangesApiQuery(params: ChangesParams): Record<string, QueryVa
     code: params.code,
     kind: params.kind,
     minChangePct: params.minChangePct,
-    listedElsewhere: params.hideListedElsewhere ? false : undefined,
     includeFacilityCharges: params.includeFacilityCharges ? true : undefined,
+    includeListedElsewhere: params.includeListedElsewhere ? true : undefined,
     sort: params.sort === DEFAULT_CHANGE_SORT ? undefined : params.sort,
     page: params.page,
     pageSize: params.pageSize,

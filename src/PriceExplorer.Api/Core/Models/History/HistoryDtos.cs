@@ -33,8 +33,8 @@ public sealed record ChangesResult(
 
 /// <summary>The request as the server ran it, with the snapshots it picked.</summary>
 public sealed record ChangesEcho(
-    int From, int To, string? Product, string? Code, string? CodeType, string? Kind, decimal? MinChangePct, bool? ListedElsewhere,
-    string Sort, int Page, int PageSize, bool IncludeFacilityCharges);
+    int From, int To, string? Product, string? Code, string? CodeType, string? Kind, decimal? MinChangePct, string Sort, int Page,
+    int PageSize, bool IncludeFacilityCharges, bool IncludeListedElsewhere);
 
 /// <param name="Compared">Both snapshots have the product, and neither file looks partial: its rates are in the counts and rows.</param>
 /// <param name="NotComparedBecause">Why it wasn't compared, in plain words; null when it was.</param>
@@ -45,12 +45,13 @@ public sealed record ChangesProduct(string ProductKey, string ProductLabel, bool
 /// behind them moved) count as unchanged.</param>
 /// <param name="Increased">Changed values that went up.</param>
 /// <param name="Decreased">Changed values that went down.</param>
-/// <param name="New">In the newer file only.</param>
-/// <param name="NewListedElsewhere">Of the new ones, providers the older file lists for the same code under other
-/// modifiers or another setting: a change in how the rate is listed more than a new contract.</param>
-/// <param name="Dropped">In the older file only.</param>
-/// <param name="DroppedListedElsewhere">Of the dropped ones, providers the newer file lists for the same code under other
-/// modifiers or another setting.</param>
+/// <param name="New">In the newer file only (the relabeled ones only when <c>includeListedElsewhere</c> is set).</param>
+/// <param name="NewListedElsewhere">New rates whose provider the older file lists for the same code under other modifiers or
+/// another setting: the same rate relabeled, not a new contract. What <c>includeListedElsewhere</c> adds to New (already in
+/// it when set), under every other filter.</param>
+/// <param name="Dropped">In the older file only (the relabeled ones only when <c>includeListedElsewhere</c> is set).</param>
+/// <param name="DroppedListedElsewhere">Dropped rates whose provider the newer file lists for the same code under other
+/// modifiers or another setting: what <c>includeListedElsewhere</c> adds to Dropped.</param>
 /// <param name="Unchanged">In both files with the same value, or with the same rates.</param>
 /// <param name="FacilityCharges">Facility charges with no procedure named (filed under a revenue code alone) that match every other filter, kind
 /// included: what <c>includeFacilityCharges</c> adds to the rows. The other counts include them only when it's set.</param>

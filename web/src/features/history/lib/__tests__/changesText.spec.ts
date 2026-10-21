@@ -5,6 +5,7 @@ import {
   changeText,
   listedElsewhereSummary,
   priceMove,
+  relabeledCount,
   upDown,
   waitingText,
 } from '../changesText'
@@ -57,14 +58,19 @@ describe('changes in words', () => {
     ).toBe('Changes show once loading finishes: the numbers for Aug 31, 2026 and Sep 28, 2026 are being updated.')
   })
 
-  it('says how many new and gone rates are only listed differently', () => {
-    expect(listedElsewhereSummary(counts)).toBe(
-      '5,858 of the new and 5,856 of the gone rates are the same provider and service, listed with other modifiers or in another setting.',
-    )
-    expect(listedElsewhereSummary({ ...counts, newListedElsewhere: 0 })).toBe(
-      '5,856 of the gone rates are the same provider and service, listed with other modifiers or in another setting.',
-    )
+  it('says in one line how many new and gone rates are the same provider and service, relabeled', () => {
+    expect(listedElsewhereSummary(counts)).toBe('5,858 new and 5,856 gone are the same provider and service, relabeled.')
+    expect(listedElsewhereSummary({ ...counts, newListedElsewhere: 0 })).toBe('5,856 gone are the same provider and service, relabeled.')
+    expect(listedElsewhereSummary({ ...none, droppedListedElsewhere: 1 })).toBe('1 gone is the same provider and service, relabeled.')
     expect(listedElsewhereSummary(none)).toBeNull()
+  })
+
+  it('counts the relabeled rates the switch adds for the kind shown', () => {
+    expect(relabeledCount(counts, null)).toBe(11714)
+    expect(relabeledCount(counts, 'new')).toBe(5858)
+    expect(relabeledCount(counts, 'dropped')).toBe(5856)
+    expect(relabeledCount(counts, 'increased')).toBe(0)
+    expect(relabeledCount(null, null)).toBe(0)
   })
 
   it('shows a change in dollars and percent, and big jumps as how many times as much', () => {

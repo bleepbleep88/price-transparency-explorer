@@ -20,12 +20,14 @@ namespace PriceExplorer.Api.Core.Queries.History;
 /// <param name="Kind">changed | increased | decreased (changed, by direction) | new | dropped. Omit for changed, new and
 /// dropped.</param>
 /// <param name="MinChangePct">Only changes of at least this many percent, up or down (changed rates only).</param>
-/// <param name="ListedElsewhere">false leaves out new and dropped rates whose provider the other file lists for the same
-/// code under other modifiers or another setting; true keeps only those.</param>
 /// <param name="Sort">largest (biggest moves first) | -changePct | changePct | code | -code | provider | -provider.</param>
 /// <param name="IncludeFacilityCharges">true adds facility charges with no procedure named (filed under a revenue code
 /// alone). Hospitals bundle different services under them, so by default they're left out of the rows and counts, as on
 /// the insights endpoints (decision 89); counts.facilityCharges says how many there are.</param>
+/// <param name="IncludeListedElsewhere">true adds new and dropped rates the other file lists for the same provider, code
+/// and fee type under other modifiers or another setting: the same rate relabeled (Centene reshuffles telehealth
+/// modifiers), which would otherwise read as one rate gone and another new. Left out of the rows and counts by default;
+/// counts.newListedElsewhere and counts.droppedListedElsewhere say how many there are.</param>
 public sealed record GetChangesQuery(
     int? From = null,
     int? To = null,
@@ -33,11 +35,11 @@ public sealed record GetChangesQuery(
     string? Code = null,
     string? Kind = null,
     decimal? MinChangePct = null,
-    bool? ListedElsewhere = null,
     string? Sort = null,
     int Page = 1,
     int PageSize = 25,
-    bool IncludeFacilityCharges = false) : IRequest<ChangesResult>, IRequiresData;
+    bool IncludeFacilityCharges = false,
+    bool IncludeListedElsewhere = false) : IRequest<ChangesResult>, IRequiresData;
 
 public sealed class GetChangesQueryValidator : AbstractValidator<GetChangesQuery>
 {
