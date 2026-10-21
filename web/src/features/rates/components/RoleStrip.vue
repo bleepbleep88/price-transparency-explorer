@@ -18,13 +18,16 @@ const emit = defineEmits<{
 
 const lens = computed(() => props.params.lens ?? null)
 const lines = computed(() => (lens.value ? roleLines(lens.value, props.result, props.group, props.params.cases, props.tiles ?? []) : []))
-const showCases = computed(() => lens.value === 'employers' && (props.tiles?.length ? props.tiles : props.group ? [props.group] : []).some((tile) => !tile.perUnit))
+const showCases = computed(() => lens.value === 'employers' && lines.value.some((line) => line.cases))
 const apiUrl = computed(() => apiSearchUrl(props.params, window.location.origin))
 // One link on to the page that answers the role's next question, when that page has something for this service.
 const nextLink = computed(() => {
   if (lens.value === 'providers') {
     const scorecard = scorecardLink(props.result)
-    return scorecard ? { to: scorecard.to, label: 'All your prices' } : null
+    if (!scorecard) return null
+    // The scorecard is titled with the tax ID's main name; it says it's the same provider as the one searched.
+    const to = typeof scorecard.to === 'object' && 'query' in scorecard.to ? { ...scorecard.to, query: { ...scorecard.to.query, as: scorecard.name } } : scorecard.to
+    return { to, label: 'All your prices' }
   }
   if (lens.value === 'plans') {
     const compare = compareLink(props.result)
@@ -110,7 +113,7 @@ function onCases(value: string | null) {
 .roles {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   padding-top: 16px;
   border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }

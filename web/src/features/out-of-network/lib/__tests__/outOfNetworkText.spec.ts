@@ -165,6 +165,6 @@ describe('out-of-network readings', () => {
     expect(outOfNetworkWhich([oonGroup()])).toBeNull()
     expect(outOfNetworkWhich([oonGroup(), LISTED_CT_READ])).toBe('Essential Plan · Facility fee')
     const doctor = oonGroup({ key: 'b', feeType: 'professional', providers: 9, modifiers: [{ code: 'LT', label: 'Left side (modifier LT)' }] })
-    expect(outOfNetworkWhich([oonGroup(), doctor])).toBe("Doctor's fee · left side")
+    expect(outOfNetworkWhich([oonGroup(), doctor])).toBe("Doctor's fee · left")
   })
 })

@@ -33,6 +33,7 @@ const items = computed<PlaceItem[]>(() =>
     name: providerName(row.businessName),
     place: placeName(row.profile?.locations[0]),
     price: row.rate,
+    band: row.band === 'low' || row.band === 'high' ? row.band : null,
     yours: props.yours && row.matched,
   })),
 )
@@ -61,13 +62,13 @@ function open(key: string) {
         aria-label="Order"
         @update:model-value="(value: string) => order(value as SortKey)"
       >
-        <v-btn value="rate" data-testid="order-cheapest">Cheapest first</v-btn>
-        <v-btn value="-rate" data-testid="order-priciest">Priciest first</v-btn>
+        <v-btn value="rate" :aria-pressed="!priciest" data-testid="order-cheapest">Cheapest first</v-btn>
+        <v-btn value="-rate" :aria-pressed="priciest" data-testid="order-priciest">Priciest first</v-btn>
       </v-btn-toggle>
     </div>
 
     <v-skeleton-loader v-if="stale" type="list-item@5" class="bg-transparent" />
-    <PlaceList v-else :items="items" :tone="priciest ? 'high' : 'low'" :per-unit="group?.perUnit ?? false" @open="open" />
+    <PlaceList v-else :items="items" :per-unit="group?.perUnit ?? false" @open="open" />
 
     <v-btn
       v-if="!stale && (rows.total > SHOWN || showAll)"

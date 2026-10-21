@@ -35,6 +35,8 @@ test('an example runs its search, and "I\'m a" gives one line for the role', asy
   // No prices, no role line: the hint explains.
   await page.getByRole('combobox', { name: 'Service or code' }).fill('J9999')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(page.getByTestId('no-prices')).toHaveText('No prices for this in these files.')
+  await page.getByTestId('no-prices-why-toggle').click()
   await expect(page.getByTestId('hint-code_not_found')).toBeVisible()
   await expect(page.getByTestId('lens-panel')).toHaveCount(0)
 })

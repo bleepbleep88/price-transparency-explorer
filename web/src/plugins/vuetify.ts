@@ -86,7 +86,7 @@ export const vuetify = createVuetify({
     VCombobox: { variant: 'outlined', density: 'compact', hideDetails: 'auto', rounded: 'sm' },
     VNumberInput: { variant: 'outlined', density: 'compact', rounded: 'sm' },
     // Chips and toggles share one shape: round ends (plan tabs, roles, filters, ranking).
-    VChip: { size: 'small', rounded: 'pill' },
+    VChip: { rounded: 'pill' },
     VBtnToggle: { rounded: 'pill' },
     VDataTableServer: { density: 'compact' },
   },

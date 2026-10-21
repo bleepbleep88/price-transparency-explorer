@@ -29,7 +29,25 @@ test('a name typed without picking a suggestion searches the best match', async 
   await box.fill('colonoscopy')
   await expect(page.getByRole('option').first()).toBeVisible()
   await page.getByRole('button', { name: 'Search', exact: true }).click()
-  await expect(page).toHaveURL(/[?&]code=\d{5}(&|$)/)
+  // The plain name wins: Colonoscopy (45378), not the busier 45380 with biopsy.
+  await expect(page).toHaveURL(/[?&]code=45378(&|$)/)
+  await expect(page.getByTestId('price-tile').first()).toBeVisible()
+})
+
+test('words people use find the service: botox, then mri', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('combobox', { name: 'Service or code' }).fill('botox')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(page).toHaveURL(/[?&]code=J0585(&|$)/)
+  await expect(page.getByTestId('service-title')).toHaveText('Botox')
+  // The tile is never the thrown-away-drug price unless that's all there is, and then it says so.
+  for (const tile of await page.getByTestId('price-tile').allInnerTexts()) {
+    if (/JW|discarded/i.test(tile)) expect(tile).toContain('for drug thrown away')
+  }
+
+  await page.getByRole('combobox', { name: 'Service or code' }).fill('mri')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(page).not.toHaveURL(/[?&]code=MRI(&|$)/i)
   await expect(page.getByTestId('price-tile').first()).toBeVisible()
 })
 

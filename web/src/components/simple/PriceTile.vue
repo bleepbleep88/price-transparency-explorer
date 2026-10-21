@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { money } from '@/lib/format'
 import { dollars } from '@/lib/plainNumbers'
 import TrendChip from './TrendChip.vue'
 
@@ -29,7 +28,7 @@ function onClick() {
 function fewText(listed: number[]): string {
   if (!listed.length) return 'Not enough prices'
   const places = listed.length === 1 ? '1 place' : `${listed.length} places`
-  return `Only ${places}: ${listed.map((rate) => money(rate)).join(' · ')}`
+  return `Only ${places}: ${listed.map((rate) => dollars(rate)).join(' · ')}`
 }
 </script>
 
@@ -48,7 +47,7 @@ function fewText(listed: number[]): string {
     </span>
     <template v-if="price != null">
       <span class="tile-price" data-testid="tile-price">
-        {{ dollars(price) }}<span class="tile-unit">{{ perUnit ? 'per unit' : 'typical' }}</span>
+        {{ dollars(price) }} <span class="tile-unit">{{ perUnit ? 'per unit' : 'typical' }}</span>
       </span>
       <span v-if="line" class="tile-line" data-testid="tile-line">{{ line }}</span>
     </template>
@@ -112,7 +111,7 @@ function fewText(listed: number[]): string {
 }
 
 .tile-unit {
-  margin-left: 8px;
+  margin-left: 4px;
   font-family: var(--v-font-body);
   font-size: 0.875rem;
   font-weight: 500;
@@ -132,7 +131,7 @@ function fewText(listed: number[]): string {
 }
 
 .tile-count {
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 </style>

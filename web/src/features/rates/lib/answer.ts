@@ -2,7 +2,7 @@
 // Pure functions of the API result, so the wording is unit-tested.
 
 import { money, plural } from '@/lib/format'
-import { billLine, billName, placesCount } from '@/lib/plainNames'
+import { billLine, billName, placesCount, serviceTitle } from '@/lib/plainNames'
 import { dollars, gapOf, lessPerCase, positionLine, bandFor, typicalPrice, yearlyLine, type PriceSummary } from '@/lib/plainNumbers'
 import type { RateGroup, RateSearchResult } from '../api/types'
 import { isDrugCode, pinsProvider, priceSummary } from './lenses'
@@ -41,9 +41,27 @@ function hasTypical(group: RateGroup): boolean {
   return typicalPrice(priceSummary(group)) != null
 }
 
-/** Groups with a typical price first, then the most providers. */
+/** A drug price for the amount thrown away (JW) or a no-waste line (JZ): never the answer for a dose. */
+export function forDiscardedDrug(group: RateGroup): boolean {
+  return group.modifiers.some((modifier) => modifier.code === 'JW' || modifier.code === 'JZ')
+}
+
+function byVideo(group: RateGroup): boolean {
+  return group.settingKey.startsWith('telehealth') || group.modifiers.some((modifier) => ['95', 'GT', 'GQ', '93', 'FQ'].includes(modifier.code))
+}
+
+/**
+ * The order tiles and other prices come in: never a thrown-away-drug price first; a price with a typical before one
+ * without; in person before video (an office visit leads with the office, when the office has a typical); then the most
+ * providers.
+ */
 function byStrength(a: RateGroup, b: RateGroup): number {
-  return Number(hasTypical(b)) - Number(hasTypical(a)) || b.providerCount - a.providerCount
+  return (
+    Number(forDiscardedDrug(a)) - Number(forDiscardedDrug(b)) ||
+    Number(hasTypical(b)) - Number(hasTypical(a)) ||
+    Number(byVideo(a)) - Number(byVideo(b)) ||
+    b.providerCount - a.providerCount
+  )
 }
 
 /**
@@ -97,7 +115,9 @@ export interface Tile {
 export function tileFor(group: RateGroup, result: RateSearchResult): Tile {
   const summary = priceSummary(group)
   const typical = typicalPrice(summary)
-  const { name, where } = billName(group)
+  const { name, where: place } = billName(group)
+  // Only a thrown-away-drug price to show: the tile says so in plain words.
+  const where = forDiscardedDrug(group) ? [place, 'for drug thrown away'].filter(Boolean).join(', ') : place
   const position = pinsProvider(result) ? group.highlights[0] : undefined
   let yours: string | null = null
   if (position) {
@@ -146,10 +166,26 @@ export function otherPrices(result: RateSearchResult, shown: string[]): OtherPri
     })
 }
 
+/**
+ * The page title for a search: a plain name, the start of the plan's long description, the short name spelled out, or
+ * for a revenue code its label ("Ambulatory surgery charge").
+ */
+export function resultTitle(result: RateSearchResult): string {
+  const code = result.code
+  const searched = code?.code ?? result.query.code
+  const revenue = result.groups
+    .flatMap((group) => group.billedAs)
+    .find((billed) => billed.billingCodeType === 'RC' && billed.billingCode === searched)
+  const revenueLabel = revenue?.label.match(/\(([^)]+)\)/)?.[1] ?? null
+  return serviceTitle(searched, code?.name, code?.descriptionSource === 'payer_file' || code?.descriptionSource === 'cms_hcpcs' ? code?.description : null, revenueLabel)
+}
+
 export interface RoleLine {
   text: string
-  /** Employers: the cases-a-year box shows, and this is the yearly figure for the cases entered. */
+  /** Employers: the yearly figure for the cases entered. */
   yearly?: string | null
+  /** Employers: a case count can give a yearly figure here, so the cases box shows. */
+  cases?: boolean
   /** A follow-up the line offers: add an NPI, open the API, try a drug. */
   action?: 'npi' | 'api' | 'drug' | null
 }
@@ -194,6 +230,7 @@ export function roleLines(lens: Lens, result: RateSearchResult, group: RateGroup
         {
           text: `${bill}the cheapest quarter of places get at least ${per}.`.replace(/^the/, 'The'),
           yearly: !best.group.perUnit && cases ? yearlyLine(best.gap, cases) : null,
+          cases: !best.group.perUnit,
         },
       ]
     }

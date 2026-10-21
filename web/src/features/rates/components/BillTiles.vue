@@ -44,7 +44,7 @@ const tiles = computed(() =>
       data-testid="plan-tabs"
       @update:model-value="(value: string | null) => value && emit('plan', value)"
     >
-      <v-btn v-for="tab in tabs" :key="tab.key" :value="tab.key" :data-testid="`plan-${tab.key}`">{{ tab.label }}</v-btn>
+      <v-btn v-for="tab in tabs" :key="tab.key" :value="tab.key" :aria-pressed="tab.key === plan" :data-testid="`plan-${tab.key}`">{{ tab.label }}</v-btn>
     </v-btn-toggle>
 
     <div class="tiles">

@@ -14,7 +14,6 @@ const EXAMPLES: readonly Example[] = [
   { code: '99213', label: 'Office visit' },
   { code: '99284', label: 'ER visit' },
   { code: '66984', label: 'Cataract surgery' },
-  { code: '29881', label: 'Knee scope' },
   { code: 'J0585', label: 'Botox' },
 ]
 </script>

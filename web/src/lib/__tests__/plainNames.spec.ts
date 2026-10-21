@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { billLine, billName, modifierWords, placeName, placesCount, providerName, sentenceCase, serviceTitle, settingName } from '../plainNames'
+import {
+  billLine,
+  billName,
+  looksLikeCode,
+  modifierWords,
+  placeName,
+  placesCount,
+  plainNameMatches,
+  providerName,
+  sentenceCase,
+  serviceTitle,
+  settingName,
+} from '../plainNames'
 
 describe('plain names', () => {
   it('names settings and bills the way people say them', () => {
@@ -8,12 +20,17 @@ describe('plain names', () => {
     expect(settingName('nope', 'Some place')).toBe('Some place')
     expect(billName({ feeType: 'facility', settingKey: 'asc' })).toEqual({ name: 'Surgery center', where: null })
     expect(billName({ feeType: 'professional', settingKey: 'office' })).toEqual({ name: 'Doctor', where: 'in the office' })
-    // A health center is paid one price for the whole visit, not a bill on top of the doctor's.
-    expect(billName({ feeType: 'facility', settingKey: 'fqhc' })).toEqual({ name: 'Health center visit (all in one price)', where: null })
+    // A health center's visit is paid one price for the whole visit; a lab test there isn't a visit.
+    expect(billName({ feeType: 'facility', settingKey: 'fqhc', code: '99213' })).toEqual({ name: 'Health center visit (all in one price)', where: null })
+    expect(billName({ feeType: 'facility', settingKey: 'fqhc', code: '86803' })).toEqual({ name: 'Health center', where: null })
+    // Physical and occupational therapy is the therapist's bill.
+    expect(billName({ feeType: 'professional', settingKey: 'office', code: '97530' })).toEqual({ name: 'Therapist', where: 'in the office' })
     expect(billLine({ feeType: 'professional', settingKey: 'asc', modifiers: [{ code: '33', label: 'Preventive service (modifier 33)' }] })).toBe(
-      'Doctor · at a surgery center · preventive service',
+      'Doctor · at a surgery center · preventive',
     )
-    expect(modifierWords([{ code: 'LT', label: 'Left side (modifier LT)' }, { code: 'RT', label: 'Right side (modifier RT)' }])).toBe('left side, right side')
+    expect(modifierWords([{ code: 'LT', label: 'Left side (modifier LT)' }, { code: 'RT', label: 'Right side (modifier RT)' }])).toBe('left, right')
+    // A few plain words per modifier, and each said once: 95 and GT are both "video".
+    expect(modifierWords([{ code: '25', label: 'x' }, { code: '95', label: 'y' }, { code: 'GT', label: 'z' }])).toBe('same day as a procedure, video')
   })
 
   it('calls common services by plain names, else the plan name in sentence case', () => {
@@ -32,6 +49,26 @@ describe('plain names', () => {
     expect(providerName('General Physician, PC')).toBe('General Physician')
     expect(providerName('MOUNT SINAI HOSPITAL')).toBe('Mount Sinai Hospital')
     expect(providerName('UNIVERSITY OF ROCHESTER')).toBe('University of Rochester')
+    // Acronyms stay: no vowel, or three letters or fewer.
+    expect(providerName('MVHS INC')).toBe('MVHS')
+    expect(providerName('NYU LANGONE HOSPITALS')).toBe('NYU Langone Hospitals')
+  })
+
+  it('titles a service from its long description or spelled-out short name, and finds plain names typed', () => {
+    expect(serviceTitle('00731', 'ANES UPR GI NDSC PX NOS', 'ANESTHESIA FOR UPPER GASTROINTESTINAL ENDOSCOPIC PROCEDURES, ENDOSCOPE INTRODUCED')).toBe(
+      'Anesthesia for upper gastrointestinal endoscopic procedures',
+    )
+    expect(serviceTitle('77067', 'SCR MAMMO BI INCL CAD', 'SCREENING MAMMOGRAPHY, BILATERAL (2-VIEW STUDY)')).toBe('Screening mammography')
+    expect(serviceTitle('J9999', null, 'INJECTION, ONABOTULINUMTOXINA, 1 UNIT')).toBe('Injection, onabotulinumtoxina')
+    expect(serviceTitle('00731', 'ANES UPR GI NDSC PX NOS')).toBe('Anesthesia upper GI endoscopy procedure')
+    expect(serviceTitle('0490', null, null, 'Ambulatory surgery')).toBe('Ambulatory surgery charge')
+    expect(plainNameMatches('colonoscopy')[0]?.code).toBe('45378')
+    expect(plainNameMatches('botox')[0]?.code).toBe('J0585')
+    expect(plainNameMatches('knee mri')[0]?.code).toBe('73721')
+    expect(plainNameMatches('mri').map((match) => match.code)).toEqual(expect.arrayContaining(['73721', '70553']))
+    expect(looksLikeCode('45378')).toBe(true)
+    expect(looksLikeCode('J0585')).toBe(true)
+    expect(looksLikeCode('botox')).toBe(false)
   })
 
   it('drops New York from places and counts places', () => {

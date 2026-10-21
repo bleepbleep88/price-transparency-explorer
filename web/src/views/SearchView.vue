@@ -136,6 +136,13 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
         <v-alert v-if="!canSearch" type="warning" variant="tonal">Fix the highlighted fields to search.</v-alert>
         <LoadingPanel v-else-if="stillLoading" />
         <v-alert v-else-if="apiError?.status === 400" type="warning" variant="tonal">{{ apiError.message }}</v-alert>
+        <!-- A month that isn't loaded (an old link): say so plainly and offer the newest. -->
+        <v-alert v-else-if="apiError?.status === 404 && params.snapshot" type="warning" variant="tonal" data-testid="search-error">
+          <p>That month isn't loaded.</p>
+          <template #append>
+            <v-btn variant="text" @click="update({ snapshot: null })">Use the newest</v-btn>
+          </template>
+        </v-alert>
         <v-alert v-else-if="apiError" type="error" variant="tonal" data-testid="search-error">
           <p>{{ apiError.message }}</p>
           <template #append>
@@ -194,7 +201,6 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
               </div>
             </template>
 
-            <v-empty-state v-else-if="!result.hints.length" headline="No prices found" text="Try another service." />
           </div>
         </template>
       </template>

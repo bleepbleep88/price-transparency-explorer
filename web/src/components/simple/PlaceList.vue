@@ -7,6 +7,8 @@ export interface PlaceItem {
   name: string
   place?: string | null
   price: number
+  /** Green when the price is lower than most, red when higher; plain ink otherwise. Overrides the list's tone. */
+  band?: 'low' | 'high' | null
   /** The provider the reader searched for: marked in copper. */
   yours?: boolean
 }
@@ -29,7 +31,7 @@ const emit = defineEmits<{ open: [key: string] }>()
             <span class="name">{{ item.name }}</span>
             <span v-if="item.place" class="place" data-testid="place-where">{{ item.place }}</span>
           </span>
-          <span class="price" :class="tone">{{ dollars(item.price) }}<span v-if="perUnit" class="unit"> per unit</span></span>
+          <span class="price" :class="item.band ?? tone">{{ dollars(item.price) }}<span v-if="perUnit" class="unit"> per unit</span></span>
         </button>
       </li>
     </ol>

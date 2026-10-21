@@ -107,6 +107,16 @@ describe('bill tiles', () => {
     expect(leadGroup(colonoscopy, 'essential-plan', essentialCenter.key)?.key).toBe(essentialCenter.key)
   })
 
+  it('never leads with a thrown-away-drug price, and puts the office before video', () => {
+    const jw = group({ key: 'jw', feeType: 'professional', settingKey: 'office', modifiers: [{ code: 'JW', label: 'Drug amount discarded (modifier JW)' }], providerCount: 40 })
+    const office = group({ key: 'office', feeType: 'professional', settingKey: 'office', providerCount: 12 })
+    const video = group({ key: 'video', feeType: 'professional', settingKey: 'telehealth-home', modifiers: [{ code: '95', label: 'Telehealth (modifier 95)' }], providerCount: 464 })
+    expect(tileGroups(result([jw, office]), 'essential-plan').map((g) => g.key)).toEqual(['office'])
+    expect(tileGroups(result([video, office]), 'essential-plan').map((g) => g.key)).toEqual(['office'])
+    // Only a thrown-away-drug price: it shows, and says so.
+    expect(tileFor(jw, result([jw]))).toMatchObject({ label: 'Doctor', where: 'in the office, for drug thrown away' })
+  })
+
   it('says each bill in a few plain words', () => {
     expect(tileFor(essentialCenter, colonoscopy)).toMatchObject({ label: 'Surgery center', where: null, price: 510.83, line: 'Most: $389 – $625', count: '27 places' })
     expect(tileFor(essentialDoctor, colonoscopy)).toMatchObject({ label: 'Doctor', where: 'at a surgery center', line: 'Most: $167 – $174' })
@@ -124,7 +134,7 @@ describe('bill tiles', () => {
     const shown = tileGroups(colonoscopy, 'essential-plan').map((g) => g.key)
     expect(otherPrices(colonoscopy, shown)).toEqual([
       { groupKey: ambetterCenter.key, plan: 'Ambetter', bill: 'Surgery center', price: '$569', count: '29 places' },
-      { groupKey: ambetterOffice.key, plan: 'Ambetter', bill: "Doctor · in the office · equipment used in a doctor's office", price: 'Only 3 places', count: '' },
+      { groupKey: ambetterOffice.key, plan: 'Ambetter', bill: 'Doctor · in the office · office equipment', price: 'Only 3 places', count: '' },
     ])
   })
 })
@@ -133,10 +143,10 @@ describe('role lines', () => {
   it('gives each role one short line about the bill picked', () => {
     // The employer line speaks for the bill with the most to gain, named: not the doctor's $1.
     expect(roleLines('employers', colonoscopy, essentialDoctor, 40, [essentialDoctor, essentialCenter])).toEqual([
-      { text: 'Surgery center: the cheapest quarter of places get at least $60 less per case.', yearly: 'About $2,400 less a year for your 40 cases at lower-priced providers.' },
+      { text: 'Surgery center: the cheapest quarter of places get at least $60 less per case.', yearly: 'About $2,400 less a year for your 40 cases at lower-priced providers.', cases: true },
     ])
     expect(roleLines('employers', colonoscopy, essentialCenter, 40)).toEqual([
-      { text: 'The cheapest quarter of places get at least $60 less per case.', yearly: 'About $2,400 less a year for your 40 cases at lower-priced providers.' },
+      { text: 'The cheapest quarter of places get at least $60 less per case.', yearly: 'About $2,400 less a year for your 40 cases at lower-priced providers.', cases: true },
     ])
     expect(roleLines('plans', colonoscopy, essentialCenter)).toEqual([{ text: 'Most places get $389 – $625. Highest: $688.' }])
     expect(roleLines('providers', colonoscopy, essentialCenter)).toEqual([{ text: 'Add your NPI or tax ID to see where you stand.', action: 'npi' }])

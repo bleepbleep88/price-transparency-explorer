@@ -264,8 +264,8 @@ describe('level ladder', () => {
 
   it('names a line plainly up front, and in full (modifiers, rate type) in the picker', () => {
     expect(lineTitle(office)).toBe('Essential Plan · Doctor · in the office')
-    expect(lineLabel(office)).toBe('Essential Plan · Doctor · in the office · separate service, same day')
-    expect(lineLabel({ ...office, negotiatedType: 'fee schedule' })).toBe('Essential Plan · Doctor · in the office · separate service, same day · fee schedule rate')
+    expect(lineLabel(office)).toBe('Essential Plan · Doctor · in the office · same day as a procedure')
+    expect(lineLabel({ ...office, negotiatedType: 'fee schedule' })).toBe('Essential Plan · Doctor · in the office · same day as a procedure · fee schedule rate')
   })
 
   it('gives every level a step, even where the line has no prices', () => {

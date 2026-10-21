@@ -44,31 +44,83 @@ const DOCTOR_WHERE: Record<string, string> = {
   inpatient: 'in the hospital',
 }
 
+/** Visit codes: office, ER and other E/M visits, therapy sessions, and the health-center visit codes. */
+export function isVisitCode(code: string | undefined): boolean {
+  return !!code && /^(99[2-4]\d\d|908\d\d|T1015|G046[6-9]|G0470)$/i.test(code)
+}
+
+interface BillGroup {
+  feeType: string
+  settingKey: string
+  settingLabel?: string
+  code?: string
+}
+
 /**
  * The bill a price is for, as a tile names it. A facility fee is the place's bill ("Surgery center"); a professional
- * fee is the doctor's ("Doctor", with where in `where`).
+ * fee is the doctor's ("Doctor", with where in `where`), or the therapist's for physical and occupational therapy.
  */
-export function billName(group: { feeType: string; settingKey: string; settingLabel?: string }): { name: string; where: string | null } {
-  if (group.feeType === 'professional') return { name: 'Doctor', where: DOCTOR_WHERE[group.settingKey] ?? null }
-  // Health centers and rural clinics are paid one all-in price per visit, not a bill on top of the doctor's.
-  if (ALL_IN.has(group.settingKey)) return { name: `${settingName(group.settingKey, group.settingLabel)} visit (all in one price)`, where: null }
+export function billName(group: BillGroup): { name: string; where: string | null } {
+  if (group.feeType === 'professional') {
+    const who = group.code && /^97\d{3}$/.test(group.code) ? 'Therapist' : 'Doctor'
+    return { name: who, where: DOCTOR_WHERE[group.settingKey] ?? null }
+  }
+  // A health center's visit is paid one all-in price, not a bill on top of the doctor's. Only said for visit codes: a
+  // $1.49 lab test at a health center isn't a visit.
+  if (ALL_IN.has(group.settingKey) && isVisitCode(group.code)) {
+    return { name: `${settingName(group.settingKey, group.settingLabel)} visit (all in one price)`, where: null }
+  }
   return { name: settingName(group.settingKey, group.settingLabel), where: null }
 }
 
 /** One short line for a bill in a list: "Doctor · in the office", "Surgery center". */
-export function billLine(group: { feeType: string; settingKey: string; settingLabel?: string; modifiers?: ModifierRef[] }): string {
+export function billLine(group: BillGroup & { modifiers?: ModifierRef[] }): string {
   const { name, where } = billName(group)
   const extra = modifierWords(group.modifiers ?? [])
   return [name, where, extra].filter(Boolean).join(' · ')
 }
 
-/** Modifiers in a few lower-case words, no codes: "preventive", "left side, right side". Empty without any. */
+const MODIFIER_WORDS: Record<string, string> = {
+  '25': 'same day as a procedure',
+  '26': 'reading only',
+  TC: 'scan only',
+  '33': 'preventive',
+  '50': 'both sides',
+  '51': 'more than one procedure',
+  '59': 'separate procedure',
+  XE: 'separate procedure',
+  XS: 'separate procedure',
+  XP: 'separate procedure',
+  XU: 'separate procedure',
+  '95': 'video',
+  GT: 'video',
+  GQ: 'video',
+  '93': 'by phone',
+  FQ: 'by phone',
+  QW: 'quick test',
+  SU: 'office equipment',
+  LT: 'left',
+  RT: 'right',
+  JW: 'thrown-away drug',
+  JZ: 'no drug thrown away',
+  GC: 'with a resident',
+  '80': 'assistant',
+  '82': 'assistant',
+  AS: 'assistant',
+  QK: 'supervising',
+  QX: 'supervised',
+  QZ: 'nurse anesthetist',
+  AA: 'anesthesiologist',
+}
+
+/** Modifiers in a few plain words, no codes: "preventive", "left, right", "video". Empty without any. */
 export function modifierWords(modifiers: ModifierRef[]): string {
-  return modifiers
-    .map((modifier) => modifier.label.replace(/\s*\(modifier [^)]*\)\s*/i, '').trim())
-    .filter(Boolean)
-    .map((label) => label.charAt(0).toLowerCase() + label.slice(1))
-    .join(', ')
+  const words = modifiers.map(
+    (modifier) =>
+      MODIFIER_WORDS[modifier.code.toUpperCase()] ??
+      modifier.label.replace(/\s*\(modifier [^)]*\)\s*/i, '').trim().replace(/^./, (first) => first.toLowerCase()),
+  )
+  return [...new Set(words.filter(Boolean))].join(', ')
 }
 
 const COMMON_NAMES: Record<string, string> = {
@@ -78,7 +130,7 @@ const COMMON_NAMES: Record<string, string> = {
   '66984': 'Cataract surgery',
   '66982': 'Cataract surgery, complex',
   '29881': 'Knee scope',
-  '73721': 'Knee MRI',
+  '73721': 'Leg joint MRI',
   '70450': 'Head CT',
   '70553': 'Brain MRI',
   '74177': 'Belly CT',
@@ -143,11 +195,127 @@ export function sentenceCase(text: string): string {
     .join('')
 }
 
-/** What to call a service: a plain name for common codes ("Colonoscopy"), else the plan's name in sentence case. */
-export function serviceTitle(code: string, name: string | null | undefined): string {
-  const plain = COMMON_NAMES[code]
+const ABBREVIATIONS: Record<string, string> = {
+  anes: 'anesthesia',
+  upr: 'upper',
+  lwr: 'lower',
+  ndsc: 'endoscopy',
+  px: 'procedure',
+  nos: '',
+  scr: 'screening',
+  mammo: 'mammogram',
+  bi: 'both sides',
+  incl: 'including',
+  cad: 'computer-aided',
+  est: 'existing patient',
+  pt: 'patient',
+  eval: 'evaluation',
+  ther: 'therapy',
+  thx: 'therapy',
+  inj: 'injection',
+  njx: 'injection',
+  dx: 'diagnostic',
+  tx: 'treatment',
+  psytx: 'therapy',
+  psych: 'mental health',
+  diag: 'evaluation',
+  srvcs: 'services',
+  'w/': 'with',
+  'w/o': 'without',
+  'w/med': 'with medicine',
+  wo: 'without',
+  ct: 'CT',
+  us: 'ultrasound',
+  abd: 'belly',
+  abdo: 'belly',
+  comp: 'complete',
+  ltd: 'limited',
+  xr: 'x-ray',
+  xray: 'x-ray',
+  dxa: 'bone density scan',
+}
+
+/** The plan's short name with its abbreviations spelled out: "ANES UPR GI NDSC PX NOS" → "Anesthesia upper GI endoscopy procedure". */
+export function expandShortName(name: string): string {
+  const words = name.split(/\s+/).flatMap((word) => {
+    const key = word.toLowerCase().replace(/[,.;]+$/, '')
+    if (key in ABBREVIATIONS) return ABBREVIATIONS[key] ? [ABBREVIATIONS[key]!] : []
+    return [word]
+  })
+  return sentenceCase(words.join(' ').toUpperCase()).replace(/\bCT\b/i, 'CT')
+}
+
+/**
+ * The start of a long description, as a title: up to the first comma, semicolon or parenthesis, at most 8 words.
+ * "SCREENING MAMMOGRAPHY, BILATERAL (2-VIEW…" → "Screening mammography". A one-word start keeps the next part:
+ * "INJECTION, ONABOTULINUMTOXINA, 1 UNIT" → "Injection, onabotulinumtoxina".
+ */
+export function descriptionTitle(description: string): string | null {
+  const parts = description.split(/[,;(]/).map((part) => part.trim()).filter(Boolean)
+  if (!parts.length) return null
+  let title = parts[0]!
+  if (title.split(/\s+/).length === 1 && parts[1]) title = `${title}, ${parts[1]}`
+  const words = title.split(/\s+/)
+  if (words.length > 8) title = words.slice(0, 8).join(' ')
+  return sentenceCase(title.toUpperCase())
+}
+
+/**
+ * What to call a service: a plain name for common codes ("Colonoscopy"); else the start of the plan's long description
+ * ("Anesthesia for upper gastrointestinal endoscopic procedures"); else the short name with its abbreviations spelled out;
+ * else, for a revenue code, its label ("Ambulatory surgery charge").
+ */
+export function serviceTitle(code: string, name: string | null | undefined, description?: string | null, revenueLabel?: string | null): string {
+  const plain = COMMON_NAMES[code.toUpperCase()]
   if (plain) return plain
-  return name ? sentenceCase(name) : `Code ${code}`
+  const fromDescription = description ? descriptionTitle(description) : null
+  if (fromDescription) return fromDescription
+  if (name) return expandShortName(name)
+  if (revenueLabel) return `${revenueLabel} charge`
+  return `Code ${code}`
+}
+
+/** Extra words people type for common services. */
+const ALIASES: Record<string, string> = {
+  botox: 'J0585',
+  'knee mri': '73721',
+  'hip mri': '73721',
+  'ankle mri': '73721',
+  'brain mri': '70553',
+  'head ct': '70450',
+  mammogram: '77067',
+  'er visit': '99284',
+  'emergency room': '99284',
+  checkup: '99396',
+  physical: '99396',
+  'physical therapy': '97110',
+  therapy: '90837',
+  'blood test': '80053',
+}
+
+/**
+ * Codes whose plain name or alias has every word typed, best first (an exact name, then a name that starts with the
+ * words, then the rest): "colonoscopy" → 45378 first; "mri" → the MRI codes; "botox" → J0585.
+ */
+export function plainNameMatches(text: string): { code: string; name: string }[] {
+  const typed = text.trim().toLowerCase()
+  if (typed.length < 3) return []
+  const words = typed.split(/\s+/)
+  const entries = [
+    ...Object.entries(COMMON_NAMES).map(([code, name]) => ({ code, name, keys: name.toLowerCase() })),
+    ...Object.entries(ALIASES).map(([alias, code]) => ({ code, name: COMMON_NAMES[code] ?? alias, keys: alias })),
+  ]
+  const scored = entries
+    .filter((entry) => words.every((word) => entry.keys.split(/[\s,/]+/).some((key) => key.startsWith(word))))
+    .map((entry) => ({ ...entry, score: entry.keys === typed ? 0 : entry.keys.startsWith(typed) ? 1 : 2 }))
+    .sort((a, b) => a.score - b.score || a.name.length - b.name.length)
+  const seen = new Set<string>()
+  return scored.filter((entry) => !seen.has(entry.code) && seen.add(entry.code)).map(({ code, name }) => ({ code, name }))
+}
+
+/** True when the text looks like a billing code rather than words: 45378, 0490, J0585, 0001U. */
+export function looksLikeCode(text: string): boolean {
+  return /^(\d{3,5}|[A-Z]\d{4}|\d{4}[A-Z])$/i.test(text.trim())
 }
 
 const SUFFIX = /,?\s+(?:l\.?l\.?c\.?|inc\.?|p\.?c\.?|pllc|llp|l\.?p\.?|corp\.?|co\.?|ltd\.?|p\.?a\.?)$/i
@@ -170,6 +338,8 @@ export function providerName(name: string): string {
       .map((word, index) => {
         if (KEEP_UPPER.has(word.toUpperCase())) return word.toUpperCase()
         if (index > 0 && SMALL_WORDS.has(word)) return word
+        // Acronyms stay as they are: no vowel ("MVHS"), or three letters or fewer ("NYU").
+        if (/^[a-z]+$/.test(word) && (!/[aeiouy]/.test(word) || word.length <= 3)) return word.toUpperCase()
         return word.charAt(0).toUpperCase() + word.slice(1)
       })
       .join(' ')

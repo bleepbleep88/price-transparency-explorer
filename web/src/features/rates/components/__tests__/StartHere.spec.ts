@@ -27,7 +27,6 @@ describe('StartHere', () => {
       'Office visit',
       'ER visit',
       'Cataract surgery',
-      'Knee scope',
       'Botox',
     ])
     // Plain names only: no codes on the chips.

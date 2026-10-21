@@ -2,7 +2,7 @@
 import { computed, nextTick, reactive, ref, useTemplateRef, watch } from 'vue'
 import { mdiMagnify } from '@mdi/js'
 import { plural } from '@/lib/format'
-import { serviceTitle, settingName } from '@/lib/plainNames'
+import { looksLikeCode, plainNameMatches, serviceTitle, settingName } from '@/lib/plainNames'
 import type {
   CodeSuggestion,
   LocationOption,
@@ -99,12 +99,29 @@ watch(
 
 const codeSuggestions = useCodeSuggestions(codeSearch, () => props.params.snapshot)
 const providerSuggestions = useProviderSuggestions(providerSearch, () => props.params.snapshot)
-const codeItems = computed<CodeSuggestion[]>(() => codeSuggestions.data.value ?? [])
+// The plan's codes for what's typed, with the plain names people use ("botox", "knee mri") first.
+const codeItems = computed<CodeSuggestion[]>(() => {
+  const server = codeSuggestions.data.value ?? []
+  const plain = looksLikeCode(codeSearch.value) ? [] : plainNameMatches(codeSearch.value)
+  const local = plain
+    .filter((match) => !server.some((item) => item.code === match.code))
+    .map((match) => ({ codeType: '', code: match.code, name: match.name, description: null, category: '', unit: '', billedDirectly: true, facilityRevenueCodes: [], rates: 0 }))
+  const ranked = [...server].sort((a, b) => rank(a) - rank(b))
+  return [...local, ...ranked]
+})
+
+/** Server suggestions: the plain name typed first ("colonoscopy" → 45378), then the API's order. */
+function rank(item: CodeSuggestion): number {
+  const typed = codeSearch.value.trim().toLowerCase()
+  const title = serviceTitle(item.code, item.name).toLowerCase()
+  return title === typed ? 0 : title.startsWith(typed) ? 1 : 2
+}
 const providerItems = computed<ProviderSuggestion[]>(() => providerSuggestions.data.value ?? [])
 const specialtySuggestions = useSpecialtySuggestions(specialtySearch)
 const specialtyItems = computed<SpecialtySuggestion[]>(() => specialtySuggestions.data.value ?? [])
 const locationItems = computed(() => locationSelectItems(props.locations ?? []))
 
+// Before a search only: once searched, the page's hint says it, so it isn't said twice.
 const npiWarning = computed(() => npiCheckDigitWarning(draft.npi))
 const feeTypes = [
   { title: "The place's bill", value: 'facility' },
@@ -128,9 +145,9 @@ function errorFor(field: FormField): string[] {
   return Array.isArray(external) ? external : [external]
 }
 
-/** A suggestion's second line: the code and how many prices the plan lists for it. */
+/** A suggestion's second line: the code, and how many prices the plan lists for it when known. */
 function describeCode(item: CodeSuggestion): string {
-  return `${item.codeType} ${item.code} · ${plural(item.rates, 'price')}`
+  return item.rates ? `${item.code} · ${plural(item.rates, 'price')}` : item.code
 }
 
 // An autocomplete forgets text that wasn't picked when it loses focus (a click on Search). Keep a place typed in full,
@@ -145,10 +162,16 @@ function onComboboxEnter(event: KeyboardEvent) {
   if (event.defaultPrevented && !event.isComposing) void nextTick(onSubmit)
 }
 
-/** A name typed without picking a suggestion ("colonoscopy") searches the best match. */
+/**
+ * What to search for what's in the box. Something that looks like a code (45378, J0585) is a code. Words search by
+ * name: a plain name people use ("botox", "knee mri") first, then the plan's names, the closest first ("colonoscopy" →
+ * 45378, not 45380). Words that match nothing are sent as typed, and the page says nothing was found.
+ */
 function typedCode(): string {
   const typed = (draft.code ?? '').trim()
-  if (!typed || /^[A-Za-z0-9]{1,8}$/.test(typed)) return typed
+  if (!typed || looksLikeCode(typed)) return typed
+  const plain = plainNameMatches(typed)[0]
+  if (plain) return plain.code
   return codeItems.value[0]?.code ?? typed
 }
 
@@ -208,7 +231,7 @@ function onSubmit() {
           <v-list-item v-bind="itemProps" :title="serviceTitle(item.code, item.name)" :subtitle="describeCode(item)" />
         </template>
       </v-combobox>
-      <v-btn type="submit" color="primary" height="56" :prepend-icon="mdiMagnify" :loading="busy" class="search-button" data-testid="search-submit">
+      <v-btn type="submit" color="primary" height="40" :prepend-icon="mdiMagnify" :loading="busy" class="search-button" data-testid="search-submit">
         Search
       </v-btn>
     </div>
@@ -229,7 +252,7 @@ function onSubmit() {
                 autocomplete="off"
                 clearable
                 :error-messages="errorFor('npi')"
-                :messages="npiWarning ? [npiWarning] : []"
+                :messages="npiWarning && draft.npi !== (params.npi ?? '') ? [npiWarning] : []"
                 data-testid="npi-input"
               >
                 <template #message="{ message }">
