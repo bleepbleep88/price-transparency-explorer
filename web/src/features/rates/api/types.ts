@@ -484,6 +484,8 @@ export interface LevelLine {
   negotiatedType: string
   unit: string
   levels: LevelStep[]
+  /** Why the steps don't always rise, when a higher level's typical price dips because different places are priced. */
+  note: string | null
 }
 
 /** One level's search card, as numbers. */

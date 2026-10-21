@@ -240,7 +240,8 @@ internal sealed class IngestionCoordinator(
         {
             Phase = phase,
             CurrentFileProgress = Math.Round(fraction, 3),
-            Message = $"{verb} {label}: {done / 1_048_576d:N0} of {total.Value / 1_048_576d:N0} MB",
+            // Decimal megabytes, as the README and the sources page give file sizes.
+            Message = $"{verb} {label}: {done / 1_000_000d:N0} of {total.Value / 1_000_000d:N0} MB",
         });
     }
 

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PriceExplorer.Api.Configuration;
 using PriceExplorer.Api.Core.Data;
+using PriceExplorer.Api.Core.Handlers.Rates;
 using PriceExplorer.Api.Core.Handlers.Sources;
 using PriceExplorer.Api.Core.Ingestion;
 using PriceExplorer.Api.Core.Models.Sources;
@@ -117,6 +118,28 @@ public sealed class PracticeNamesTests : IAsyncLifetime
         (await ShownAsync(2, "t60", "Shuffled 67")).Should().Be("Practice 60");
         (await ShownAsync(2, "t3", "Shuffled 10")).Should().Be(PracticeNames.UnknownPracticeName, "a network's name is never a practice's own");
         (await ShownAsync(1, "t3", "Big IPA")).Should().Be("Big IPA");
+    }
+
+    [Fact]
+    public async Task A_name_filter_matches_a_name_as_published_only_where_the_files_names_can_be_trusted()
+    {
+        await FileAsync(1, snapshot: 1, "ambetter");
+        await FileAsync(2, snapshot: 1, "essential");
+        await FileAsync(3, snapshot: 2, "ambetter");
+        await ManyAsync(1, "CASE WHEN i < 6 THEN 'Big IPA' ELSE 'Practice ' || i END");
+        await ManyAsync(3, "CASE WHEN i < 6 THEN 'Big IPA' ELSE 'Practice ' || i END");
+        // Like the Sep 28 Essential Plan file, which put "Teladoc" on Memorial Sloan Kettering: other tax IDs' names.
+        await ManyAsync(2, "CASE WHEN i = 50 THEN 'Practice 50' ELSE 'Shuffled ' || ((i + 7) % 120) END");
+        await RefreshAsync();
+
+        (await MatchesAsync(2, "t60", "Shuffled 67", "practice 60")).Should().BeTrue("the name shown is the practice's own");
+        (await MatchesAsync(2, "t60", "Shuffled 67", "shuffled 67")).Should().BeFalse("that file's names belong to other tax IDs");
+        (await MatchesAsync(1, "t3", "Big IPA", "big ipa")).Should().BeTrue("a trusted file's name as published still finds it");
+
+        // The typeahead follows the same rule: nothing for the misplaced name, the practice for its own.
+        (await SuggestAsync("shuffled 67")).Should().BeEmpty();
+        (await SuggestAsync("practice 60")).Should().ContainSingle()
+            .Which.Should().Match<Suggestion>(suggestion => suggestion.ProviderKey == "t60" && suggestion.ListedAs == null);
     }
 
     [Fact]
@@ -276,6 +299,14 @@ public sealed class PracticeNamesTests : IAsyncLifetime
 
     private async Task<string> ShownAsync(int file, string key, string name) =>
         (await QueryAsync<string>("SELECT practice_name($file, $key, $name)", new { file, key, name })).Single();
+
+    private async Task<bool> MatchesAsync(int file, string key, string name, string text) =>
+        (await QueryAsync<bool>("SELECT provider_name_matches($file, $key, $name, $text)", new { file, key, name, text })).Single();
+
+    private Task<IReadOnlyList<Suggestion>> SuggestAsync(string text) => QueryAsync<Suggestion>(
+        SqlFile.For<SuggestProvidersHandler>("SuggestProviders.sql"), new { snapshotId = 1, text, digits = "", limit = 10 });
+
+    private sealed record Suggestion(string ProviderKey, string? Ein, bool EinUnverified, string? BusinessNames, long Rates, string? ListedAs);
 
     private async Task<StatisticsState> StateAsync()
     {

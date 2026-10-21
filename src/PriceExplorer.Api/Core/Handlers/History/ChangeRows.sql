@@ -32,9 +32,12 @@ LEFT JOIN group_stats g
     ON g.snapshot_id = CASE WHEN s.kind = 'dropped' THEN $from ELSE $to END AND g.group_key = s.group_key
 WHERE s.kind <> 'unchanged' AND s.of_kind AND s.included
 ORDER BY
-    -- largest: the biggest moves first, then new and dropped rates, highest first. Facility charges with no procedure
-    -- named, when included, come after the rest: they don't compare like for like, so they aren't ranked with them.
+    -- largest: the biggest moves in dollars first, up or down (a drop can't pass -100%, so ranking by percent put only
+    -- rises on top), the bigger percentage first on a tie; then new and dropped rates, highest first. Facility charges
+    -- with no procedure named, when included, come after the rest: they don't compare like for like, so they aren't
+    -- ranked with them.
     CASE WHEN $sort = 'largest' THEN s.code_type = 'RC' END ASC,
+    CASE WHEN $sort = 'largest' THEN abs(s.change) END DESC NULLS LAST,
     CASE WHEN $sort = 'largest' THEN abs(s.change_pct) END DESC NULLS LAST,
     CASE WHEN $sort = 'largest' THEN coalesce(s.to_value, s.from_value) END DESC,
     CASE WHEN $sort = '-changePct' THEN s.change_pct END DESC NULLS LAST,

@@ -86,13 +86,16 @@ public sealed record CodeSuggestion(
     IReadOnlyList<string> FacilityRevenueCodes,
     long Rates);
 
+/// <param name="ListedAs">The name as the plan published it, when only that name matched the typed text (a network's
+/// name on a member practice): "listed by the plan as …". Null when a shown name or the EIN matched.</param>
 public sealed record ProviderSuggestion(
     string ProviderKey,
     string TaxIdDisplay,
     bool TaxIdMasked,
     string BusinessName,
     IReadOnlyList<string> OtherNames,
-    long Rates);
+    long Rates,
+    string? ListedAs = null);
 
 /// <param name="Locations">New York counties and NYC boroughs for the location filter; empty without a provider directory.</param>
 /// <param name="Directory">Where the provider directory came from; null when none is loaded.</param>

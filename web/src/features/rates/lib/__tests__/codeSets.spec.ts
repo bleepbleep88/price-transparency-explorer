@@ -249,6 +249,7 @@ describe('level ladder', () => {
       negotiatedType: 'negotiated',
       unit: 'per visit',
       levels,
+      note: null,
       ...overrides,
     }
   }

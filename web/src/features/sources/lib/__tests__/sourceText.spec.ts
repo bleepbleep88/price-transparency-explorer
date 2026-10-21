@@ -60,16 +60,17 @@ describe('source readings', () => {
     expect(timingLine(sourceFile({ timing: { downloadMs: null, parseMs: null, loadedAt: null } }))).toBeNull()
   })
 
-  it('gives small files their size in KB rather than "0 MB"', () => {
-    expect(fileSize(89359830)).toBe('85 MB')
-    expect(fileSize(122953)).toBe('120 KB')
+  it('gives sizes in decimal MB, and small files in KB rather than "0 MB"', () => {
+    // 89,359,830 bytes is 89 MB (85 MiB): the README's sizes are decimal too.
+    expect(fileSize(89359830)).toBe('89 MB')
+    expect(fileSize(122953)).toBe('123 KB')
     expect(fileSize(300)).toBe('1 KB')
     expect(fileSize(null)).toBe('size unknown')
   })
 
   it('puts the size on a file link, since the link downloads the whole file', () => {
-    expect(fileLinkText('Prices', sourceFile())).toBe('Prices · 85 MB')
-    expect(fileLinkText('Out of network', ALLOWED_FILE)).toBe('Out of network · 508 KB')
+    expect(fileLinkText('Prices', sourceFile())).toBe('Prices · 89 MB')
+    expect(fileLinkText('Out of network', ALLOWED_FILE)).toBe('Out of network · 520 KB')
     expect(fileLinkText('Prices', sourceFile({ contentLength: null }))).toBe('Prices')
   })
 

@@ -17,6 +17,8 @@ test('an office visit shows every level side by side, numbers in Details', async
   await expect(ladder.getByRole('heading', { name: 'Price by level' })).toBeVisible()
   await expect(ladder.getByTestId('level-ladder-chart')).toBeVisible()
   await expect(ladder.getByTestId('level-ladder-chart')).toHaveAttribute('aria-label', /^Typical price by level: Level 1 \$/)
+  // Essential Plan in the office: level 5 ($101, 70 places) sits below level 4 ($163, 40 places), and the chart says why.
+  await expect(ladder.getByTestId('level-dip-note')).toHaveText("Different places are priced at each level, so the steps don't always rise.")
   await expect(ladder.getByTestId('level-table')).toBeHidden()
 
   await expect(ladder.getByTestId('level-details-toggle')).toHaveText('Details: levels')

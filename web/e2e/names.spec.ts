@@ -93,3 +93,15 @@ test("a name only the mislabelled file gives reads \"Unknown practice\", with th
   await row.click()
   await expect(page.getByTestId('source-listed-as')).toHaveText('Listed by the plan as Jacobi Medical Center')
 })
+
+test("a provider search matches the names shown, not the names the mislabelled file gives other tax IDs", async ({ page, request }) => {
+  // The Sep 28 Essential file calls Memorial Sloan Kettering at Basking Ridge, among others, "Teladoc".
+  const teladoc = await (await request.get('/api/v1/providers?q=teladoc')).json()
+  expect(teladoc.map((suggestion: { businessName: string }) => suggestion.businessName)).toEqual(['Teladoc Physicians PC'])
+
+  await page.goto('/providers')
+  await page.getByTestId('provider-lookup').locator('input').fill('teladoc')
+  await expect(page.getByRole('option')).toHaveCount(1)
+  await expect(page.getByRole('option').first()).toContainText('Teladoc Physicians')
+  await expect(page.getByRole('listbox')).not.toContainText(/Memorial Sloan|Starrett City/)
+})

@@ -270,6 +270,8 @@ public sealed record LevelCode(string Code, int Level);
 /// <param name="Key">The search's group key without the code.</param>
 /// <param name="Unit">What one rate pays for, as the search card says ("per visit", "per visit (all-inclusive)").</param>
 /// <param name="Levels">The levels with rates here, lowest first; a level with none is left out.</param>
+/// <param name="Note">Why the steps don't always rise, when a higher level's typical price is below a lower one's and
+/// different places are priced at the two levels; null otherwise.</param>
 public sealed record LevelLine(
     string Key,
     string ProductKey,
@@ -280,7 +282,8 @@ public sealed record LevelLine(
     IReadOnlyList<ModifierRef> Modifiers,
     string NegotiatedType,
     string Unit,
-    IReadOnlyList<LevelStep> Levels);
+    IReadOnlyList<LevelStep> Levels,
+    string? Note = null);
 
 /// <summary>One level on one line: that level's search card, as numbers.</summary>
 /// <param name="GroupKey">The search's group key for this level (<see cref="RateGroup.Key"/>).</param>

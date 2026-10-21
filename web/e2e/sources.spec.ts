@@ -35,7 +35,7 @@ test('the sources page leads with one total, then each month with its two plans 
   await expect(plans).toHaveCount(2)
   await expect(plans.first().getByTestId('source-link-prices')).toHaveAttribute('href', /in-network\.json$/)
   await expect(plans.first().getByTestId('source-link-oon')).toHaveAttribute('href', /allowed-amounts\.json$/)
-  // Each link downloads the whole file (the rate files run 85 to 175 MB), so it says how big it is.
+  // Each link downloads the whole file (the rate files run 89 to 183 MB), so it says how big it is.
   await expect(plans.first().getByTestId('source-link-prices')).toHaveText(/^Prices · \d+ MB\s*$/)
   await expect(plans.first().getByTestId('source-link-oon')).toHaveText(/^Out of network · [\d,]+ (KB|MB)\s*$/)
   await expect(page.getByTestId('source-plan-problem')).toHaveCount(0)

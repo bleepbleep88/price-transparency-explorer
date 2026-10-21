@@ -20,8 +20,8 @@ describe('format', () => {
     expect(shortDate(null)).toBe('—')
   })
 
-  it('shows file sizes in megabytes', () => {
-    expect(megabytes(89_359_830)).toBe('85 MB')
+  it('shows file sizes in decimal megabytes', () => {
+    expect(megabytes(89_359_830)).toBe('89 MB')
   })
 })
 
