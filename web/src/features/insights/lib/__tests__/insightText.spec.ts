@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ProviderScorecard, StatisticsBasis } from '../../api/types'
-import { facilityLeftOut, OVERALL_METHOD, overallReading, serviceName, share, staleMessage, statisticsLine, toneOf } from '../insightText'
+import { alsoListedAs, facilityLeftOut, OVERALL_METHOD, overallReading, serviceName, share, staleMessage, statisticsLine, toneOf } from '../insightText'
 
 function index(overrides: Partial<ProviderScorecard['index']> = {}): Pick<ProviderScorecard, 'index'> {
   return { index: { value: 1.18, groupsCounted: 26, groupsTotal: 26, minimumGroups: 5, minimumProviders: 5, below: 11, atMedian: 1, above: 14, ...overrides } }
@@ -29,6 +29,23 @@ describe('overallReading', () => {
   it('explains itself in Details the same way whichever way the provider leans', () => {
     expect(OVERALL_METHOD).toContain('the middle of those comparisons')
     expect(OVERALL_METHOD).not.toMatch(/median|percentile|half/i)
+  })
+})
+
+describe('alsoListedAs', () => {
+  const provider = { name: 'GASTROINTESTINAL CARE OF LONG ISLAND, PC', otherNames: ['Raymond Tam MD PC', 'The Trustees of Columbia University in the City of NY'] }
+
+  it('names the provider the reader came from when it is another of its names', () => {
+    expect(alsoListedAs(provider, 'The Trustees of Columbia University in the City of NY')).toBe(
+      'Also listed as The Trustees of Columbia University in the City of NY',
+    )
+    expect(alsoListedAs(provider, 'Gastrointestinal Care of Long Island')).toBeNull()
+  })
+
+  it('falls back to its first other name, and ignores a name that is not its own', () => {
+    expect(alsoListedAs(provider)).toBe('Also listed as Raymond Tam MD')
+    expect(alsoListedAs(provider, 'Someone Else Entirely')).toBe('Also listed as Raymond Tam MD')
+    expect(alsoListedAs({ name: 'Mount Sinai Hospital', otherNames: [] })).toBeNull()
   })
 })
 

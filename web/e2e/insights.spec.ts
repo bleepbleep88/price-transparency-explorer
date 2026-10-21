@@ -35,6 +35,13 @@ test('price gaps rank plain-named services, follow a code from a link, and open 
   await expect(page.getByTestId('gaps-details')).toContainText('CPT 45378')
   await expect(page.getByTestId('gaps-details')).toContainText("don't say how often a service happens")
 
+  // One plan at a time, like search; "Both plans" names the plan on each row.
+  await expect(page.getByTestId('gaps-plans')).toBeVisible()
+  await expect(row).not.toContainText(/Essential Plan|Ambetter/)
+  await page.getByTestId('gaps-plan-both').click()
+  await expect(page).toHaveURL(/[?&]product=both(&|$)/)
+  await expect(page.getByTestId('gap-row').first()).toContainText(/Essential Plan|Ambetter/)
+
   // The widest range uses its own columns, and the order lives in the address.
   await page.getByTestId('sort-range').click()
   await expect(page).toHaveURL(/[?&]sort=range(&|$)/)
@@ -103,4 +110,20 @@ test('a provider found by name opens its scorecard: one reading, above and below
   await row.getByTestId('scorecard-search').click()
   await expect(page).toHaveURL(/[?&]group=/)
   await expect(page).toHaveURL(/[?&]ein=/)
+})
+
+test('a scorecard reached under another of its names says so, and an unknown provider gets a way back', async ({ page }) => {
+  // The search row named this provider "The Trustees of Columbia…"; its scorecard is titled with its tax ID's own name.
+  const came = 'The Trustees of Columbia University in the City of NY'
+  await page.goto(`/providers/113466729?as=${encodeURIComponent(came)}`)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Gastrointestinal Care of Long Island')
+  await expect(page.getByTestId('scorecard-also')).toHaveText(`Also listed as ${came}`)
+  // A name that isn't one of its own is never shown.
+  await page.goto('/providers/113466729?as=Someone%20Else')
+  await expect(page.getByTestId('scorecard-also')).not.toContainText('Someone Else')
+
+  await page.goto('/providers/999999999')
+  await expect(page.getByRole('heading', { name: 'No such provider', level: 1 })).toBeVisible()
+  await page.getByTestId('scorecard-find').click()
+  await expect(page).toHaveURL(/\/providers$/)
 })

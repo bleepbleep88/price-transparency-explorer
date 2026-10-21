@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { modifierWords } from '@/lib/plainNames'
 import { dollars } from '@/lib/plainNumbers'
-import { fewModifiers, groupLine, pairWords, paysWords, planName, rangeText, rowLine, spreadDollars, unitSuffix, versusTypical } from '../plainWords'
+import { groupLine, pairWords, paysWords, planName, rangeText, rowLine, spreadDollars, tellApart, unitSuffix, versusTypical } from '../plainWords'
 
 // Decisions 89 and 90 on the insights pages: no statistics words, "about" within 5%, "times" only from twice, and as
 // few words as can say it.
@@ -19,8 +20,8 @@ describe('versusTypical', () => {
   })
 
   it('takes those dollars between the figures as shown, and says only "about" when rounding leaves none', () => {
-    // $1,404.32 against a typical $1,384 (within 5%, but placed higher than most).
-    expect(versusTypical(1404.32, 1384, 'high')).toBe('$20.32 above typical')
+    // $1,404.32 (shown $1,404) against a typical $1,384: within 5%, but placed higher than most.
+    expect(versusTypical(1404.32, 1384, 'high')).toBe('$20 above typical')
     // $100.40 against a typical $100.45, which shows as $100: the difference would point the wrong way.
     expect(versusTypical(100.4, 100.45, 'low')).toBe('About typical')
   })
@@ -33,7 +34,9 @@ describe('versusTypical', () => {
 describe('what one plan pays against the other', () => {
   it('says "the same" for a pair only when the two rates are equal', () => {
     expect(pairWords({ same: true, productValue: 603.82, versusValue: 603.82, ratio: 1 })).toBe('the same')
-    expect(pairWords({ same: false, productValue: 395.22, versusValue: 393.81, ratio: 1 })).toBe('almost the same ($1.41 more)')
+    // $395 and $394 as shown beside it.
+    expect(pairWords({ same: false, productValue: 395.22, versusValue: 393.81, ratio: 1 })).toBe('almost the same ($1 more)')
+    expect(pairWords({ same: false, productValue: 90.1, versusValue: 90.5, ratio: 1 })).toBe('almost the same ($0.40 less)')
     expect(pairWords({ same: false, productValue: 603.821, versusValue: 603.824, ratio: 1 })).toBe('almost the same')
     expect(pairWords({ same: false, productValue: 90, versusValue: 100, ratio: 0.9 })).toBe('about 10% less')
   })
@@ -65,26 +68,33 @@ describe('names on the main view', () => {
     expect(planName('Essential Plan')).toBe('Essential Plan')
   })
 
-  it('says the bill, its modifiers in short, the plan and "per unit"', () => {
+  it('says the bill, the word that tells it apart, the plan and "per unit"', () => {
     expect(rowLine(office)).toBe('Doctor · in the office · Essential Plan')
+    expect(rowLine(office, 'left side')).toBe('Doctor · in the office · left side · Essential Plan')
     expect(rowLine({ ...office, feeType: 'facility', settingKey: 'asc', productLabel: 'Ambetter from Fidelis Care', perUnit: true })).toBe(
       'Surgery center · Ambetter · per unit',
     )
+    expect(rowLine({ ...office, productLabel: undefined })).toBe('Doctor · in the office')
   })
 
-  it('keeps at most two modifiers, without codes or brackets or repeats, and drops telehealth ones on a video visit', () => {
+  it('shows a modifier only when it tells two rows of the same service, bill and plan apart', () => {
     const modifier = (code: string, label: string) => ({ code, label })
-    expect(fewModifiers([modifier('LT', 'Left side (modifier LT)'), modifier('RT', 'Right side (modifier RT)')])).toBe('left side, right side')
-    expect(
-      fewModifiers([
-        modifier('25', 'Separate visit on the same day as a procedure (modifier 25)'),
-        modifier('95', 'Telehealth (audio and video) (modifier 95)'),
-        modifier('GT', 'Telehealth (interactive audio and video) (modifier GT)'),
-      ]),
-    ).toBe('separate visit on the same day as a procedure, telehealth')
-    expect(fewModifiers(['A', 'B', 'C'].map((code) => modifier(code, `Side ${code}`)))).toBe('side A, +2 more')
-    expect(fewModifiers([modifier('95', 'Telehealth (audio and video) (modifier 95)')], 'telehealth-home')).toBe('')
-    expect(fewModifiers([modifier('SS', 'Modifier SS')])).toBe('')
+    const procedure = modifier('25', 'Separate visit on the same day as a procedure (modifier 25)')
+    const video = modifier('95', 'Telehealth (audio and video) (modifier 95)')
+    const plain = { key: 'office', modifiers: [] as { code: string; label: string }[] }
+    const withProcedure = { key: 'office', modifiers: [procedure] }
+    const withBoth = { key: 'office', modifiers: [procedure, video] }
+    const alone = { key: 'er', modifiers: [modifier('LT', 'Left side (modifier LT)')] }
+    const unnamed = { key: 'home', modifiers: [modifier('SS', 'Modifier SS')] }
+    const unnamedToo = { key: 'home', modifiers: [] as { code: string; label: string }[] }
+    const apart = tellApart([plain, withProcedure, withBoth, alone, unnamed, unnamedToo], (row) => row.key)
+    expect(apart.get(plain)).toBe('')
+    expect(apart.get(withProcedure)).toBe(modifierWords([procedure]))
+    // The procedure word doesn't tell it from the row above; the video one does.
+    expect(apart.get(withBoth)).toBe(modifierWords([video]))
+    expect(apart.get(alone)).toBe('')
+    // A modifier with no plain name is a code: it stays in Details.
+    expect(apart.get(unnamed)).toBe('')
   })
 
   it('keeps the precise group line and the unit for Details', () => {

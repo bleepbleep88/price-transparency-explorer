@@ -3,9 +3,9 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { mdiRefresh, mdiSwapHorizontal } from '@mdi/js'
 import { ApiError } from '@/lib/apiClient'
-import { money, plural, wholeNumber } from '@/lib/format'
+import { plural, wholeNumber } from '@/lib/format'
 import { billName, providerName, settingName } from '@/lib/plainNames'
-import { MIN_PROVIDERS_FOR_RANGE, MIN_PROVIDERS_FOR_TYPICAL } from '@/lib/plainNumbers'
+import { dollars, MIN_PROVIDERS_FOR_RANGE, MIN_PROVIDERS_FOR_TYPICAL } from '@/lib/plainNumbers'
 import DetailsPanel from '@/components/simple/DetailsPanel.vue'
 import PageHeader from '@/components/simple/PageHeader.vue'
 import LoadingPanel from '@/features/status/components/LoadingPanel.vue'
@@ -19,7 +19,7 @@ import { useProductComparison } from '@/features/insights/composables/useInsight
 import { searchLocation } from '@/features/insights/lib/insightLinks'
 import { COMPARE_PAGE_SIZE, mergeInsightQuery, parseCompareQuery, pickProducts, type InsightPatch } from '@/features/insights/lib/insightParams'
 import { serviceName, share, statisticsLine } from '@/features/insights/lib/insightText'
-import { FACILITY_CHARGE_REASON, fewModifiers, groupLine, pairWords, paysWords, planName, serviceLabel } from '@/features/insights/lib/plainWords'
+import { FACILITY_CHARGE_REASON, groupLine, pairWords, paysWords, planName, serviceLabel, tellApart } from '@/features/insights/lib/plainWords'
 
 const route = useRoute()
 const router = useRouter()
@@ -114,12 +114,15 @@ const middle = computed(() => {
   return lines.join(' ')
 })
 
+// A modifier shows only when it tells a price apart from another of the same place, service and bill on this page.
+const apart = computed(() =>
+  tellApart(result.value?.pairs.items ?? [], (pair) => [pair.providerKey, pair.code, pair.feeType, pair.settingKey].join('|')),
+)
+
 /** "Colonoscopy · Surgery center", "Office visit, level 3 · Doctor · in the office · per unit". */
 function pairLine(pair: ComparisonPair): string {
   const { name, where } = billName(pair)
-  return [serviceLabel(pair), name, where, fewModifiers(pair.modifiers, pair.settingKey), pair.perUnit ? 'per unit' : null]
-    .filter(Boolean)
-    .join(' · ')
+  return [serviceLabel(pair), name, where, apart.value.get(pair), pair.perUnit ? 'per unit' : null].filter(Boolean).join(' · ')
 }
 
 function tone(pair: ComparisonPair): string {
@@ -289,24 +292,24 @@ const kinds = computed(() => [...(result.value?.byCategory ?? [])].sort((a, b) =
                     {{ pairLine(pair) }}
                   </div>
                   <!-- On a phone the two prices sit under the name. -->
-                  <div class="text-body-medium d-sm-none">{{ product }} {{ money(pair.productValue) }} · {{ versus }} {{ money(pair.versusValue) }}</div>
+                  <div class="text-body-medium d-sm-none">{{ product }} {{ dollars(pair.productValue) }} · {{ versus }} {{ dollars(pair.versusValue) }}</div>
                 </td>
                 <!-- Each amount opens the search that shows it. -->
                 <td class="text-end plan-col">
                   <router-link
                     :to="searchLocation(pair.productSearch)"
                     class="amount"
-                    :aria-label="`${money(pair.productValue)} in ${product}: see it in search`"
+                    :aria-label="`${dollars(pair.productValue)} in ${product}: see it in search`"
                     data-testid="pair-product-value"
-                  >{{ money(pair.productValue) }}</router-link>
+                  >{{ dollars(pair.productValue) }}</router-link>
                 </td>
                 <td class="text-end plan-col">
                   <router-link
                     :to="searchLocation(pair.versusSearch)"
                     class="amount"
-                    :aria-label="`${money(pair.versusValue)} in ${versus}: see it in search`"
+                    :aria-label="`${dollars(pair.versusValue)} in ${versus}: see it in search`"
                     data-testid="pair-versus-value"
-                  >{{ money(pair.versusValue) }}</router-link>
+                  >{{ dollars(pair.versusValue) }}</router-link>
                 </td>
                 <td class="text-end pays" :class="tone(pair)" data-testid="pair-ratio">{{ pairWords(pair) }}</td>
               </tr>

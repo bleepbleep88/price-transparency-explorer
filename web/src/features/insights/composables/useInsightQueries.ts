@@ -12,10 +12,11 @@ export const insightKeys = {
   compare: (params: CompareParams) => [...insightKeys.all, 'compare', compareApiQuery(params)] as const,
 }
 
-export function useGapLeaderboard(params: MaybeRefOrGetter<GapParams>) {
+export function useGapLeaderboard(params: MaybeRefOrGetter<GapParams>, enabled: MaybeRefOrGetter<boolean> = true) {
   return useQuery({
     queryKey: computed(() => insightKeys.gaps(toValue(params))),
     queryFn: ({ signal }) => insightsApi.gaps(toValue(params), signal),
+    enabled: computed(() => toValue(enabled)),
     // Keep the current page on screen (dimmed) while the next page or filter loads.
     placeholderData: keepPreviousData,
   })

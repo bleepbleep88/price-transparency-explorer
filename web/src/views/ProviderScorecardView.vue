@@ -20,9 +20,9 @@ import StatisticsNote from '@/features/insights/components/StatisticsNote.vue'
 import { insightKeys, useProviderScorecard } from '@/features/insights/composables/useInsightQueries'
 import { searchLocation } from '@/features/insights/lib/insightLinks'
 import { mergeInsightQuery, parseScorecardQuery, sortBy, sortParam, type InsightPatch } from '@/features/insights/lib/insightParams'
-import { facilityLeftOut, OVERALL_METHOD, overallReading, serviceName, statisticsLine, toneOf } from '@/features/insights/lib/insightText'
+import { alsoListedAs, facilityLeftOut, OVERALL_METHOD, overallReading, serviceName, statisticsLine, toneOf } from '@/features/insights/lib/insightText'
 import { filterScorecardGroups } from '@/features/insights/lib/scorecardFilter'
-import { FACILITY_CHARGE_MARK, FACILITY_CHARGE_REASON, groupLine, rowLine, serviceLabel, unitSuffix, versusTypical } from '@/features/insights/lib/plainWords'
+import { FACILITY_CHARGE_MARK, FACILITY_CHARGE_REASON, groupLine, rowLine, serviceLabel, tellApart, unitSuffix, versusTypical } from '@/features/insights/lib/plainWords'
 
 const route = useRoute()
 const router = useRouter()
@@ -39,6 +39,8 @@ const name = computed(() => (provider.value ? providerName(provider.value.name) 
 // Until the first statistics build there is nothing to compare; the note says so, and the page claims nothing else.
 const saved = computed(() => result.value?.statistics.builtAt != null)
 const overall = computed(() => (result.value ? overallReading(result.value) : null))
+// Reached from a search row with another of its names, the page says it's the same provider.
+const alsoListed = computed(() => (provider.value ? alsoListedAs(provider.value, params.value.as) : null))
 
 // The router's afterEach puts the generic title back on every navigation (this page's own replace and a Back that
 // remounts it from the cache included), so the provider's name goes back on whenever the answer or the address changes.
@@ -94,6 +96,8 @@ const headers = computed(() => [
   { title: 'Compared', key: 'vsMedian', sortable: true, align: 'end' as const },
 ])
 const shownGroups = computed(() => filterScorecardGroups(result.value?.groups ?? [], params.value.q))
+// A modifier shows only when it tells a row apart from another with the same service, bill and plan.
+const apart = computed(() => tellApart(result.value?.groups ?? [], (group) => [group.code, group.feeType, group.settingKey, group.productKey].join('|')))
 // One price per service, place and plan: "45 prices in 2 plans".
 const subtitle = computed(() => (result.value && provider.value ? `${plural(result.value.groups.length, 'price')} in ${plural(provider.value.products.length, 'plan')}` : null))
 
@@ -122,18 +126,12 @@ function setFacilityCharges(value: boolean) {
     <v-btn :to="{ name: 'providers' }" variant="text" :prepend-icon="mdiChevronLeft" class="align-self-start px-1">Providers</v-btn>
 
     <LoadingPanel v-if="apiError?.isLoading" />
-    <v-alert v-else-if="apiError?.status === 404" type="info" variant="tonal" data-testid="scorecard-not-found">
-      {{ apiError.message }}
-      <template #append>
-        <v-btn :to="{ name: 'providers' }" variant="text">Find a provider</v-btn>
-      </template>
-    </v-alert>
-    <v-alert v-else-if="apiError?.status === 400" type="warning" variant="tonal">
-      {{ apiError.fieldErrors.provider?.[0] ?? apiError.message }}
-      <template #append>
-        <v-btn :to="{ name: 'providers' }" variant="text">Find a provider</v-btn>
-      </template>
-    </v-alert>
+    <template v-else-if="apiError?.status === 404 || apiError?.status === 400">
+      <PageHeader title="No such provider" subtitle="No prices for this provider in these files." data-testid="scorecard-not-found" />
+      <v-btn :to="{ name: 'providers' }" variant="tonal" color="primary" class="align-self-start" data-testid="scorecard-find">
+        Find a provider
+      </v-btn>
+    </template>
     <v-alert v-else-if="apiError" type="error" variant="tonal">
       {{ apiError.message }}
       <template #append>
@@ -146,7 +144,9 @@ function setFacilityCharges(value: boolean) {
     </template>
 
     <template v-else-if="result && provider">
-      <PageHeader :title="name" :subtitle="subtitle" data-testid="scorecard-name" />
+      <PageHeader :title="name" :subtitle="subtitle" data-testid="scorecard-name">
+        <p v-if="alsoListed" class="also-listed" data-testid="scorecard-also">{{ alsoListed }}</p>
+      </PageHeader>
       <StatisticsNote :basis="result.statistics" />
 
       <div v-if="saved" class="d-flex flex-column ga-10" :style="{ opacity: scorecard.isPlaceholderData.value ? 0.6 : 1 }">
@@ -214,12 +214,12 @@ function setFacilityCharges(value: boolean) {
                   </router-link>
                   <span class="code"> {{ item.code }}</span>
                   <div class="text-body-medium text-medium-emphasis">
-                    {{ item.facilityCharge ? `${FACILITY_CHARGE_MARK} · ` : '' }}{{ rowLine(item) }}
+                    {{ item.facilityCharge ? `${FACILITY_CHARGE_MARK} · ` : '' }}{{ rowLine(item, apart.get(item)) }}
                   </div>
                 </div>
               </template>
               <template #[`item.value`]="{ item }">
-                <span class="text-no-wrap" data-testid="scorecard-rate">{{ money(item.value) }}</span>
+                <span class="text-no-wrap" data-testid="scorecard-rate">{{ dollars(item.value) }}</span>
               </template>
               <template #[`item.median`]="{ item }">
                 <span class="text-no-wrap">{{ item.median == null ? '—' : dollars(item.median) }}</span>
@@ -313,6 +313,10 @@ function setFacilityCharges(value: boolean) {
 
 .compared {
   font-weight: 600;
+}
+
+.also-listed {
+  font-size: 1rem;
 }
 
 .compared.low {
