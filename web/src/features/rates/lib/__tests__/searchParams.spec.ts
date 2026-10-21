@@ -110,8 +110,8 @@ describe('toApiQuery', () => {
   })
 
   it('passes the specialty and location through as typed', () => {
-    const query = toApiQuery(parseRouteQuery({ code: '45378', specialty: 'Gastroenterology Physician', county: 'Monroe' }))
-    expect(query).toMatchObject({ specialty: 'Gastroenterology Physician', county: 'Monroe' })
+    const query = toApiQuery(parseRouteQuery({ code: '45378', specialty: 'Gastroenterology', county: 'Monroe' }))
+    expect(query).toMatchObject({ specialty: 'Gastroenterology', county: 'Monroe' })
     expect(toApiQuery(parseRouteQuery({ code: '45378' }))).toMatchObject({ specialty: undefined, county: undefined })
   })
 })

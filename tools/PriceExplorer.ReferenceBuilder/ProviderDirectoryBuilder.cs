@@ -10,14 +10,13 @@ using DuckDB.NET.Data;
 namespace PriceExplorer.ReferenceBuilder;
 
 /// <summary>
-/// Builds reference/provider_directory.csv.gz: for each NPI in the loaded rate files, its name, NUCC specialty,
-/// practice location and county (NYC boroughs named). Sources are public CMS/NUCC/Census files; street addresses and
+/// Builds reference/provider_directory.csv.gz: for each NPI in the loaded rate files, its name, Medicare specialty,
+/// practice location and county (NYC boroughs named). Sources are public CMS and Census files; street addresses and
 /// phone numbers are deliberately left out.
 /// </summary>
 internal static partial class ProviderDirectoryBuilder
 {
     private const string NppesPage = "https://download.cms.gov/nppes/NPI_Files.html";
-    private const string NuccPage = "https://www.nucc.org/index.php/code-sets-mainmenu-41/provider-taxonomy-mainmenu-40/csv-mainmenu-57";
     private const string CensusZipToCounty = "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt";
 
     private static readonly Dictionary<string, string> NycBoroughs = new(StringComparer.Ordinal)
@@ -29,7 +28,9 @@ internal static partial class ProviderDirectoryBuilder
         ["36085"] = "Staten Island",
     };
 
-    public static async Task RunAsync(string database, string output, string cache, CancellationToken cancellationToken)
+    /// <param name="nppes">An NPPES monthly zip already downloaded, used instead of finding and fetching the newest one
+    /// (the NPPES download site is sometimes down for maintenance).</param>
+    public static async Task RunAsync(string database, string output, string cache, string? nppes, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(cache);
         using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
@@ -38,19 +39,24 @@ internal static partial class ProviderDirectoryBuilder
         var npis = await LoadNpisAsync(database);
         Console.WriteLine($"NPIs in the loaded rate files: {npis.Count:N0}");
 
-        var nppesUrl = await FindLinkAsync(http, NppesPage, NppesMonthlyZip(), "https://download.cms.gov/nppes/", cancellationToken);
-        var nuccUrl = await FindLinkAsync(http, NuccPage, NuccCsv(), "https://www.nucc.org", cancellationToken);
+        // A local copy of the monthly file is cited by its NPPES download address, which names the release.
+        var nppesUrl = nppes is null
+            ? await FindLinkAsync(http, NppesPage, NppesMonthlyZip(), "https://download.cms.gov/nppes/", cancellationToken)
+            : "https://download.cms.gov/nppes/" + Path.GetFileName(nppes);
+        var (crosswalkUrl, crosswalkRelease) = await MedicareSpecialties.FindCsvAsync(http, cancellationToken);
 
-        var nppesZip = await DownloadAsync(http, nppesUrl, cache, cancellationToken);
-        var nuccCsv = await DownloadAsync(http, nuccUrl, cache, cancellationToken);
+        var nppesZip = nppes ?? await DownloadAsync(http, nppesUrl, cache, cancellationToken);
+        var crosswalkCsv = await DownloadAsync(http, crosswalkUrl, cache, cancellationToken);
         var zipCounties = await DownloadAsync(http, CensusZipToCounty, cache, cancellationToken);
 
-        var taxonomy = ReadTaxonomy(nuccCsv);
+        var specialties = MedicareSpecialties.Read(crosswalkCsv);
         var counties = ReadZipCounties(zipCounties);
-        Console.WriteLine($"NUCC taxonomy codes: {taxonomy.Count:N0}; ZIP codes mapped to counties: {counties.Count:N0}");
+        Console.WriteLine($"Taxonomy codes with a Medicare specialty: {specialties.Count:N0}; ZIP codes mapped to counties: {counties.Count:N0}");
 
-        var providers = FillCountiesFromCities(ReadNppes(nppesZip, npis, taxonomy, counties));
+        var providers = FillCountiesFromCities(ReadNppes(nppesZip, npis, specialties, counties));
         Console.WriteLine($"Matched {providers.Count:N0} of {npis.Count:N0} NPIs ({providers.Count * 100.0 / Math.Max(1, npis.Count):F1}%)");
+        var named = providers.Count(p => specialties.ContainsKey(p.TaxonomyCode));
+        Console.WriteLine($"Named by the crosswalk: {named:N0} ({named * 100.0 / Math.Max(1, providers.Count):F1}%)");
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
         WriteCsvGz(output, providers);
@@ -58,7 +64,8 @@ internal static partial class ProviderDirectoryBuilder
         {
             generatedAt = DateTimeOffset.UtcNow,
             nppes = nppesUrl,
-            nucc = nuccUrl,
+            medicareSpecialties = crosswalkUrl,
+            medicareSpecialtiesRelease = crosswalkRelease,
             census = CensusZipToCounty,
             npisRequested = npis.Count,
             npisFound = providers.Count,
@@ -132,35 +139,6 @@ internal static partial class ProviderDirectoryBuilder
         return path;
     }
 
-    /// <summary>NUCC taxonomy: code → display name and grouping.</summary>
-    private static Dictionary<string, (string Name, string Group)> ReadTaxonomy(string path)
-    {
-        var result = new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase);
-        using var reader = new StreamReader(path, Encoding.Latin1);
-        var header = CsvLine.Split(reader.ReadLine() ?? "");
-        int Column(string name) => header.FindIndex(h => h.Equals(name, StringComparison.OrdinalIgnoreCase));
-        var (code, grouping, classification, specialization, display) =
-            (Column("Code"), Column("Grouping"), Column("Classification"), Column("Specialization"), Column("Display Name"));
-
-        while (reader.ReadLine() is { } line)
-        {
-            var fields = CsvLine.Split(line);
-            if (fields.Count <= Math.Max(code, classification))
-            {
-                continue;
-            }
-
-            var name = display >= 0 && display < fields.Count && fields[display].Length > 0
-                ? fields[display]
-                : specialization >= 0 && fields[specialization].Length > 0
-                    ? $"{fields[classification]} ({fields[specialization]})"
-                    : fields[classification];
-            result[fields[code]] = (name, grouping >= 0 ? fields[grouping] : "");
-        }
-
-        return result;
-    }
-
     /// <summary>Census 2020 ZCTA → county, picking the county holding most of each ZIP's land area.</summary>
     private static Dictionary<string, (string Fips, string Name)> ReadZipCounties(string path)
     {
@@ -190,7 +168,7 @@ internal static partial class ProviderDirectoryBuilder
 
     /// <summary>Streams npidata_pfile_*.csv out of the NPPES zip, fully parsing only lines whose NPI we need.</summary>
     private static List<ProviderRecord> ReadNppes(
-        string zipPath, HashSet<long> npis, Dictionary<string, (string Name, string Group)> taxonomy, Dictionary<string, (string Fips, string Name)> counties)
+        string zipPath, HashSet<long> npis, Dictionary<string, (string Name, string Group)> specialties, Dictionary<string, (string Fips, string Name)> counties)
     {
         using var zip = ZipFile.OpenRead(zipPath);
         var entry = zip.Entries.FirstOrDefault(e => NpiDataFile().IsMatch(e.Name))
@@ -238,7 +216,7 @@ internal static partial class ProviderDirectoryBuilder
             var taxonomyCode = columns.Taxonomies.Where(t => Field(t.Primary) == "Y").Select(t => Field(t.Code)).FirstOrDefault(code => code.Length > 0)
                 ?? columns.Taxonomies.Select(t => Field(t.Code)).FirstOrDefault(code => code.Length > 0)
                 ?? "";
-            var (specialty, group) = taxonomy.TryGetValue(taxonomyCode, out var found) ? found : ("", "");
+            var (specialty, group) = MedicareSpecialties.For(specialties, taxonomyCode);
             var zip5 = Field(columns.Postal) is { Length: >= 5 } postal ? postal[..5] : "";
             // A practice outside the US has a foreign postal code, which may look like a US ZIP (Rota, Spain: 11530).
             var abroad = Field(columns.Country) is { Length: > 0 } country && country != "US";
@@ -348,9 +326,6 @@ internal static partial class ProviderDirectoryBuilder
 
     [GeneratedRegex(@"href=['""](\.?/?NPPES_Data_Dissemination_[A-Za-z]+_\d{4}_V2\.zip)['""]", RegexOptions.IgnoreCase)]
     private static partial Regex NppesMonthlyZip();
-
-    [GeneratedRegex(@"href=['""](/images/stories/CSV/nucc_taxonomy_\d+\.csv)['""]", RegexOptions.IgnoreCase)]
-    private static partial Regex NuccCsv();
 
     [GeneratedRegex(@"^npidata_pfile_\d+-\d+\.csv$", RegexOptions.IgnoreCase)]
     private static partial Regex NpiDataFile();

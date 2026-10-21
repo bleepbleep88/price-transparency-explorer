@@ -40,7 +40,7 @@ SELECT
     count(d.npi) FILTER (WHERE d.found)                                            AS Found,
     count(d.npi) FILTER (WHERE d.entity_type = 'individual' AND NOT d.deactivated) AS Individuals,
     count(d.npi) FILTER (WHERE d.deactivated)                                      AS Deactivated,
-    -- Radiologists of every kind (NUCC 2085*, but not radiation oncology or therapeutic radiology, which treat), nuclear
+    -- Radiologists of every kind (taxonomy codes 2085*, but not radiation oncology or therapeutic radiology, which treat), nuclear
     -- medicine physicians (207U*) and radiology centers read CT, MRI and PET.
     count(d.npi) FILTER (WHERE NOT d.deactivated AND (
         (d.taxonomy_code LIKE '2085%' AND d.taxonomy_code NOT IN ('2085R0001X', '2085R0203X'))

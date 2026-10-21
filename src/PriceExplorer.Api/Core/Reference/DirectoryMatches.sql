@@ -1,14 +1,14 @@
 -- Which NPIs in the provider directory match a specialty and/or a location filter (either may be NULL). Search, hints,
 -- row profiles and the specialty typeahead all use it, so they agree on what a match is. Created at startup, after the
 -- table it reads. With neither filter it reads nothing.
---   specialty_text is matched against the NUCC specialty name ("Urology Physician"), never its grouping.
+--   specialty_text is matched against the specialty, CMS's Medicare name ("Urology") and its group ("Physician").
 --     - A full specialty name, which is what picking a suggestion sends, matches that specialty only.
 --     - An exact taxonomy code ("207RG0100X") matches that code.
---     - Other text: every word must start a word of the name, so "urology" never matches "Neurology Physician" and
---       "gi" never matches "Surgical". A few common forms are read the way the registry writes them: titles
---       ("cardiologist" → cardiolog, "psychiatrist" → psychiatr, "surgeon" → surg, "pediatrician" → pediatric),
---       "anesthesia", British spellings ("orthopaedic" and "orthopedic" are one word), ENT, GI and OB/GYN. Cardiology
---       also finds the "Cardiovascular Disease" physicians, NUCC's name for general cardiologists.
+--     - Other text: every word must start a word of the name or group, so "physician" finds every physician specialty,
+--       "urology" never matches "Neurology" and "gi" never matches "Surgical". A few common forms are read the way the
+--       names write them: titles ("cardiologist" → cardiolog, "psychiatrist" → psychiatr, "surgeon" → surg,
+--       "pediatrician" → pediatric, "chiropractor" → chiropract), "anesthesia", British spellings ("orthopaedic" and
+--       "orthopedic" are one word), ENT, GI and OB/GYN. Cardiology also finds "Cardiovascular Disease" names.
 --   county_text: a New York county or New York City borough by name ("Manhattan", "Monroe", "Kings County",
 --   "The Bronx", "St Lawrence", "Brooklyn, NY"), by FIPS code ("36061"), or "NYC" for all five boroughs. Only New York
 --   counties (FIPS 36...) match: "Monroe" is Monroe County, NY, never Monroe County, PA.
@@ -20,18 +20,19 @@ WITH wanted AS (
         -- The typed words, in the registry's spelling. ENT and GI become markers the name rule below expands.
         list_filter(string_split_regex(
             regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(
-                regexp_replace(regexp_replace(lower(trim(specialty_text)),
+                regexp_replace(regexp_replace(regexp_replace(lower(trim(specialty_text)),
                     'orthopaed', 'orthoped', 'g'), 'paediatr', 'pediatr', 'g'), 'anaesth', 'anesth', 'g'),
-                    '(olog|iatr)ists?\b', '\1', 'g'), '\bpediatricians?\b', 'pediatric', 'g'), '\bsurgeons?\b', 'surg', 'g'),
+                    '(olog|iatr)ists?\b', '\1', 'g'), '\bchiropractors?\b', 'chiropract', 'g'),
+                    '\bpediatricians?\b', 'pediatric', 'g'), '\bsurgeons?\b', 'surg', 'g'),
                     '\banesthesia\b', 'anesthe', 'g'), '\bob\W*gyn\b', 'obstetric gynecolog', 'g'),
                     '\b(ent|gi)\b', '\1_alias', 'g'),
             '[^a-z0-9_]+'), word -> word <> '') AS words,
         regexp_replace(regexp_replace(regexp_replace(regexp_replace(lower(trim(county_text)),
             '^the\s+', ''), '(,\s*|\s+)(ny|new york)$', ''), '\s+(county|borough)$', ''), '^(saint|st)\.?\s+', 'st. ') AS place
 ),
--- The distinct specialty names (about 400), so the word rules run once per name rather than once per NPI.
+-- The distinct specialty names (about 120), so the word rules run once per name rather than once per NPI.
 names AS (
-    SELECT DISTINCT specialty AS name
+    SELECT DISTINCT specialty AS name, specialty_group AS grp
     FROM provider_directory
     WHERE specialty_text IS NOT NULL AND specialty IS NOT NULL
 ),
@@ -46,7 +47,7 @@ matched_names AS (
     WHERE NOT EXISTS (SELECT 1 FROM picked)
       AND len(wanted.words) > 0
       AND list_bool_and(list_transform(wanted.words, word ->
-          regexp_matches(replace(replace(lower(names.name), 'orthopaed', 'orthoped'), 'paediatr', 'pediatr'),
+          regexp_matches(replace(replace(lower(names.name || ' ' || coalesce(names.grp, '')), 'orthopaed', 'orthoped'), 'paediatr', 'pediatr'),
               '(^|[^a-z0-9])' || CASE
                   WHEN word = 'ent_alias' THEN 'otolaryngolog'
                   WHEN word = 'gi_alias' THEN 'gastroenterolog'

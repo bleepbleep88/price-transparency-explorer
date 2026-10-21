@@ -18,7 +18,7 @@ public sealed class ProviderDirectoryApiTests(ExplorerApiFactory factory) : ICla
         var result = await SearchAsync("code=45378&npi=1174873780", ct);
 
         var profile = result.GetProperty("rows").GetProperty("items")[0].GetProperty("profile");
-        profile.GetProperty("specialties")[0].GetProperty("specialty").GetString().Should().Be("Ambulatory Surgical Clinic/Center");
+        profile.GetProperty("specialties")[0].GetProperty("specialty").GetString().Should().Be("Ambulatory Surgical Center");
         profile.GetProperty("locations").EnumerateArray().Select(l => l.GetString()).Should().Equal("Manhattan, NY");
         profile.GetProperty("individuals").GetInt32().Should().Be(0);
     }
@@ -35,7 +35,7 @@ public sealed class ProviderDirectoryApiTests(ExplorerApiFactory factory) : ICla
         Names(putnam).Should().NotBeEmpty().And.NotContain(name => name.StartsWith("Yorkville Endoscopy", StringComparison.Ordinal));
         surgeryCenters.GetProperty("rows").GetProperty("items").EnumerateArray()
             .Should().NotBeEmpty().And.OnlyContain(row => row.GetProperty("profile").GetProperty("specialties").EnumerateArray()
-                .Any(s => s.GetProperty("specialty").GetString() == "Ambulatory Surgical Clinic/Center"));
+                .Any(s => s.GetProperty("specialty").GetString() == "Ambulatory Surgical Center"));
     }
 
     [Fact(Timeout = 60_000)]
@@ -62,13 +62,13 @@ public sealed class ProviderDirectoryApiTests(ExplorerApiFactory factory) : ICla
         await factory.WaitForIngestionAsync(ct);
 
         var suggestions = await client.GetFromJsonAsync<JsonElement>("/api/v1/specialties?q=gastroenterology", ct);
-        var picked = suggestions.EnumerateArray().First(s => s.GetProperty("specialty").GetString() == "Gastroenterology Physician");
-        var result = await SearchAsync("code=45378&specialty=Gastroenterology%20Physician&pageSize=100", ct);
+        var picked = suggestions.EnumerateArray().First(s => s.GetProperty("specialty").GetString() == "Gastroenterology");
+        var result = await SearchAsync("code=45378&specialty=Gastroenterology&pageSize=100", ct);
 
         // Matching specialties are listed first, so each row leads with the one picked.
         var rows = result.GetProperty("rows").GetProperty("items").EnumerateArray().ToList();
         rows.Should().NotBeEmpty().And.OnlyContain(row =>
-            row.GetProperty("profile").GetProperty("specialties")[0].GetProperty("specialty").GetString() == "Gastroenterology Physician");
+            row.GetProperty("profile").GetProperty("specialties")[0].GetProperty("specialty").GetString() == "Gastroenterology");
         picked.GetProperty("npis").GetInt32().Should().BePositive();
     }
 
@@ -90,11 +90,13 @@ public sealed class ProviderDirectoryApiTests(ExplorerApiFactory factory) : ICla
     }
 
     [Theory(Timeout = 60_000)]
-    [InlineData("cardiologist", "Cardiovascular Disease Physician")]
-    [InlineData("orthopaedic surgeon", "Orthopaedic Surgery Physician")]
-    [InlineData("ENT", "Otolaryngology Physician")]
-    [InlineData("ob/gyn", "Obstetrics & Gynecology Physician")]
-    [InlineData("anesthesia", "Anesthesiology Physician")]
+    [InlineData("cardiologist", "Cardiovascular Disease (Cardiology)")]
+    [InlineData("orthopaedic surgeon", "Orthopedic Surgery")]
+    [InlineData("ENT", "Otolaryngology")]
+    [InlineData("ob/gyn", "Obstetrics & Gynecology")]
+    [InlineData("anesthesia", "Anesthesiology")]
+    [InlineData("chiropractor", "Chiropractic")]
+    [InlineData("physician", "Gastroenterology")]
     public async Task Common_specialty_words_find_the_registry_name(string typed, string name)
     {
         var ct = TestContext.Current.CancellationToken;
@@ -195,7 +197,7 @@ public sealed class ProviderDirectoryApiTests(ExplorerApiFactory factory) : ICla
         var specialties = await client.GetFromJsonAsync<JsonElement>("/api/v1/specialties?q=anesth", ct);
         var reference = await client.GetFromJsonAsync<JsonElement>("/api/v1/reference", ct);
 
-        specialties.EnumerateArray().Select(s => s.GetProperty("specialty").GetString()).Should().Contain("Anesthesiology Physician");
+        specialties.EnumerateArray().Select(s => s.GetProperty("specialty").GetString()).Should().Contain("Anesthesiology");
         reference.GetProperty("locations").EnumerateArray().Take(5).Select(l => l.GetProperty("label").GetString())
             .Should().BeEquivalentTo(["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]);
         reference.GetProperty("locations").EnumerateArray().Select(l => l.GetProperty("label").GetString())

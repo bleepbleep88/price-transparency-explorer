@@ -58,7 +58,7 @@ public sealed class LookupController(ISender sender) : ControllerBase
         CancellationToken cancellationToken = default) =>
         sender.Send(new SuggestProvidersQuery(q, snapshot, limit), cancellationToken);
 
-    /// <summary>Specialties (NUCC, from the national provider registry) that the specialty filter matches for the text.</summary>
+    /// <summary>Specialties (CMS's Medicare names for the national provider registry's provider types) that the specialty filter matches for the text.</summary>
     /// <param name="q">Required. 2 to 100 characters: words that start words of a specialty name ("gastro", "cardiologist", "ENT"), or a taxonomy code.</param>
     /// <param name="limit">How many suggestions, 1 to 50.</param>
     [HttpGet("specialties")]
