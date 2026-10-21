@@ -124,12 +124,12 @@ describe('validateSearchForm', () => {
   })
 
   it('requires a code with a helpful message', () => {
-    expect(validateSearchForm({ ...valid, code: '  ' }).code).toMatch(/Enter a billing code/)
+    expect(validateSearchForm({ ...valid, code: '  ' }).code).toMatch(/Type a service/)
   })
 
   it.each([
-    ['code', '!!!', /only letters and digits/],
-    ['code', '123456789', /up to 8/],
+    ['code', '!!!', /Pick a service/],
+    ['code', '123456789', /Pick a service/],
     ['npi', '12345', /10 digits/],
     ['npi', '13967478AB', /10 digits/],
     ['ein', '1234', /9 digits/],

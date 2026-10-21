@@ -38,6 +38,8 @@ export interface SearchParams {
   snapshot?: number
   /** Interpretation only: never sent to the API, and it survives new searches. */
   lens?: Lens
+  /** The plan tab picked on the results (a product key). Interpretation only: never sent to the API. */
+  plan?: string
   /** Employers lens: cases a year for the searched code; a search for a different code drops it. */
   cases?: number
   /** Dose calculator: a dose of the searched drug, in its code's unit; a search for a different code drops it. */
@@ -96,6 +98,7 @@ export function parseRouteQuery(query: LocationQuery): SearchParams {
     pageSize: positiveInteger(first(query.pageSize), 100) ?? DEFAULT_PAGE_SIZE,
     snapshot: positiveInteger(first(query.snapshot)),
     lens: lensSchema.safeParse(first(query.lens)).data,
+    plan: first(query.plan),
     cases: positiveInteger(first(query.cases), MAX_CASES),
     dose: parseDose(first(query.dose)) ?? undefined,
   }
@@ -147,9 +150,9 @@ export const searchFormSchema = z.object({
   code: z
     .string()
     .trim()
-    .min(1, 'Enter a billing code, for example 45378 (colonoscopy) or 0490 (ambulatory surgery).')
-    .max(8, 'A billing code is up to 8 letters and digits, for example 45378, J0585 or 0490.')
-    .regex(/^[A-Za-z0-9]+$/, 'A billing code is only letters and digits, for example 45378, J0585 or 0490.'),
+    .min(1, 'Type a service, like colonoscopy or 45378.')
+    .max(8, 'Pick a service from the list.')
+    .regex(/^[A-Za-z0-9]+$/, 'Pick a service from the list.'),
   npi: z
     .string()
     .trim()

@@ -2,6 +2,7 @@
 import { computed, nextTick, reactive, ref, useTemplateRef, watch } from 'vue'
 import { mdiMagnify } from '@mdi/js'
 import { plural } from '@/lib/format'
+import { serviceTitle, settingName } from '@/lib/plainNames'
 import type {
   CodeSuggestion,
   LocationOption,
@@ -35,8 +36,10 @@ const props = defineProps<{
 const emit = defineEmits<{ submit: [patch: QueryPatch]; clear: [] }>()
 
 const npiField = useTemplateRef<{ focus: () => void }>('npiField')
-/** The providers lens sends readers here to add their NPI. */
-function focusNpi() {
+/** The provider role sends readers here to add their NPI: open the filters, then focus the field. */
+async function focusNpi() {
+  filtersOpen.value = [0]
+  await nextTick()
   npiField.value?.focus()
 }
 defineExpose({ focusNpi })
@@ -71,7 +74,8 @@ function syncFromParams(params: SearchParams) {
   draft.specialty = params.specialty || null
   draft.county = params.county || null
   localErrors.value = {}
-  const anyFilter = params.product || params.setting || params.feeType || params.provider || params.specialty || params.county
+  const anyFilter =
+    params.npi || params.ein || params.product || params.setting || params.feeType || params.provider || params.specialty || params.county
   filtersOpen.value = anyFilter ? [0] : filtersOpen.value
 }
 // Only a different search re-syncs the form. Each field is its own source, so lens, cases, paging, sorting and
@@ -103,11 +107,18 @@ const locationItems = computed(() => locationSelectItems(props.locations ?? []))
 
 const npiWarning = computed(() => npiCheckDigitWarning(draft.npi))
 const feeTypes = [
-  { title: 'Facility fee', value: 'facility' },
-  { title: "Doctor's fee", value: 'professional' },
+  { title: "The place's bill", value: 'facility' },
+  { title: "The doctor's bill", value: 'professional' },
 ]
 const productItems = computed(() => props.products.map((product) => ({ title: product.productLabel, value: product.productKey })))
-const settingItems = computed(() => props.settings.map((setting) => ({ title: setting.label, value: setting.key })))
+// Plain place names; the two video-visit settings keep their difference.
+const VIDEO: Record<string, string> = { 'telehealth-home': 'Video visit, at home', 'telehealth-other': 'Video visit, not at home' }
+const settingItems = computed(() =>
+  props.settings.map((setting) => ({ title: VIDEO[setting.key] ?? settingName(setting.key, setting.label), value: setting.key })),
+)
+const activeFilterCount = computed(
+  () => [draft.npi, draft.ein, draft.provider, draft.product, draft.setting, draft.feeType, draft.specialty, draft.county].filter(Boolean).length,
+)
 
 function errorFor(field: FormField): string[] {
   const local = localErrors.value[field]
@@ -117,13 +128,9 @@ function errorFor(field: FormField): string[] {
   return Array.isArray(external) ? external : [external]
 }
 
+/** A suggestion's second line: the code and how many prices the plan lists for it. */
 function describeCode(item: CodeSuggestion): string {
-  const parts = [item.name ?? 'No description published by the plan', item.category]
-  if (item.facilityRevenueCodes.length) {
-    parts.push(`${item.billedDirectly ? 'also ' : 'only '}as a facility rate via revenue code ${item.facilityRevenueCodes.join(', ')}`)
-  }
-  parts.push(plural(item.rates, 'rate'))
-  return parts.join(' · ')
+  return `${item.codeType} ${item.code} · ${plural(item.rates, 'price')}`
 }
 
 // An autocomplete forgets text that wasn't picked when it loses focus (a click on Search). Keep a place typed in full,
@@ -138,9 +145,16 @@ function onComboboxEnter(event: KeyboardEvent) {
   if (event.defaultPrevented && !event.isComposing) void nextTick(onSubmit)
 }
 
+/** A name typed without picking a suggestion ("colonoscopy") searches the best match. */
+function typedCode(): string {
+  const typed = (draft.code ?? '').trim()
+  if (!typed || /^[A-Za-z0-9]{1,8}$/.test(typed)) return typed
+  return codeItems.value[0]?.code ?? typed
+}
+
 function onSubmit() {
   const values = {
-    code: draft.code ?? '',
+    code: typedCode(),
     npi: draft.npi ?? '',
     ein: draft.ein ?? '',
     provider: draft.provider ?? '',
@@ -170,81 +184,78 @@ function onSubmit() {
 
 <template>
   <v-form validate-on="submit" data-testid="search-form" @submit.prevent="onSubmit">
-    <v-row density="compact">
-      <v-col cols="12" md="5">
-        <v-combobox
-          v-model="draft.code"
-          v-model:search="codeSearch"
-          :items="codeItems"
-          item-title="code"
-          item-value="code"
-          :return-object="false"
-          label="Billing code"
-          placeholder="e.g. 45378, 0490, J0585 or 'colonoscopy'"
-          :error-messages="errorFor('code')"
-          :loading="codeSuggestions.isFetching.value"
-          no-filter
-          hide-no-data
-          autocomplete="off"
-          persistent-placeholder
-          data-testid="code-input"
-          @keydown.enter="onComboboxEnter"
-        >
-          <template #item="{ props: itemProps, item }">
-            <v-list-item v-bind="itemProps" :title="`${item.codeType} ${item.code}`" :subtitle="describeCode(item)" lines="two" />
-          </template>
-        </v-combobox>
-      </v-col>
-      <v-col cols="12" sm="6" md="3">
-        <v-text-field
-          ref="npiField"
-          v-model="draft.npi"
-          label="NPI (optional)"
-          inputmode="numeric"
-          autocomplete="off"
-          clearable
-          :error-messages="errorFor('npi')"
-          :messages="npiWarning ? [npiWarning] : []"
-          data-testid="npi-input"
-        >
-          <template #message="{ message }">
-            <span :class="npiWarning === message ? 'text-warning' : undefined">{{ message }}</span>
-          </template>
-        </v-text-field>
-      </v-col>
-      <v-col cols="12" sm="6" md="2">
-        <v-text-field
-          v-model="draft.ein"
-          label="EIN (optional)"
-          placeholder="11-3471596"
-          autocomplete="off"
-          clearable
-          :error-messages="errorFor('ein')"
-          data-testid="ein-input"
-        />
-      </v-col>
-      <v-col cols="12" md="2" class="d-flex align-start ga-2">
-        <v-btn type="submit" color="primary" height="40" :prepend-icon="mdiMagnify" :loading="busy" block data-testid="search-submit">
-          Search
-        </v-btn>
-      </v-col>
-    </v-row>
+    <div class="search-row">
+      <v-combobox
+        v-model="draft.code"
+        v-model:search="codeSearch"
+        :items="codeItems"
+        item-title="code"
+        item-value="code"
+        :return-object="false"
+        label="Service or code"
+        placeholder="e.g. colonoscopy or 45378"
+        :error-messages="errorFor('code')"
+        :loading="codeSuggestions.isFetching.value"
+        no-filter
+        hide-no-data
+        autocomplete="off"
+        persistent-placeholder
+        class="search-field"
+        data-testid="code-input"
+        @keydown.enter="onComboboxEnter"
+      >
+        <template #item="{ props: itemProps, item }">
+          <v-list-item v-bind="itemProps" :title="serviceTitle(item.code, item.name)" :subtitle="describeCode(item)" />
+        </template>
+      </v-combobox>
+      <v-btn type="submit" color="primary" height="56" :prepend-icon="mdiMagnify" :loading="busy" class="search-button" data-testid="search-submit">
+        Search
+      </v-btn>
+    </div>
 
-    <v-expansion-panels v-model="filtersOpen" multiple variant="accordion" flat class="mt-1">
+    <v-expansion-panels v-model="filtersOpen" multiple variant="accordion" flat class="filters mt-1">
       <v-expansion-panel>
-        <v-expansion-panel-title class="text-body-medium">
-          More filters (product, setting, fee type, provider name, specialty, location)
+        <v-expansion-panel-title class="text-body-medium" data-testid="filters-toggle">
+          Filters<template v-if="activeFilterCount"> ({{ activeFilterCount }})</template>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <v-row density="compact">
             <v-col cols="12" sm="6" md="4">
-              <v-select v-model="draft.product" :items="productItems" label="Product" clearable placeholder="All products" persistent-placeholder />
+              <v-text-field
+                ref="npiField"
+                v-model="draft.npi"
+                label="NPI"
+                inputmode="numeric"
+                autocomplete="off"
+                clearable
+                :error-messages="errorFor('npi')"
+                :messages="npiWarning ? [npiWarning] : []"
+                data-testid="npi-input"
+              >
+                <template #message="{ message }">
+                  <span :class="npiWarning === message ? 'text-warning' : undefined">{{ message }}</span>
+                </template>
+              </v-text-field>
             </v-col>
             <v-col cols="12" sm="6" md="4">
-              <v-select v-model="draft.setting" :items="settingItems" label="Setting" clearable placeholder="All settings" persistent-placeholder />
+              <v-text-field
+                v-model="draft.ein"
+                label="Tax ID (EIN)"
+                placeholder="11-3471596"
+                autocomplete="off"
+                clearable
+                :error-messages="errorFor('ein')"
+                data-testid="ein-input"
+              />
             </v-col>
             <v-col cols="12" sm="6" md="4">
-              <v-select v-model="draft.feeType" :items="feeTypes" label="Fee type" clearable placeholder="Facility and doctor's fees" persistent-placeholder />
+              <v-select v-model="draft.product" :items="productItems" label="Plan" clearable placeholder="Both plans" persistent-placeholder />
+            </v-col>
+            <v-col cols="12" sm="6" md="4">
+              <v-select v-model="draft.setting" :items="settingItems" label="Place" clearable placeholder="Any place" persistent-placeholder />
+            </v-col>
+            <v-col cols="12" sm="6" md="4">
+              <v-select v-model="draft.feeType" :items="feeTypes" label="Bill" clearable placeholder="Both bills" persistent-placeholder />
             </v-col>
             <v-col cols="12" sm="6" md="4">
               <v-combobox
@@ -254,7 +265,7 @@ function onSubmit() {
                 item-title="businessName"
                 item-value="businessName"
                 :return-object="false"
-                label="Provider name contains"
+                label="Provider name"
                 no-filter
                 hide-no-data
                 clearable
@@ -266,7 +277,7 @@ function onSubmit() {
                 <template #item="{ props: itemProps, item }">
                   <v-list-item
                     v-bind="itemProps"
-                    :subtitle="`EIN ${item.taxIdDisplay} · ${plural(item.rates, 'rate')}`"
+                    :subtitle="plural(item.rates, 'price')"
                   />
                 </template>
               </v-combobox>
@@ -280,7 +291,7 @@ function onSubmit() {
                 item-value="specialty"
                 :return-object="false"
                 label="Specialty"
-                placeholder="Any specialty, e.g. gastro"
+                placeholder="e.g. gastro"
                 persistent-placeholder
                 no-filter
                 hide-no-data
@@ -291,7 +302,7 @@ function onSubmit() {
                 @keydown.enter="onComboboxEnter"
               >
                 <template #item="{ props: itemProps, item }">
-                  <v-list-item v-bind="itemProps" :subtitle="`${item.group ?? 'Specialty'} · ${plural(item.npis, 'NPI')}`" />
+                  <v-list-item v-bind="itemProps" :subtitle="item.group ?? undefined" />
                 </template>
               </v-combobox>
             </v-col>
@@ -302,7 +313,7 @@ function onSubmit() {
                 :items="locationItems"
                 :filter-keys="['title', 'raw.county']"
                 label="Location"
-                placeholder="Any county or borough"
+                placeholder="County or borough"
                 persistent-placeholder
                 clearable
                 auto-select-first
@@ -324,3 +335,47 @@ function onSubmit() {
     </v-expansion-panels>
   </v-form>
 </template>
+
+<style scoped>
+.search-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.search-field {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.search-button {
+  flex: 0 0 auto;
+}
+
+/* Filters read as a quiet text toggle under the search box, not a bar. */
+.filters :deep(.v-expansion-panel) {
+  background: transparent;
+}
+
+.filters :deep(.v-expansion-panel-title) {
+  min-height: 40px;
+  padding: 0;
+  font-weight: 600;
+  color: rgb(var(--v-theme-primary));
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+.filters :deep(.v-expansion-panel-title__overlay) {
+  display: none;
+}
+
+.filters :deep(.v-expansion-panel-title__icon) {
+  margin-inline-start: 0;
+}
+
+.filters :deep(.v-expansion-panel-text__wrapper) {
+  padding: 8px 0 0;
+}
+</style>

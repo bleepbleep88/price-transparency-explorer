@@ -99,6 +99,7 @@ function fewText(listed: number[]): string {
 }
 
 .tile-where {
+  margin-left: 0.3em;
   font-weight: 400;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
