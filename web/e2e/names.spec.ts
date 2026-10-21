@@ -70,7 +70,7 @@ test("the sources page says the Sep 28 Essential file's names don't match, in De
   await expect(september.getByTestId('source-names')).toHaveText(
     'Provider names in this file match the other files for only 9% of the same tax IDs (about 98% between the other files). ' +
       "Names shown come from the same tax ID in Ambetter's Sep 28 file, else Essential Plan's Aug 31 file. " +
-      `134 names couldn't be found: they show as "Unknown practice".`,
+      `61 names couldn't be found: they show as "Unknown practice".`,
   )
   await expect(september.getByTestId('source-names')).toHaveCount(1)
 })

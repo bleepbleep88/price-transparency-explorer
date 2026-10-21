@@ -49,7 +49,7 @@ Every page leads with one answer in plain words, like "Surgery center $511" or "
 - **Fair comparisons.** Prices are compared only like for like: same plan, code, doctor or facility fee, setting and modifiers. Each provider counts once.
 - **Plain numbers.** "Typical" needs at least 5 providers and "Most" at least 10. With fewer than 5, the page just lists each price. No page says median or percentile; the API keeps the exact figures.
 - **Traceable.** Every price links back to its file, the file's dates, its checksum and its exact spot in the JSON.
-- **The API.** `GET /api/v1/rates?code=45378&npi=…&ein=…` returns the price groups, each provider's price and hints for empty results. The other endpoints, with examples, are in [docs/architecture.md](docs/architecture.md#7-using-the-api).
+- **The API.** `GET /api/v1/rates?code=45378&npi=…&ein=…` returns the price groups, each provider's price and hints for empty results. The other endpoints, with examples, are in [docs/architecture.md](docs/architecture.md#using-the-api).
 
 ## Tech
 
@@ -77,7 +77,7 @@ Figures are from the Aug 31 files unless noted.
 | The procedure code is hidden in a notes field | Knee arthroscopy (29881) exists only under revenue code 0490 | Searches by the hidden code |
 | Most rows are copies | Ambetter, Aug 31: 179,948 prices, 7,727 unique (96% copies) | Drops copies while loading |
 | Leading zeros are missing | `490` is 0490; anesthesia `812` is 00812 | Restores them; both forms search |
-| One file names the wrong providers | Sep 28 Essential Plan file: names match the other files for 9% of practices, against about 98% elsewhere | Takes names from the reliable files; 134 show "Unknown practice" |
+| One file names the wrong providers | Sep 28 Essential Plan file: names match the other files for 9% of practices, against about 98% elsewhere | Takes names from the reliable files; 61 show "Unknown practice" |
 | Networks put their name on their members | "Chinese American IPA" is on 253 practices' tax IDs (Ambetter, Sep 28) | Shows each practice's own name |
 | Group IDs change every month | `provider_group_id` is renumbered in each file | Matches providers by tax ID |
 | Suspect IDs | 2 NPIs fail their check digit; 326 tax IDs in Ambetter's file use prefixes the IRS never issues (likely Social Security numbers) | Flags the NPIs; masks those tax IDs |
@@ -86,7 +86,7 @@ Figures are from the Aug 31 files unless noted.
 | Out-of-network amounts may cover several claims | A 15-minute therapy code has a middle amount of $1,814.70 | Shows only ranges, never a typical figure |
 | Each file has three dates | Index Aug 31, file Sep 2, server Sep 4 | Keeps and shows all three |
 
-Sanity check: a colonoscopy at a surgery center on the Essential Plan is $510.83, within $1 of Medicare's proposed 2026 surgery-center rate ($511.39).
+Sanity check: a colonoscopy at a surgery center on the Essential Plan is $510.83 (Sep 28), within $1 of Medicare's 2026 surgery-center rate ($510.49).
 
 More detail on each rule and finding: [docs/details.md](docs/details.md).
 

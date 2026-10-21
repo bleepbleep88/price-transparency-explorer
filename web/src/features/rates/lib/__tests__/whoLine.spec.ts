@@ -87,7 +87,7 @@ describe('moreLines', () => {
 
 describe('directorySourceNote', () => {
   it('cites the release the API reports, and just the registry when it is unknown', () => {
-    expect(directorySourceNote({ release: 'October 2026', builtAt: null, npisLoaded: 58688, source: null })).toBe(
+    expect(directorySourceNote({ release: 'October 2026', builtAt: null, npisLoaded: 68876, source: null })).toBe(
       'Specialty and location from the national provider registry (NPPES, October 2026).',
     )
     expect(directorySourceNote(null)).toBe('Specialty and location from the national provider registry (NPPES).')

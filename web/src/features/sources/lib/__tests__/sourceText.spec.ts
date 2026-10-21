@@ -124,13 +124,13 @@ describe('source readings', () => {
           { productLabel: 'Ambetter from Fidelis Care', indexDate: '2026-09-28' },
           { productLabel: 'Essential Plan', indexDate: '2026-08-31' },
         ],
-        unknownTaxIds: 134,
+        unknownTaxIds: 61,
       },
     })
     expect(namesLine(mislabelled)).toBe(
       'Provider names in this file match the other files for only 9% of the same tax IDs (about 98% between the other files). ' +
         "Names shown come from the same tax ID in Ambetter's Sep 28 file, else Essential Plan's Aug 31 file. " +
-        `134 names couldn't be found: they show as "Unknown practice".`,
+        `61 names couldn't be found: they show as "Unknown practice".`,
     )
     expect(namesLine(sourceFile({ providerNames: { agreementPct: 9, typicalAgreementPct: null, namesFrom: [], unknownTaxIds: 0 } }))).toBe(
       'Provider names in this file match the other files for only 9% of the same tax IDs. ' +
