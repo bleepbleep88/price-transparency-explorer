@@ -56,7 +56,8 @@ test("ENT & Allergy's tax ID (13-4000192) has its own name on every page, though
   await expect(page.locator('main')).toContainText('ENT & Allergy Associates')
 
   // Aug 31 to Sep 28: the same name on both sides of the change.
-  await page.goto('/changes?code=30903')
+  // Its two Aug to Sep rows are the same service relabeled, which the counts leave out unless asked for.
+  await page.goto('/changes?code=30903&includeListedElsewhere=true')
   await expect(page.locator('main')).toContainText('ENT & Allergy Associates')
   await expect(page.locator('main')).not.toContainText('Memorial Sloan Kettering')
 })
