@@ -4,6 +4,7 @@ import { serviceTitle } from '@/lib/plainNames'
 import type { LocationOption, ProductFileSummary, RateSearchResult, SettingOption } from '../api/types'
 import { activeFilterChips } from '../lib/filterChips'
 import type { QueryPatch, SearchParams } from '../lib/searchParams'
+import { TECHNICAL_HINTS } from '../lib/answer'
 
 // The service's plain name with its code small, the filters in use (each removable) and any hint about the result.
 const props = defineProps<{
@@ -18,6 +19,8 @@ const emit = defineEmits<{ update: [patch: QueryPatch] }>()
 const code = computed(() => props.result.code)
 const title = computed(() => serviceTitle(code.value?.code ?? props.result.query.code, code.value?.name))
 const chips = computed(() => activeFilterChips(props.result, props.params, props.products, props.settings, props.locations ?? []))
+// How the plan filed the code (revenue codes, procedure lists) is for Details once there are prices to show.
+const hints = computed(() => props.result.hints.filter((hint) => !props.result.groups.length || !TECHNICAL_HINTS.has(hint.kind)))
 </script>
 
 <template>
@@ -43,7 +46,7 @@ const chips = computed(() => activeFilterChips(props.result, props.params, props
     </div>
 
     <v-alert
-      v-for="(hint, index) in result.hints"
+      v-for="(hint, index) in hints"
       :key="`${hint.kind}-${index}`"
       :type="hint.severity === 'warning' ? 'warning' : 'info'"
       variant="tonal"

@@ -27,7 +27,7 @@ const emit = defineEmits<{ open: [key: string] }>()
         <button type="button" class="row" data-testid="place-row" @click="emit('open', item.key)">
           <span class="who">
             <span class="name">{{ item.name }}</span>
-            <span v-if="item.place" class="place">{{ item.place }}</span>
+            <span v-if="item.place" class="place" data-testid="place-where">{{ item.place }}</span>
           </span>
           <span class="price" :class="tone">{{ dollars(item.price) }}<span v-if="perUnit" class="unit"> per unit</span></span>
         </button>

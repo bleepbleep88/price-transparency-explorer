@@ -1,7 +1,12 @@
 import { expect, test } from '@playwright/test'
 
-// Decision 89: the core search pages put every number in plain words. Runs against the real API and data.
+// Decisions 89 and 90: every number in plain words, and the main view simple enough for anyone. Runs against the real
+// API and data. What sits behind Details (closed) isn't on the main view.
 const BANNED = /percentile|median|quartile|×|p90|p10|spread multiple|\bindex\b|comparison group/i
+// Off the main view: codes and IDs belong in Details. Filter chips the reader set (an NPI) are taken out first.
+const JARGON = /\bmodifiers?\b|\bEIN\b|tax ID|revenue code|\bNPIs?\b|unique rate|published row|snapshot|provider group/i
+// The main view stays short: about 120 words for colonoscopy, a little more with a role line or a dose.
+const WORD_BUDGET = 220
 
 const routes = [
   '/?code=45378',
@@ -13,7 +18,7 @@ const routes = [
   '/?code=J0585&lens=life-sciences',
   // Has the out-of-network panel too.
   '/?code=97530',
-  // Specialty and location filters: who-lines, the lens note and the card headings.
+  // Specialty and location filters.
   '/?code=45378&county=Manhattan&lens=providers',
   '/?code=45378&specialty=gastro&lens=employers',
   // The level ladder and the dose calculator.
@@ -24,20 +29,32 @@ const routes = [
 
 test('the home page uses no statistics words', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByTestId('start-providers')).toBeVisible()
-  await expect(page.getByTestId('dataset-snapshot')).toBeVisible()
-  expect(await page.locator('body').innerText()).not.toMatch(BANNED)
+  await expect(page.getByTestId('example-45378')).toBeVisible()
+  const text = await page.locator('main').innerText()
+  expect(text).not.toMatch(BANNED)
+  expect(text).not.toMatch(JARGON)
 })
 
 for (const route of routes) {
-  test(`${route} uses no statistics words and says once what the numbers are`, async ({ page }) => {
+  test(`${route} is in plain words, short, and says once what the numbers are`, async ({ page }) => {
     await page.goto(route)
-    await expect(page.getByTestId('group-card').first()).toBeVisible()
-    await expect(page.getByTestId('provider-row').first()).toBeVisible()
-    const text = await page.locator('body').innerText()
-    expect(text).not.toMatch(BANNED)
-    expect(text.match(/not what a person pays/g)).toHaveLength(1)
-    await expect(page.getByTestId('like-for-like')).toHaveText('Each card compares like with like: same service, same setting, same plan.')
+    await expect(page.getByTestId('price-tile').first()).toBeVisible()
+    await expect(page.getByTestId('place-row').first()).toBeVisible()
+    const body = await page.locator('body').innerText()
+    expect(body).not.toMatch(BANNED)
+    expect(body.match(/Not what a patient pays/g)).toHaveLength(1)
+
+    // The search form's own labels (NPI, Tax ID) and the provider role, which asks for an NPI, are exempt: providers
+    // know their NPI. Filter chips the reader set are taken out too.
+    let main = await page.locator('main').innerText()
+    const exempt = [
+      await page.getByTestId('search-form').innerText(),
+      ...(await page.getByTestId('lens-providers').allInnerTexts()),
+      ...(await page.getByTestId('active-filter').allInnerTexts()),
+    ]
+    for (const text of exempt) main = main.replace(text, '')
+    expect(main).not.toMatch(JARGON)
+    expect(main.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(WORD_BUDGET)
   })
 }
 

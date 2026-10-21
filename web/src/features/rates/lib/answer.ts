@@ -192,6 +192,9 @@ export function roleLines(lens: Lens, result: RateSearchResult, group: RateGroup
   }
 }
 
+/** Hints about how the plan filed a code: shown in Details when the search has prices. */
+export const TECHNICAL_HINTS: ReadonlySet<string> = new Set(['code_facility_only', 'revenue_code_procedures'])
+
 /** The role chips, in plain words. */
 export const ROLE_OPTIONS: readonly { key: Lens; label: string }[] = [
   { key: 'providers', label: 'Provider' },

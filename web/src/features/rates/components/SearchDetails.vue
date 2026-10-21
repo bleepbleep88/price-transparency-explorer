@@ -9,6 +9,7 @@ import { LIKE_FOR_LIKE } from '@/lib/plainNumbers'
 import type { DirectorySource, RateGroup, RateSearchResult } from '../api/types'
 import { groupName, pinsProvider, qualityLines } from '../lib/lenses'
 import { pricingNotes } from '../lib/pricing'
+import { TECHNICAL_HINTS } from '../lib/answer'
 import { directorySourceNote } from '../lib/whoLine'
 
 // Everything behind the answer, for anyone who wants it: the code and its category, how it's priced, the clean-up,
@@ -30,6 +31,7 @@ const category = computed(() => {
 })
 const notes = computed(() => pricingNotes(props.result))
 const cleanup = computed(() => qualityLines(props.result.quality))
+const hints = computed(() => props.result.hints.filter((hint) => TECHNICAL_HINTS.has(hint.kind)))
 const groupTrend = computed(() => (props.group ? trendFor(props.trend, props.group.key) : null))
 </script>
 
@@ -72,6 +74,11 @@ const groupTrend = computed(() => (props.group ? trendFor(props.trend, props.gro
         <dd>{{ directorySourceNote(directory) }}</dd>
       </div>
     </dl>
+
+    <div v-if="hints.length" class="notes">
+      <h3 class="notes-title">How the plan lists it</h3>
+      <p v-for="(hint, index) in hints" :key="index" :data-testid="`hint-${hint.kind}`">{{ hint.message }}</p>
+    </div>
 
     <div v-if="notes.length" class="notes" data-testid="pricing-notes">
       <h3 class="notes-title">How it's priced</h3>
