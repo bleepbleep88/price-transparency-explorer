@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { cleaningLines, contentsLine, fileSize, kindLabel, publishedLine, timingLine } from '../sourceText'
-import { ALLOWED_FILE, sourceFile } from './fixtures'
+import {
+  CLEANING_RULES,
+  cleaningLines,
+  contentsLine,
+  datesLine,
+  fileProblem,
+  fileSize,
+  kindLabel,
+  leadSnapshot,
+  planFiles,
+  planProblems,
+  priceTotals,
+  publishedLine,
+  snapshotProblem,
+  sourcesSubtitle,
+  timingLine,
+  totalsText,
+} from '../sourceText'
+import { ALLOWED_FILE, septemberSnapshot, sourceFile, sourceSnapshot } from './fixtures'
 
 describe('source readings', () => {
   it('names each kind of file and what a published row is in it', () => {
@@ -46,5 +63,51 @@ describe('source readings', () => {
     expect(fileSize(122953)).toBe('120 KB')
     expect(fileSize(300)).toBe('1 KB')
     expect(fileSize(null)).toBe('size unknown')
+  })
+
+  it('gives the one answer: prices in the rate files, and what is left once exact copies count once', () => {
+    const totals = priceTotals(septemberSnapshot())
+    expect(totals).toEqual({ published: 573393, unique: 17140 })
+    expect(totalsText(totals!)).toBe('573,393 prices → 17,140')
+    // Allowed-amount files hold amounts, not prices; files not loaded yet count for nothing.
+    expect(priceTotals(sourceSnapshot([ALLOWED_FILE]))).toBeNull()
+    expect(priceTotals(sourceSnapshot([sourceFile({ counts: null })]))).toBeNull()
+  })
+
+  it('leads with the month shown by default, and names the months and who published them', () => {
+    const older = { ...sourceSnapshot(), snapshotId: 9, isLatest: false }
+    expect(leadSnapshot([older, septemberSnapshot()])?.indexDate).toBe('2026-09-28')
+    expect(leadSnapshot([older])?.snapshotId).toBe(9)
+    expect(leadSnapshot([])).toBeNull()
+    expect(sourcesSubtitle([septemberSnapshot(), older, older])).toBe('3 months of public files from Centene Management Company')
+    expect(sourcesSubtitle([{ ...older, reportingEntityName: null }])).toBe('1 month of public files')
+    expect(sourcesSubtitle([])).toBeNull()
+  })
+
+  it('groups a month by plan, each with its prices file and its out-of-network file', () => {
+    const plans = planFiles(septemberSnapshot())
+    expect(plans.map((plan) => [plan.productLabel, plan.prices?.fileId, plan.outOfNetwork?.fileId])).toEqual([
+      ['Ambetter from Fidelis Care', 11, 13],
+      ['Essential Plan', 12, 14],
+    ])
+    expect(planFiles(sourceSnapshot([ALLOWED_FILE]))[0]).toMatchObject({ productKey: 'essential-plan', prices: null })
+  })
+
+  it('says in a few words when a file or a month did not load in full', () => {
+    expect(fileProblem(sourceFile())).toBeNull()
+    expect(fileProblem(sourceFile({ status: 'partial' }))).toBe('Only partly read')
+    expect(fileProblem(sourceFile({ status: 'failed' }))).toBe("Couldn't be loaded")
+    expect(fileProblem(sourceFile({ status: 'pending', counts: null }))).toBe('Not loaded yet')
+    const [plan] = planFiles(sourceSnapshot([sourceFile({ status: 'partial' }), { ...ALLOWED_FILE, productKey: 'ambetter-from-fidelis-care', status: 'failed' }]))
+    expect(planProblems(plan!)).toEqual(['Prices file: only partly read', "Out of network file: couldn't be loaded"])
+    expect(planProblems(planFiles(septemberSnapshot())[0]!)).toEqual([])
+    expect(snapshotProblem(sourceSnapshot())).toBeNull()
+    expect(snapshotProblem({ ...sourceSnapshot(), status: 'failed' })).toBe("This month's list of files couldn't be read")
+    expect(snapshotProblem({ ...sourceSnapshot(), status: 'partial' })).toBe('Some files were only partly read')
+  })
+
+  it('puts the three dates of a file on one line, and keeps every cleaning rule short', () => {
+    expect(datesLine(sourceFile())).toBe('List of files Aug 31, 2026 · file says Sep 2, 2026 · server Sep 4, 2026')
+    for (const rule of CLEANING_RULES) expect(rule.split(' ').length).toBeLessThanOrEqual(12)
   })
 })

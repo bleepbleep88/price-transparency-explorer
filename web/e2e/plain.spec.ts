@@ -60,6 +60,9 @@ for (const route of routes) {
 
 test('the sources page uses no statistics words, and out-of-network amounts are never "typical" or "payments"', async ({ page }) => {
   await page.goto('/sources')
+  await expect(page.getByTestId('source-snapshot').first()).toBeVisible()
+  // Everything, Details included.
+  for (const toggle of await page.getByTestId('details-toggle').all()) await toggle.click()
   await expect(page.getByTestId('source-file').first()).toBeVisible()
   const text = await page.locator('body').innerText()
   expect(text).not.toMatch(BANNED)
@@ -67,6 +70,7 @@ test('the sources page uses no statistics words, and out-of-network amounts are 
 
   await page.goto('/?code=97530')
   const panel = page.getByTestId('oon-panel')
+  await panel.getByTestId('oon-details-toggle').click()
   await expect(panel.getByTestId('oon-row').first()).toBeVisible()
   expect(await panel.innerText()).not.toMatch(/typical|payment/i)
 })
