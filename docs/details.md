@@ -47,7 +47,7 @@ Each provider (tax ID) counts once per group. If it has several rates in one gro
 ### Plain numbers, simple pages
 
 The people who read these pages aren't statisticians. Every page is built so anyone can read it at a glance:
-- Each page leads with one answer, big: a price per bill ("Doctor $168", "Surgery center $511"), "Same price in both plans: 77%", or "Usually 18% above typical".
+- Each page leads with one answer, big: a price per bill ("Doctor $168", "Surgery center $511"), "Same price in both plans: 81%", or "Usually 18% above typical".
 - Under it come a short list of places and a few plain words.
 - Codes, modifiers, tax IDs, NPI counts, file facts and method text sit behind one "Details".
 
@@ -104,7 +104,7 @@ Three monthly files are loaded. The snapshot picker in the app bar switches ever
 
 These are the page's defaults: relabeled rates and facility charges with no procedure named left out. With both added, July to August is 4,608 changed, 8,843 new and 8,232 gone, and August to September 3,899, 14,632 and 16,776.
 
-These include facility charges with no procedure named (3,335 and 3,816 of the changed, new and dropped rows), which the page leaves out by default. Counts are of provider values: one per provider per comparison group. When a provider has several rates in a group, its value is their NPI-weighted median, so it also moves when a rate is added or removed; the changes page marks those rows. Same rates with only the NPI counts moved (11 and 33 pairs) are unchanged.
+Turning on facility charges with no procedure named adds 3,331 (July to August) and 3,810 (August to September) changed, new and gone rows. Counts are of provider values: one per provider per comparison group. When a provider has several rates in a group, its value is their NPI-weighted median, so it also moves when a rate is added or removed; the changes page marks those rows. Same rates with only the NPI counts moved (11 and 33 pairs) are unchanged.
 
 ## Insights across codes
 
@@ -119,7 +119,7 @@ Three pages read each month's saved statistics, so they look across every code a
   - With 5 or more shared services, an overall line: "Usually about 8% more than typical (across 26 services)".
   - Lists of the services where it is lower or higher than most.
   - A masked tax ID can be found by its full number, but only its key comes back.
-- **Compare plans** (`/insights/compare`): the same provider in the same comparison group under both plans. "The same" means exactly the same rate. Of the 7,951 provider-and-service pairs priced under both plans, 5,979 are paid exactly the same. Pairs priced in different units are left out and counted.
+- **Compare plans** (`/insights/compare`): the same provider in the same comparison group under both plans. "The same" means exactly the same rate. On the Sep 28 files, 6,401 of the 7,871 provider-and-service pairs priced under both plans (81%) are paid exactly the same, with health centers left out by default. Pairs priced in different units are left out and counted.
 - Facility charges with no procedure named are left out of every reading and order by default. A switch adds them and shows how many it adds.
 - On the real files, scorecard and comparison numbers were checked against search: 60 providers' scorecards, 150 ranked groups and 120 pairs each equal their searches.
 
