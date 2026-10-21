@@ -131,4 +131,4 @@ Every endpoint and parameter is listed in [details.md](details.md#api-endpoints)
 | Errors | One handler turns every error into the same JSON shape. |
 | Traceability | Every price keeps its file, dates, checksum and exact place in the JSON. |
 | Privacy | Tax IDs that look like Social Security numbers are masked. |
-| Tests | 681 API, 329 web unit, 54 browser tests on the real data. |
+| Tests | 689 API, 340 web unit, 62 browser tests on the real data. |
