@@ -42,14 +42,14 @@ public sealed class SyntheticHintTests(SyntheticHintTests.Factory factory) : ICl
         [Minkowitz, CountyClinicWholeTin, AlphaEndoscopy, BetaSurgery, CountyClinicWithMinkowitz, GammaEmergency],
         [
             // Minkowitz: one emergency room rate billed under revenue code 0450, one filed under CPT 99284.
-            Item("RC", "0450", "EMERGENCY ROOM", "[1]", Price(rate: "500.00", serviceCode: "[\"23\"]")),
-            Item("RC", "0450", "EMERGENCY ROOM", "[1]", Price(rate: "300.00", serviceCode: "[\"23\"]", additionalInformation: "99284")),
+            Item("RC", "0450", "Item 3", "[1]", Price(rate: "500.00", serviceCode: "[\"23\"]")),
+            Item("RC", "0450", "Item 3", "[1]", Price(rate: "300.00", serviceCode: "[\"23\"]", additionalInformation: "99284")),
             // Gamma: an emergency room rate filed under CPT 99285 only.
-            Item("RC", "0450", "EMERGENCY ROOM", "[8]", Price(rate: "350.00", serviceCode: "[\"23\"]", additionalInformation: "99285")),
+            Item("RC", "0450", "Item 3", "[8]", Price(rate: "350.00", serviceCode: "[\"23\"]", additionalInformation: "99285")),
             // Revenue code 0490: Beta bills it directly; Alpha's rate is filed under CPT 45378.
-            Item("RC", "0490", "AMBULATORY SURGERY", "[6]", Price(rate: "900.00")),
-            Item("RC", "0490", "AMBULATORY SURGERY", "[5]", Price(rate: "600.00", additionalInformation: "45378")),
-            Item("CPT", "88305", "TISSUE EXAM BY PATHOLOGIST", "[1, 2, 7]", Price(rate: "41.50", serviceCode: "[\"11\"]", billingClass: "professional")),
+            Item("RC", "0490", "Item 4", "[6]", Price(rate: "900.00")),
+            Item("RC", "0490", "Item 4", "[5]", Price(rate: "600.00", additionalInformation: "45378")),
+            Item("CPT", "88305", "Item 1", "[1, 2, 7]", Price(rate: "41.50", serviceCode: "[\"11\"]", billingClass: "professional")),
         ]);
 
     [Fact(Timeout = 60_000)]

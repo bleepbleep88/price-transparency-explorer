@@ -28,8 +28,9 @@ public sealed class GapLeaderboardTests(InsightsApiFactory factory) : IClassFixt
         first.GetProperty("categoryKey").GetString().Should().Be("surgery");
         first.GetProperty("feeTypeLabel").GetString().Should().Be("Facility fee");
         first.GetProperty("settingLabel").GetString().Should().Be("Ambulatory surgery center");
-        first.GetProperty("codeName").ValueKind.Should().Be(JsonValueKind.Null, "45378 is only named in revenue-code lines, whose names aren't used");
-        Items(result)[1].GetProperty("codeName").GetString().Should().Be("CPT 99213", "the plan's own item name");
+        // CPT codes are named from CMS's RBCS, never the plan's text (PublishedText).
+        first.GetProperty("codeName").GetString().Should().Be("Lower GI endoscopy");
+        Items(result)[1].GetProperty("codeName").GetString().Should().Be("Office E&M, established");
         var stats = first.GetProperty("stats");
         (stats.GetProperty("p10").GetDecimal(), stats.GetProperty("p25").GetDecimal(), stats.GetProperty("median").GetDecimal(),
                 stats.GetProperty("p90").GetDecimal(), stats.GetProperty("p90ToP10").GetDecimal())

@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { shortDate } from '@/lib/format'
 import { feeLabel } from '@/lib/plainNumbers'
-import { billLine, providerName } from '@/lib/plainNames'
+import { billLine, codeName, providerName } from '@/lib/plainNames'
 import { planName } from '@/features/rates/lib/answer'
 import { serviceLabel } from '@/features/insights/lib/plainWords'
 import { modifierText } from '@/features/rates/lib/lenses'
@@ -97,7 +97,7 @@ function otherFile(row: RateChange): string {
             {{ item.productLabel }} · {{ feeLabel(item.feeType) }} · {{ item.settingLabel
             }}<template v-if="item.modifiers.length"> · {{ modifierText(item.modifiers) }}</template>
           </span>
-          <span>{{ item.codeType }} {{ item.code }}<template v-if="item.codeName"> · {{ item.codeName }}</template></span>
+          <span>{{ item.codeType }} {{ item.code }}<template v-if="codeName(item.code, item.codeName)"> · {{ codeName(item.code, item.codeName) }}</template></span>
           <span>{{ item.businessName }} · tax ID {{ item.einDisplay }}<template v-if="item.einMasked"> (not verified)</template></span>
           <span v-if="(item.fromRates ?? 0) > 1 || (item.toRates ?? 0) > 1" data-testid="several-rates">
             Several rates: {{ item.fromRates ?? 0 }} then {{ item.toRates ?? 0 }}. The one shown is its clinicians' typical rate.

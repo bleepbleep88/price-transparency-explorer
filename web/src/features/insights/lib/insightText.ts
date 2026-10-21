@@ -1,5 +1,5 @@
 import { plural, shortDate } from '@/lib/format'
-import { providerName } from '@/lib/plainNames'
+import { codeName, providerName } from '@/lib/plainNames'
 import { MIN_PROVIDERS_FOR_TYPICAL, MIN_SERVICES_FOR_SCORECARD } from '@/lib/plainNumbers'
 import type { ProviderScorecard, StatisticsBasis } from '../api/types'
 import { versusTypical } from './plainWords'
@@ -71,7 +71,8 @@ export function staleMessage(basis: StatisticsBasis, rebuilding: boolean): strin
 
 /** "CPT 45378 · Colonoscopy" or "RC 0360 · Operating room", for Details and the table filter. */
 export function serviceName(item: { codeType: string; code: string; codeName: string | null }): string {
-  return item.codeName ? `${item.codeType} ${item.code} · ${item.codeName}` : `${item.codeType} ${item.code}`
+  const name = codeName(item.code, item.codeName)
+  return name ? `${item.codeType} ${item.code} · ${name}` : `${item.codeType} ${item.code}`
 }
 
 /** A share as a whole percent: 5,985 of 9,369 → "64%". */

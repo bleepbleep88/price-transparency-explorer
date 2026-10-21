@@ -129,7 +129,8 @@ internal sealed class InNetworkFileBuilder
         var label = Intern(Clean(item.Name) ?? "");
         var arrangement = Intern(Lower(item.NegotiationArrangement) ?? "ffs");
 
-        if (billingType is BillingCodes.Cpt or BillingCodes.Hcpcs)
+        // Only CMS's public-domain HCPCS Level II text is kept: never the AMA's CPT or the ADA's CDT (PublishedText).
+        if (billingType is BillingCodes.Cpt or BillingCodes.Hcpcs && PublishedText.MayKeep(billingCode))
         {
             RememberDescription(billingType, billingCode, item);
         }
@@ -234,15 +235,17 @@ internal sealed class InNetworkFileBuilder
             decimal.Round(rate, 4), expiration, Intern(string.Join(',', places)), modifiers,
             Intern(additionalInformation ?? ""), referencesKey);
 
+        // Item names are counted for every rate, but kept as text only where the code's published text may be (PublishedText).
+        var samples = PublishedText.MayKeep(billingCode) && PublishedText.MayKeep(code) ? MaxLabelsKept : 0;
         if (_rates.TryGetValue(key, out var existing))
         {
             existing.Occurrences++;
-            existing.AddLabel(label, MaxLabelsKept);
+            existing.AddLabel(label, samples);
             return;
         }
 
         var entry = new RateEntry(key, billingRaw, codeSource, places, references, itemIndex, rateIndex, priceIndex);
-        entry.AddLabel(label, MaxLabelsKept);
+        entry.AddLabel(label, samples);
         _rates[key] = entry;
     }
 

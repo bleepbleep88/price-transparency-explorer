@@ -13,7 +13,8 @@ namespace PriceExplorer.Api.Core.Handlers.Rates;
 /// applied to the current search; null removes that filter). Links are built to find rates, clearing whatever other
 /// filter would leave the result empty, and <see cref="HintLinkChecker"/> then drops any link that still finds none.
 /// </summary>
-internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot snapshot, ReferenceCatalog catalog, SearchContext search)
+internal sealed class SearchHints(
+    DuckDBConnection connection, ResolvedSnapshot snapshot, ReferenceCatalog catalog, CodeReference codeReference, SearchContext search)
 {
     /// <summary>Every filter that picks providers: NPI, EIN, name, specialty and location.</summary>
     private static readonly (string Key, string? Value)[] ClearProvider =
@@ -184,7 +185,7 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
 
         (string Key, string? Value)[] clear = providerScoped || !search.ProviderFilterActive ? ClearNarrowing : [.. ClearNarrowing, .. ClearProvider];
         return Hint("code_not_found", "info", message, similar
-            .Select(row => Link($"{row.CodeType} {row.Code}{(row.Name is null ? "" : $" · {row.Name}")}", [("code", row.Code), ("codeType", row.CodeType), .. clear]))
+            .Select(row => Link($"{row.CodeType} {row.Code}{(NameOf(row) is { } name ? $" · {name}" : "")}", [("code", row.Code), ("codeType", row.CodeType), .. clear]))
             .ToList());
     }
 
@@ -192,6 +193,9 @@ internal sealed class SearchHints(DuckDBConnection connection, ResolvedSnapshot 
     /// Codes that start like the input, one prefix at a time: the filtered provider's own codes first, then everyone's.
     /// A provider's codes under a later, zero-padded prefix never beat everyone's codes under the prefix as typed.
     /// </summary>
+    /// <summary>A similar code's name: CMS's RBCS name for a CPT or CDT code, never the AMA's or ADA's text (PublishedText).</summary>
+    private string? NameOf(SimilarCodeRow row) => PublishedText.IsLicensed(row.Code) ? codeReference.RbcsName(row.CodeType, row.Code) : row.Name;
+
     private async Task<(List<SimilarCodeRow> Rows, bool ProviderScoped)> SimilarCodesAsync()
     {
         foreach (var (prefix, codeType) in SimilarPrefixes())

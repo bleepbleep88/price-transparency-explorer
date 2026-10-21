@@ -164,7 +164,7 @@ public sealed class OutOfNetworkApiTests(ExplorerApiFactory factory) : IClassFix
     {
         var ct = TestContext.Current.CancellationToken;
         var allowed = File([
-            Item("CPT", "99214", "OFFICE VISIT",
+            Item("CPT", "99214", "Item 1",
                 Entry("""{ "type": "ein", "value": "071234567" }""", "[\"11\"]", "professional", Payment("150.00"), Payment("160.00")),
                 Entry("""{ "type": "ein", "value": "71234567" }""", "[\"11\"]", "professional", Payment("170.00")),
                 Entry("""{ "type": "ein", "value": "131740114" }""", "[\"11\"]", "professional", Payment("180.00"))),

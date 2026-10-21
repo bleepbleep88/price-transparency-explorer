@@ -9,7 +9,7 @@ function group(overrides: Partial<ScorecardGroup> = {}): ScorecardGroup {
     productLabel: 'Essential Plan',
     codeType: 'CPT',
     code: '99213',
-    codeName: 'OFFICE/OUTPATIENT VISIT EST',
+    codeName: 'Office E&M, established',
     categoryKey: 'visits',
     categoryLabel: 'Office, ER & hospital visits',
     feeType: 'facility',
@@ -41,7 +41,7 @@ const er = group({
   productKey: 'ambetter-from-fidelis-care',
   productLabel: 'Ambetter from Fidelis Care',
   code: '99285',
-  codeName: 'EMERGENCY DEPT VISIT',
+  codeName: 'Emergency department E&M',
   settingKey: 'er',
   settingLabel: 'Hospital emergency room',
 })
@@ -80,7 +80,7 @@ describe('the scorecard filter', () => {
   })
 
   it('reads what the row shows', () => {
-    expect(scorecardRowText(er)).toContain('CPT 99285 · EMERGENCY DEPT VISIT')
+    expect(scorecardRowText(er)).toContain('CPT 99285 · ER visit, level 5')
     expect(scorecardRowText(er)).toContain('Ambetter from Fidelis Care · Facility fee · Hospital emergency room')
   })
 })

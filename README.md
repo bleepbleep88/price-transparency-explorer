@@ -55,7 +55,7 @@ Every page leads with one answer in plain words, like "Surgery center $511" or "
 
 - **API:** .NET 10, ASP.NET Core, MediatR, FluentValidation, Dapper, DuckDB (embedded), Serilog, OpenAPI.
 - **Web:** Vue 3, Vite, TypeScript, Vuetify, TanStack Vue Query, zod.
-- **Tests:** xUnit (680), Vitest (328), Playwright on the real data (52). CI builds and runs the xUnit and Vitest tests, and builds the Docker images, on every PR.
+- **Tests:** xUnit (681), Vitest (329), Playwright on the real data (54). CI builds and runs the xUnit and Vitest tests, and builds the Docker images, on every PR.
 
 ## Tradeoffs
 
@@ -107,4 +107,10 @@ Built with Claude Code. I made the scope, data and design decisions, and the AI 
 
 ## Notice
 
-CPT® is a registered trademark of the American Medical Association. Reference data comes from CMS (NPPES, HCPCS Level II, RBCS), the Census Bureau and NUCC.
+Prices come from the payer's public Transparency in Coverage files. CMS data (NPPES, HCPCS Level II names, RBCS categories) and the Census ZIP-to-county file are public domain.
+
+Service names are our own words, or CMS's category with the code. The app never shows or keeps CPT or CDT descriptions.
+
+Specialty names are the NUCC taxonomy, unaltered, used under the NUCC's permission in the US only. Copyright 2026 American Medical Association; all rights reserved. Neither the AMA nor the NUCC endorses this project.
+
+CPT® is a registered trademark of the American Medical Association. CDT is a trademark of the American Dental Association.

@@ -54,7 +54,7 @@ public sealed class MaskedTaxIdTests
     private static void ServeMaskedClinic(FixtureHttpHandler http) =>
         http.ServeJson(FixtureHttpHandler.EssentialUrl, File(
             [Minkowitz, CountyClinicWholeTin],
-            [Item("CPT", "88305", "Tissue exam by pathologist", "[1, 2]", Price(rate: "41.50", serviceCode: "[\"11\"]", billingClass: "professional"))]));
+            [Item("CPT", "88305", "Item 1", "[1, 2]", Price(rate: "41.50", serviceCode: "[\"11\"]", billingClass: "professional"))]));
 
     /// <summary>The clinic's key, found by its full number and found again by the key itself.</summary>
     private static async Task<string> KeyForAsync(ExplorerApiFactory factory, CancellationToken ct)

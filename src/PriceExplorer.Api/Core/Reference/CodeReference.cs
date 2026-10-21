@@ -106,6 +106,30 @@ public sealed class CodeReference
         ];
     }
 
+    /// <summary>
+    /// A name for a code from CMS's RBCS (public domain): its family, else its subcategory, else its category, in sentence
+    /// case, with a trailing " - Other" dropped and " - " read as a comma: "Lower GI Endoscopy - Other" → "Lower GI
+    /// endoscopy", "Office E&amp;M - Established" → "Office E&amp;M, established". What a CPT code is called when the app has no
+    /// name of its own for it (the app adds the code: "Lower GI endoscopy (45399)"). Null for a code RBCS doesn't list.
+    /// </summary>
+    public string? RbcsName(string codeType, string code)
+    {
+        if (Rbcs(codeType, code) is not { } rbcs)
+        {
+            return null;
+        }
+
+        var name = rbcs.Family ?? (string.IsNullOrEmpty(rbcs.Subcategory) ? CategoryLabel(rbcs.CategoryCode, rbcs.Category) : rbcs.Subcategory);
+        if (name.EndsWith(" - Other", StringComparison.OrdinalIgnoreCase))
+        {
+            name = name[..^" - Other".Length];
+        }
+
+        var words = name.Replace(" - ", ", ", StringComparison.Ordinal).Replace("- ", ", ", StringComparison.Ordinal).Split(' ');
+        // Acronyms ("GI", "E&M", "MRI/MRA") keep their capitals; other words after the first are lower-cased.
+        return string.Join(' ', words.Select((word, index) => index == 0 || word.Count(char.IsUpper) >= 2 ? word : word.ToLowerInvariant()));
+    }
+
     /// <summary>Whether a path level is an "Other …" family, which the tree shows only beside real families.</summary>
     public static bool IsOtherFamily(CategoryLevel level) =>
         level.Source == RbcsSource && level.Key.Length > 2 && level.Key.EndsWith(NoFamily, StringComparison.Ordinal);

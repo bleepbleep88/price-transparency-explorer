@@ -16,7 +16,7 @@ namespace PriceExplorer.Api.Core.Handlers.Insights;
 /// × median with <see cref="RateStatistics.Ratio"/>, band with <see cref="RateStatistics.Band"/>. Saved values are the
 /// search's own (the statistics build runs search's code), so each group reads exactly as a search with this EIN shows it.
 /// </summary>
-internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog)
+internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog, CodeReference codeReference)
     : IRequestHandler<GetProviderScorecardQuery, ProviderScorecard>
 {
     /// <summary>How many groups the highest and lowest lists show.</summary>
@@ -104,7 +104,7 @@ internal sealed class GetProviderScorecardHandler(DuckDbConnectionFactory connec
             ProductLabel: row.ProductLabel,
             CodeType: row.CodeType,
             Code: row.Code,
-            CodeName: InsightSupport.NameOf(names, catalog, row.CodeType, row.Code),
+            CodeName: InsightSupport.NameOf(names, catalog, codeReference, row.CodeType, row.Code),
             CategoryKey: category.Key,
             CategoryLabel: category.Label,
             FeeType: row.FeeType,

@@ -26,7 +26,7 @@ describe('ChangesTable', () => {
     await mountList([
       change({ businessName: 'NHPE, LLC dba New Hyde Park Endoscopy' }),
       change({ providerKey: 'u1', einDisplay: '••-•••4567', einMasked: true, change: -50, changePct: -10, from: 500, to: 450 }),
-      change({ providerKey: 'p3', feeType: 'professional', settingKey: 'office', code: '99213', codeName: 'OFFICE/OUTPATIENT VISIT EST', from: 100.21, to: 100.4 }),
+      change({ providerKey: 'p3', feeType: 'professional', settingKey: 'office', code: '99213', codeName: 'Office E&M, established', from: 100.21, to: 100.4 }),
     ])
 
     const rows = wrapper!.findAll('[data-testid="change-row"]')
@@ -74,7 +74,7 @@ describe('ChangesTable', () => {
     const details = rows[0]!.get('[data-testid="change-details"]')
     expect(details.get('[data-testid="change-bill"]').text()).toBe('Surgery center')
     expect(details.text()).toContain('Ambetter from Fidelis Care · Facility fee · Ambulatory surgery center')
-    expect(details.text()).toContain('CPT 45378 · DIAGNOSTIC COLONOSCOPY')
+    expect(details.text()).toContain('CPT 45378 · Colonoscopy')
     expect(details.text()).toContain('tax ID 22-1111111')
     expect(details.get('[data-testid="listed-elsewhere"]').text()).toBe('Also in the Sep 28, 2026 file, with other modifiers or setting.')
     expect(rows[0]!.get('button').attributes('aria-expanded')).toBe('true')

@@ -23,9 +23,11 @@ dotnet run --project tools/PriceExplorer.ReferenceBuilder -c Release -- provider
 
 Caveats: NPPES addresses are self-reported and can be stale or out of state; a provider's specialty is its primary taxonomy only; a deactivated NPI keeps only its number and dates (no name, type, specialty or place).
 
+**NUCC taxonomy notice.** `specialty` and `specialty_group` are the NUCC Health Care Provider Taxonomy code set's own display names and groupings, unaltered (where a code has no display name, the builder joins its classification and specialization, a format change only). Used under the NUCC's royalty-free permission (https://nucc.org/index.php/nucc-structure-mainmenu-36/contact-us-mainmenu-34?id=111), in the United States only. Copyright 2026 American Medical Association; all rights reserved. Neither the AMA nor the NUCC endorses this project.
+
 ## hcpcs_names.csv.gz
 
-`code`, `description`: the long name of every HCPCS Level II code (a letter and four digits, such as J0585) in CMS's newest quarterly HCPCS file (October 2026). The search shows it when the plan's file doesn't name the code itself. Public domain. Two kinds of names are left out on purpose: CPT codes (the AMA's descriptors, and not in this file anyway) and dental D codes (the American Dental Association's).
+`code`, `description`: the long name of every HCPCS Level II code (a letter and four digits, such as J0585) in CMS's newest quarterly HCPCS file (October 2026). The search shows it when the plan's file doesn't name the code itself. Public domain. Two kinds of names are left out on purpose: CPT codes (the AMA's descriptors, and not in this file anyway) and dental D codes (the American Dental Association's). The app shows no CPT or CDT descriptions at all: see the main README's Notice.
 
 ## rbcs.csv.gz
 

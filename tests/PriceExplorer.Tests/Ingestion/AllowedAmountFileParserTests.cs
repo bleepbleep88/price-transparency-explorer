@@ -43,13 +43,14 @@ public sealed class AllowedAmountFileParserTests : IDisposable
     {
         var entry = Entry(payments: [Payment("520.64", providers: [Provider("494.00", "[1447255153]")])]);
         var (builder, _) = await ParseAsync(File([
-            Item("RC", "450", "TREAT SHOULDER DISLOCATION", entry),
-            Item("RC", "450", "THER/PROPH/DIAG IV INF INIT", entry),
+            Item("RC", "450", "Item 1", entry),
+            Item("RC", "450", "Item 2", entry),
         ]));
 
         var payment = builder.Payments.Should().ContainSingle().Subject;
         payment.Occurrences.Should().Be(2);
-        payment.LabelSamples.Should().Equal("TREAT SHOULDER DISLOCATION", "THER/PROPH/DIAG IV INF INIT");
+        payment.LabelCount.Should().Be(2);
+        payment.LabelSamples.Should().BeEmpty("a revenue-code item's names carry CPT text, so they're counted but never kept");
         payment.Path.ToString().Should().Be("out_of_network[0].allowed_amounts[0].payments[0]");
         builder.Items.Select(item => item.Payments).Should().Equal(1, 1);
         builder.GetStats().DuplicatesRemoved.Should().Be(1);
@@ -59,7 +60,7 @@ public sealed class AllowedAmountFileParserTests : IDisposable
     public async Task Payments_that_differ_in_amount_billed_charge_place_or_tax_id_stay_apart()
     {
         var (builder, _) = await ParseAsync(File([
-            Item("CPT", "74177", "CT ABD & PELV W/CONTRAST",
+            Item("CPT", "74177", "Item 3",
                 Entry(serviceCode: "[\"22\", \"23\"]", billingClass: "professional", payments: [
                     Payment("91.25", providers: [Provider("246.00", "[1407814825]")]),
                     Payment("91.25", providers: [Provider("315.00", "[1407814825]")]),
@@ -78,9 +79,9 @@ public sealed class AllowedAmountFileParserTests : IDisposable
     public async Task Codes_and_eins_get_their_leading_zeros_back_and_the_published_values_are_kept()
     {
         var (builder, _) = await ParseAsync(File([
-            Item("CPT", "142", "ANESTH, LENS SURGERY",
+            Item("CPT", "142", "Item 5",
                 Entry("""{ "type": "ein", "value": 43431956 }""", "[\"24\"]", "professional", Payment("1700.00"))),
-            Item("RC", "450", "EMERGENCY DEPT VISIT", Entry("""{ "type": "ein", "value": "60646659" }""", "[\"23\"]")),
+            Item("RC", "450", "Item 6", Entry("""{ "type": "ein", "value": "60646659" }""", "[\"23\"]")),
         ]));
 
         var anesthesia = builder.Payments.Single(p => p.Key.BillingCodeType == "CPT");
@@ -102,7 +103,7 @@ public sealed class AllowedAmountFileParserTests : IDisposable
     public async Task A_never_issued_prefix_is_flagged_even_when_it_appears_only_after_the_zero_is_restored()
     {
         var (builder, _) = await ParseAsync(File([
-            Item("CPT", "97530", "THERAPEUTIC ACTIVITIES",
+            Item("CPT", "97530", "Item 7",
                 Entry("""{ "type": "ein", "value": "71234567" }""", "[\"11\"]", "professional"),
                 Entry("""{ "type": "ein", "value": "07-1234568" }""", "[\"11\"]", "professional")),
         ]));
@@ -116,7 +117,7 @@ public sealed class AllowedAmountFileParserTests : IDisposable
     public async Task Numbers_written_as_strings_and_single_values_instead_of_arrays_are_accepted()
     {
         const string item = """
-            { "name": "HOT OR COLD PACKS THERAPY", "billing_code_type": "RC", "billing_code": 430,
+            { "name": "Item 8", "billing_code_type": "RC", "billing_code": 430,
               "allowed_amounts": [ { "tin": { "type": "EIN", "value": 131740114 }, "service_code": "22", "billing_class": "Institutional",
                 "payments": [ { "allowed_amount": "43.24", "billing_code_modifier": "go",
                   "providers": [ { "billed_charge": "481.00", "npi": "1952476988" } ] } ] } ] }
@@ -146,7 +147,7 @@ public sealed class AllowedAmountFileParserTests : IDisposable
         const string noAllowedAmounts = """{ "name": "EMPTY", "billing_code_type": "CPT", "billing_code": "99213", "allowed_amounts": [] }""";
 
         var (builder, outcome) = await ParseAsync(File([
-            Item("CPT", "74177", "CT ABD & PELV W/CONTRAST",
+            Item("CPT", "74177", "Item 3",
                 Entry(payments: [
                     Payment("\"N/A\""),
                     Payment("0"),
@@ -196,7 +197,7 @@ public sealed class AllowedAmountFileParserTests : IDisposable
     {
         var (builder, outcome) = await ParseAsync(File([
             "null",
-            Item("CPT", "74177", "CT ABD & PELV W/CONTRAST",
+            Item("CPT", "74177", "Item 3",
                 "null",
                 Entry(payments: ["null", Payment("217.92", providers: ["null", Provider("3892.00", "[1255962783, null]")])])),
         ]));
@@ -218,7 +219,7 @@ public sealed class AllowedAmountFileParserTests : IDisposable
     public async Task Invalid_npis_are_flagged_and_npi_zero_means_none_listed()
     {
         var (builder, _) = await ParseAsync(File([
-            Item("CPT", "74177", "CT ABD & PELV W/CONTRAST",
+            Item("CPT", "74177", "Item 3",
                 Entry(payments: [Payment("217.92", providers: [Provider("3892.00", "[1861171663, 0]"), Provider("100.00", "[0]")])])),
         ]));
 
@@ -233,8 +234,8 @@ public sealed class AllowedAmountFileParserTests : IDisposable
     public async Task A_truncated_file_keeps_what_was_read_and_is_reported_as_partial()
     {
         var json = File([
-            Item("CPT", "74177", "CT ABD & PELV W/CONTRAST", Entry(payments: [Payment("217.92")])),
-            Item("CPT", "70450", "CT HEAD/BRAIN W/O DYE", Entry(payments: [Payment("100.00")])),
+            Item("CPT", "74177", "Item 3", Entry(payments: [Payment("217.92")])),
+            Item("CPT", "70450", "Item 4", Entry(payments: [Payment("100.00")])),
         ]);
         var truncated = json[..(json.LastIndexOf("70450", StringComparison.Ordinal) + 3)];
 
@@ -248,7 +249,7 @@ public sealed class AllowedAmountFileParserTests : IDisposable
     [Fact]
     public async Task Gzip_a_byte_order_mark_and_a_header_after_the_items_are_all_read()
     {
-        var json = File([Item("CPT", "74177", "CT ABD & PELV W/CONTRAST")], headerFirst: false);
+        var json = File([Item("CPT", "74177", "Item 3")], headerFirst: false);
 
         var (gzipped, gzipOutcome) = await ParseAsync(json, Gzip);
         var (withBom, bomOutcome) = await ParseAsync(json, bytes => [0xEF, 0xBB, 0xBF, .. bytes]);

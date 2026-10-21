@@ -37,7 +37,9 @@ SELECT
     count(DISTINCT c.rate_id) AS Rates,
     any_value(cd.name)       AS Name
 FROM candidates c
+-- A HCPCS Level II name only: never a CPT or CDT code's published text (Core/Domain/PublishedText.cs).
 LEFT JOIN code_descriptions cd ON cd.file_id = c.file_id AND cd.code_type = c.code_type AND cd.code = c.code
+    AND regexp_matches(cd.code, '^[A-CE-V][0-9]{4}$')
 GROUP BY c.code_type, c.code
 ORDER BY Rates DESC, c.code
 LIMIT 5

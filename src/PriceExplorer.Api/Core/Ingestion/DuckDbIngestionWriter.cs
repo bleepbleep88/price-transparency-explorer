@@ -17,7 +17,8 @@ internal sealed class DuckDbIngestionWriter(DuckDbConnectionFactory connections,
     internal const string ProviderKeySecret = "provider_key_secret";
 
     /// <summary>Bump when normalization rules change: every file is re-parsed even if its bytes didn't change.</summary>
-    public const int ParserVersion = 1;
+    /// <remarks>2: CPT and CDT names, descriptions and item names are no longer kept (PublishedText).</remarks>
+    public const int ParserVersion = 2;
 
     /// <summary>Timestamps are stored as UTC. DuckDB's now() would write the server's local time without an offset.</summary>
     private DateTime UtcNow => time.GetUtcNow().UtcDateTime;

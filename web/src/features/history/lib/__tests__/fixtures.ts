@@ -84,7 +84,7 @@ export function change(overrides: Partial<RateChange> = {}): RateChange {
     productLabel: 'Ambetter from Fidelis Care',
     codeType: 'CPT',
     code: '45378',
-    codeName: 'DIAGNOSTIC COLONOSCOPY',
+    codeName: 'Lower GI endoscopy',
     feeType: 'facility',
     feeTypeLabel: 'Facility fee',
     settingKey: 'asc',

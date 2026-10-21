@@ -86,7 +86,7 @@ public sealed class SourcesApiTests(ExplorerApiFactory factory) : IClassFixture<
     {
         var ct = TestContext.Current.CancellationToken;
         var allowed = File([
-            Item("CPT", "74177", "CT ABD & PELV W/CONTRAST",
+            Item("CPT", "74177", "Item 1",
                 Entry(payments: [Payment("\"N/A\""), Payment("\"N/A\""), "null", Payment("217.92")]),
                 Entry("""{ "type": "ein", "value": "12-3456" }""", payments: [Payment("300.00")]),
                 Entry("""{ "type": "ein", "value": "071234567" }""", payments: [Payment("301.00")])),

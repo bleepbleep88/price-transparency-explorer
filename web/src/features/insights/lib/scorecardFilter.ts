@@ -36,7 +36,7 @@ export function scorecardRowText(group: FilterableGroup): string {
 
 /**
  * Every word typed has to appear somewhere in the row, in any order and any case: "ambetter emergency" finds
- * Ambetter's ER rows, "office visit" finds "OFFICE/OUTPATIENT VISIT EST". An empty filter keeps every row.
+ * Ambetter's ER rows, "office visit" finds "Office visit, level 3". An empty filter keeps every row.
  */
 export function filterScorecardGroups<T extends FilterableGroup>(groups: T[], query: string | null | undefined): T[] {
   const words = (query ?? '').toLowerCase().split(/\s+/).filter(Boolean)

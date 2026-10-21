@@ -83,7 +83,10 @@ internal sealed class AllowedAmountFileBuilder
 
         var code = new ItemCode(Intern(billingType), Intern(BillingCodes.Canonicalize(billingType, billingRaw)), Intern(billingRaw));
         var label = Intern(Clean(item.Name) ?? "");
-        _items.Add(new OutOfNetworkItemRecord(itemIndex, code.Type, code.Code, code.Raw, Clean(item.Name), Clean(item.Description), published));
+        // Item text is kept only for a HCPCS Level II code: revenue-code items here carry CPT descriptions (PublishedText).
+        var keepText = PublishedText.MayKeep(code.Code);
+        _items.Add(new OutOfNetworkItemRecord(
+            itemIndex, code.Type, code.Code, code.Raw, keepText ? Clean(item.Name) : null, keepText ? Clean(item.Description) : null, published));
 
         if (entries is null || entries.Count == 0)
         {
@@ -168,12 +171,12 @@ internal sealed class AllowedAmountFileBuilder
         if (_payments.TryGetValue(key, out var existing))
         {
             existing.Occurrences++;
-            existing.AddLabel(label, MaxLabelsKept);
+            existing.AddLabel(label, PublishedText.MayKeep(code.Code) ? MaxLabelsKept : 0);
             return;
         }
 
         var entry = new PaymentEntry(key, code.Raw, taxId, providers, at);
-        entry.AddLabel(label, MaxLabelsKept);
+        entry.AddLabel(label, PublishedText.MayKeep(code.Code) ? MaxLabelsKept : 0);
         _payments[key] = entry;
     }
 

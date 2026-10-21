@@ -16,7 +16,7 @@ public sealed class InNetworkFileParserTests : IDisposable
     {
         var (builder, outcome) = await ParseAsync(File(
             [Minkowitz],
-            [Item("RC", "490", "KNEE ARTHROSCOPY/SURGERY", "[1]", Price(additionalInformation: "29881"))]));
+            [Item("RC", "490", "Item 1", "[1]", Price(additionalInformation: "29881"))]));
 
         outcome.IsComplete.Should().BeTrue();
         var rate = builder.Rates.Should().ContainSingle().Subject;
@@ -35,14 +35,14 @@ public sealed class InNetworkFileParserTests : IDisposable
         var (builder, _) = await ParseAsync(File(
             [Minkowitz],
             [
-                Item("RC", "490", "KNEE ARTHROSCOPY/SURGERY", "[1]", price),
-                Item("RC", "490", "REMOVAL OF FOREIGN BODY", "[1]", price),
+                Item("RC", "490", "Item 1", "[1]", price),
+                Item("RC", "490", "Item 2", "[1]", price),
             ]));
 
         var rate = builder.Rates.Should().ContainSingle().Subject;
         rate.Occurrences.Should().Be(2);
         rate.LabelCount.Should().Be(2);
-        rate.LabelSamples.Should().BeEquivalentTo(["KNEE ARTHROSCOPY/SURGERY", "REMOVAL OF FOREIGN BODY"]);
+        rate.LabelSamples.Should().BeEmpty("a revenue-code item's names carry CPT text, so they're counted but never kept");
         builder.GetStats().DuplicatesRemoved.Should().Be(1);
     }
 
@@ -51,12 +51,30 @@ public sealed class InNetworkFileParserTests : IDisposable
     {
         var (builder, _) = await ParseAsync(File(
             [Minkowitz],
-            [Item("CPT", "812", "ANES LWR INTST SCR COLSC", "[1]", Price("7.94", "[\"24\"]", "professional"))]));
+            [Item("CPT", "812", "Item 1", "[1]", Price("7.94", "[\"24\"]", "professional"))]));
 
         var rate = builder.Rates.Should().ContainSingle().Subject;
         rate.Key.Code.Should().Be("00812");
         rate.BillingCodeRaw.Should().Be("812");
-        builder.Descriptions.Should().ContainSingle(d => d.Code == "00812" && d.Name == "ANES LWR INTST SCR COLSC");
+    }
+
+    [Fact]
+    public async Task Only_a_HCPCS_Level_II_codes_published_text_is_kept_never_a_CPT_or_CDT_codes()
+    {
+        // CPT text is the AMA's and CDT text the ADA's, which we have no license for; HCPCS Level II text is CMS's.
+        var (builder, _) = await ParseAsync(File(
+            [Minkowitz],
+            [
+                Item("CPT", "812", "Item 1", "[1]", Price("7.94", "[\"24\"]", "professional")),
+                Item("HCPCS", "99213", "Item 2", "[1]", Price("90.00")),
+                Item("CDT", "D0120", "Item 3", "[1]", Price("40.00")),
+                Item("HCPCS", "J0585", "Botulinum toxin per unit", "[1]", Price("7.23")),
+            ]));
+
+        builder.Descriptions.Should().ContainSingle().Which.Should().Be(
+            new CodeDescriptionRecord("HCPCS", "J0585", "Botulinum toxin per unit", "Botulinum toxin per unit"));
+        builder.Rates.Single(rate => rate.Key.Code == "J0585").LabelSamples.Should().Equal("Botulinum toxin per unit");
+        builder.Rates.Where(rate => rate.Key.Code != "J0585").Should().AllSatisfy(rate => rate.LabelSamples.Should().BeEmpty());
     }
 
     [Fact]
@@ -64,7 +82,7 @@ public sealed class InNetworkFileParserTests : IDisposable
     {
         var (builder, outcome) = await ParseAsync(File(
             [Minkowitz],
-            [Item("CPT", "45378", "DIAGNOSTIC COLONOSCOPY", "[1]", Price("300.00", "[\"11\"]", "professional"))],
+            [Item("CPT", "45378", "Item 1", "[1]", Price("300.00", "[\"11\"]", "professional"))],
             referencesFirst: false));
 
         outcome.IsComplete.Should().BeTrue();
@@ -81,7 +99,7 @@ public sealed class InNetworkFileParserTests : IDisposable
             """;
         var (builder, outcome) = await ParseAsync(File(
             [reference],
-            [Item("CPT", "45378", "DIAGNOSTIC COLONOSCOPY", "1", Price("\"300.00\"", "\"11\"", "professional"))]));
+            [Item("CPT", "45378", "Item 1", "1", Price("\"300.00\"", "\"11\"", "professional"))]));
 
         outcome.IsComplete.Should().BeTrue();
         var rate = builder.Rates.Should().ContainSingle().Subject;
@@ -96,7 +114,7 @@ public sealed class InNetworkFileParserTests : IDisposable
     {
         var (builder, outcome) = await ParseAsync(File(
             [Minkowitz],
-            [Item("CPT", "45378", "DIAGNOSTIC COLONOSCOPY", "[1]", Price("\"N/A\""), Price("300.00"))]));
+            [Item("CPT", "45378", "Item 1", "[1]", Price("\"N/A\""), Price("300.00"))]));
 
         outcome.IsComplete.Should().BeTrue();
         builder.Rates.Should().ContainSingle().Which.Key.Rate.Should().Be(300.00m);
@@ -107,7 +125,7 @@ public sealed class InNetworkFileParserTests : IDisposable
     [Fact]
     public async Task Npi_zero_marks_a_contract_with_the_whole_tax_id()
     {
-        var (builder, _) = await ParseAsync(File([CountyClinicWholeTin], [Item("CPT", "99214", "OFFICE VISIT", "[2]", Price("150.29"))]));
+        var (builder, _) = await ParseAsync(File([CountyClinicWholeTin], [Item("CPT", "99214", "Item 1", "[2]", Price("150.29"))]));
 
         var group = builder.Groups.Should().ContainSingle().Subject;
         group.EinLevel.Should().BeTrue();
@@ -120,8 +138,8 @@ public sealed class InNetworkFileParserTests : IDisposable
     public async Task A_truncated_file_keeps_what_was_read_and_is_reported_as_partial()
     {
         var json = File([Minkowitz], [
-            Item("CPT", "45378", "DIAGNOSTIC COLONOSCOPY", "[1]", Price("300.00")),
-            Item("CPT", "45380", "COLONOSCOPY AND BIOPSY", "[1]", Price("400.00")),
+            Item("CPT", "45378", "Item 1", "[1]", Price("300.00")),
+            Item("CPT", "45380", "Item 2", "[1]", Price("400.00")),
         ]);
         var truncated = json[..(json.LastIndexOf("45380", StringComparison.Ordinal) + 3)];
 
@@ -140,7 +158,7 @@ public sealed class InNetworkFileParserTests : IDisposable
               { "npi": [1174873780], "tin": { "type": "ein", "value": "460857425", "business_name": "Yorkville Endoscopy" } } ] }
             """;
         const string itemWithNullRateBlock = """
-            { "negotiation_arrangement": "ffs", "name": "COLONOSCOPY AND BIOPSY", "billing_code_type": "CPT", "billing_code": "45380",
+            { "negotiation_arrangement": "ffs", "name": "Item 2", "billing_code_type": "CPT", "billing_code": "45380",
               "negotiated_rates": [ null, { "provider_references": [3], "negotiated_prices": [
                 { "negotiated_type": "negotiated", "negotiated_rate": 400, "expiration_date": "9999-12-31",
                   "service_code": ["24"], "billing_class": "professional" } ] } ] }
@@ -148,7 +166,7 @@ public sealed class InNetworkFileParserTests : IDisposable
 
         var (builder, outcome) = await ParseAsync(File(
             ["null", Minkowitz, referenceWithNullGroup],
-            [Item("CPT", "45378", "DIAGNOSTIC COLONOSCOPY", "[1]", "null", Price("300.00")), "null", itemWithNullRateBlock]));
+            [Item("CPT", "45378", "Item 1", "[1]", "null", Price("300.00")), "null", itemWithNullRateBlock]));
 
         outcome.IsComplete.Should().BeTrue();
         builder.Rates.Select(r => r.Key.Rate).Should().BeEquivalentTo([300.00m, 400m]);
@@ -183,7 +201,7 @@ public sealed class InNetworkFileParserTests : IDisposable
     [Fact]
     public async Task Gzip_compressed_files_are_read_transparently()
     {
-        var json = File([Minkowitz], [Item("CPT", "45378", "DIAGNOSTIC COLONOSCOPY", "[1]", Price("300.00"))]);
+        var json = File([Minkowitz], [Item("CPT", "45378", "Item 1", "[1]", Price("300.00"))]);
 
         var (builder, outcome) = await ParseAsync(json, Gzip);
 
@@ -194,7 +212,7 @@ public sealed class InNetworkFileParserTests : IDisposable
     [Fact]
     public async Task A_utf8_byte_order_mark_is_skipped()
     {
-        var json = File([Minkowitz], [Item("CPT", "45378", "DIAGNOSTIC COLONOSCOPY", "[1]", Price("300.00"))]);
+        var json = File([Minkowitz], [Item("CPT", "45378", "Item 1", "[1]", Price("300.00"))]);
 
         var (builder, outcome) = await ParseAsync(json, bytes => [0xEF, 0xBB, 0xBF, .. bytes]);
 
@@ -206,7 +224,7 @@ public sealed class InNetworkFileParserTests : IDisposable
     public async Task Provider_groups_written_inline_on_a_rate_are_supported()
     {
         const string item = """
-            { "negotiation_arrangement": "ffs", "name": "DIAGNOSTIC COLONOSCOPY", "billing_code_type": "CPT", "billing_code": "45378",
+            { "negotiation_arrangement": "ffs", "name": "Item 1", "billing_code_type": "CPT", "billing_code": "45378",
               "negotiated_rates": [ { "provider_groups": [ { "npi": [1396747861], "tin": { "type": "ein", "value": "11-3471596" } } ],
                 "negotiated_prices": [ { "negotiated_type": "negotiated", "negotiated_rate": 300, "expiration_date": "9999-12-31",
                   "service_code": ["11"], "billing_class": "professional" } ] } ] }

@@ -122,7 +122,7 @@ export interface CodeInfo {
   /** The plan's own name, else CMS's HCPCS name (shortened when long). */
   name: string | null
   description: string | null
-  descriptionSource: 'payer_file' | 'cms_hcpcs' | 'none' | string
+  descriptionSource: 'payer_file' | 'cms_hcpcs' | 'rbcs' | 'none' | string
   /** How the code is priced: its kind of service and the unit a rate pays for. */
   category: ServiceCategory
   classification: CodeClassification
