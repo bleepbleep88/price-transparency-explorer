@@ -31,17 +31,36 @@ describe('ChangesTable', () => {
 
     const rows = wrapper!.findAll('[data-testid="change-row"]')
     expect(rows[0]!.text()).toContain('New Hyde Park Endoscopy')
-    expect(rows[0]!.get('[data-testid="change-service"]').text()).toBe('Colonoscopy · Surgery center')
+    expect(rows[0]!.get('[data-testid="change-service"]').text()).toBe('Colonoscopy')
     expect(rows[0]!.get('[data-testid="change-text"]').text()).toBe('$600 → $660')
     expect(rows[0]!.get('[data-testid="change-text"]').classes()).toContain('text-high')
     expect(rows[1]!.get('[data-testid="change-text"]').classes()).toContain('text-low')
     // Whole dollars would read "$100 → $100".
     expect(rows[2]!.get('[data-testid="change-text"]').text()).toBe('$100.21 → $100.40')
-    expect(rows[2]!.get('[data-testid="change-service"]').text()).toBe('Office visit, level 3 · Doctor in the office')
+    expect(rows[2]!.get('[data-testid="change-service"]').text()).toBe('Office visit, level 3')
     expect(wrapper!.text()).not.toMatch(/CPT|45378|EIN|tax ID|22-1111111|modifier/)
   })
 
-  it('opens a row to show the plan, code, tax ID, several rates, and where else it is listed', async () => {
+  it('tells apart rows with the same provider and service by their bill or plan, and no more', async () => {
+    await mountList([
+      change({ providerKey: 'a', groupKey: 'ambetter|CPT|45378|facility|asc||negotiated' }),
+      change({ providerKey: 'a', groupKey: 'ambetter|CPT|45378|professional|asc||negotiated', feeType: 'professional' }),
+      change({ providerKey: 'b', groupKey: 'essential-plan|CPT|90834|facility|fqhc||negotiated', code: '90834', settingKey: 'fqhc', productLabel: 'Essential Plan', businessName: 'Community Health Project, Inc.' }),
+      change({ providerKey: 'b', groupKey: 'ambetter|CPT|90834|facility|fqhc||negotiated', code: '90834', settingKey: 'fqhc', businessName: 'Community Health Project, Inc.' }),
+      change({ providerKey: 'c', code: '99213', businessName: 'Other Clinic' }),
+    ])
+
+    const services = wrapper!.findAll('[data-testid="change-service"]').map((service) => service.text())
+    expect(services).toEqual([
+      'Colonoscopy · Surgery center',
+      'Colonoscopy · Doctor · at a surgery center',
+      'Therapy session, 45 minutes · Essential Plan',
+      'Therapy session, 45 minutes · Ambetter',
+      'Office visit, level 3',
+    ])
+  })
+
+  it('opens a row to show its bill, plan, code, tax ID, several rates, and where else it is listed', async () => {
     await mountList([
       change({ kind: 'dropped', to: null, change: null, changePct: null, listedElsewhere: true }),
       change({ providerKey: 'p2', fromRates: 2, toRates: 3 }),
@@ -53,6 +72,7 @@ describe('ChangesTable', () => {
 
     await rows[0]!.get('button').trigger('click')
     const details = rows[0]!.get('[data-testid="change-details"]')
+    expect(details.get('[data-testid="change-bill"]').text()).toBe('Surgery center')
     expect(details.text()).toContain('Ambetter from Fidelis Care · Facility fee · Ambulatory surgery center')
     expect(details.text()).toContain('CPT 45378 · DIAGNOSTIC COLONOSCOPY')
     expect(details.text()).toContain('tax ID 22-1111111')

@@ -2,7 +2,9 @@
 import { computed, ref } from 'vue'
 import { shortDate } from '@/lib/format'
 import { feeLabel } from '@/lib/plainNumbers'
-import { billName, providerName, serviceTitle } from '@/lib/plainNames'
+import { billLine, providerName } from '@/lib/plainNames'
+import { planName } from '@/features/rates/lib/answer'
+import { serviceLabel } from '@/features/insights/lib/plainWords'
 import { modifierText } from '@/features/rates/lib/lenses'
 import type { HistorySnapshot, RateChange, RateChangesPage } from '../api/types'
 import { changeText, priceMove } from '../lib/changesText'
@@ -25,11 +27,24 @@ function toggle(id: string) {
   open.value = open.value === id ? null : id
 }
 
-/** "Therapy session, 45 minutes · Health center": the service, then whose bill it is. */
-function serviceLine(row: RateChange): string {
-  const { name, where } = billName(row)
-  return [serviceTitle(row.code, row.codeName), where ? `${name} ${where}` : name].join(' · ')
-}
+/**
+ * The service, about 10 words a row with the name and prices (decision 90): "Therapy session, 45 minutes". When another
+ * row on the page has the same provider and service, what tells them apart is added: the bill ("Doctor · in the office",
+ * "Surgery center") and/or the plan. A row's details always name both.
+ */
+const serviceLines = computed(() => {
+  const rows = props.rows.items
+  const keyOf = (row: RateChange) => `${providerName(row.businessName)}|${serviceLabel(row)}`
+  return rows.map((row) => {
+    const service = serviceLabel(row)
+    const twins = rows.filter((other) => keyOf(other) === keyOf(row))
+    if (twins.length < 2) return service
+    const bills = new Set(twins.map((twin) => billLine(twin)))
+    const plans = new Set(twins.map((twin) => twin.productLabel))
+    const tell = [bills.size > 1 ? billLine(row) : '', plans.size > 1 ? planName(row.productLabel) : '']
+    return [service, ...tell.filter(Boolean)].join(' · ')
+  })
+})
 
 /** Up in red, down in green (decision 90's colours); new and gone in ink. */
 function tone(row: RateChange): string | undefined {
@@ -61,7 +76,7 @@ function otherFile(row: RateChange): string {
   <div class="d-flex flex-column ga-2" :style="{ opacity: loading ? 0.6 : 1 }" data-testid="changes-table">
     <p v-if="!items.length" class="text-medium-emphasis" data-testid="changes-none">No changes match.</p>
     <ol v-else class="change-list">
-      <li v-for="item in items" :key="item.id" data-testid="change-row">
+      <li v-for="(item, index) in items" :key="item.id" data-testid="change-row">
         <button
           type="button"
           class="change-row"
@@ -71,11 +86,12 @@ function otherFile(row: RateChange): string {
         >
           <span class="who">
             <span class="name">{{ providerName(item.businessName) }}</span>
-            <span class="service" data-testid="change-service">{{ serviceLine(item) }}</span>
+            <span class="service" data-testid="change-service">{{ serviceLines[index] }}</span>
           </span>
           <span class="move" :class="tone(item)" data-testid="change-text">{{ priceMove(item) }}</span>
         </button>
         <div v-if="open === item.id" :id="`change-${item.id}`" class="change-details" data-testid="change-details">
+          <span data-testid="change-bill">{{ billLine(item) }}</span>
           <span>{{ changeText(item) }}</span>
           <span>
             {{ item.productLabel }} · {{ feeLabel(item.feeType) }} · {{ item.settingLabel
