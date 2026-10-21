@@ -12,15 +12,19 @@ export type TrendGroup = GroupTrend
 
 /**
  * same: the typical price looks the same in both files. listed: it moved, but every provider listed in both kept its
- * rates (only who is listed changed). priced: it moved and rates changed, or the API can't say (no step between them).
+ * rates (only who is listed changed). mixed: rates changed and providers also joined or left, so the dollar move is
+ * partly who's listed. priced: it moved and rates changed with the same providers, or the API can't say (no step).
  */
-type StepKind = 'same' | 'listed' | 'priced'
+type StepKind = 'same' | 'listed' | 'mixed' | 'priced'
 
 function stepKind(before: TrendPoint, after: TrendPoint): StepKind {
   if (sameAsShown(before.median!, after.median!, 'typical')) return 'same'
   const step = after.sincePrevious?.sinceSnapshotId === before.snapshotId ? after.sincePrevious : null
-  return step && step.raised === 0 && step.lowered === 0 ? 'listed' : 'priced'
+  if (step && step.raised === 0 && step.lowered === 0) return 'listed'
+  return step && (step.left > 0 || step.joined > 0) ? 'mixed' : 'priced'
 }
+
+const movesPrice = (kind: StepKind | undefined) => kind === 'priced' || kind === 'mixed'
 
 interface Reading {
   date: string | null
@@ -30,16 +34,19 @@ interface Reading {
 /**
  * The chip for readings up to the file on screen, with how each step moved (kinds[i]: readings[i] to readings[i + 1]):
  * "<steady> since Jul" with no price move, else the last run of price moves the same way ("Up $20 since Jul" for $100,
- * $110, $120), with no amount when a move that only reflects who's listed came after it.
+ * $110, $120). No amount when part of the move is who's listed: a step where providers also joined or left, or a
+ * who's-listed move after it ("Rates up since Aug").
  */
 function chipFor(readings: readonly Reading[], kinds: readonly StepKind[], shown: Shown, steady: string): string {
-  const last = kinds.lastIndexOf('priced')
+  let last = kinds.length - 1
+  while (last >= 0 && !movesPrice(kinds[last])) last--
   if (last === -1) return `${steady} since ${monthOf(readings[0]!.date)}`
   const direction = Math.sign(readings[last + 1]!.value - readings[last]!.value)
   let start = last
-  while (start > 0 && kinds[start - 1] === 'priced' && Math.sign(readings[start]!.value - readings[start - 1]!.value) === direction) start--
+  while (start > 0 && movesPrice(kinds[start - 1]) && Math.sign(readings[start]!.value - readings[start - 1]!.value) === direction) start--
   const since = monthOf(readings[start]!.date)
-  if (kinds.slice(last + 1).includes('listed')) return `Rates ${direction > 0 ? 'up' : 'down'} since ${since}`
+  const partlyListed = kinds.slice(start, last + 1).includes('mixed') || kinds.slice(last + 1).includes('listed')
+  if (partlyListed) return `Rates ${direction > 0 ? 'up' : 'down'} since ${since}`
   const amount = upDown(readings[start]!.value, readings[readings.length - 1]!.value, shown)
   return amount ? `${amount} since ${since}` : `${steady} since ${since}`
 }

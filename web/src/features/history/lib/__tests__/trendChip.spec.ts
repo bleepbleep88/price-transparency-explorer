@@ -7,8 +7,12 @@ const JUL = 3
 const AUG = 2
 const SEP = 1
 
-/** How the providers moved since the file before: rates changed (priced) or only who is listed (listed). */
-const priced = (since: number): TrendStep => ({ sinceSnapshotId: since, stayed: 20, raised: 3, lowered: 1, reweighted: 0, left: 1, joined: 1 })
+/**
+ * How the providers moved since the file before: rates changed with the same providers (priced), rates changed while
+ * providers also joined or left (mixed), or only who is listed changed (listed).
+ */
+const priced = (since: number): TrendStep => ({ sinceSnapshotId: since, stayed: 20, raised: 3, lowered: 1, reweighted: 0, left: 0, joined: 0 })
+const mixed = (since: number): TrendStep => ({ sinceSnapshotId: since, stayed: 24, raised: 1, lowered: 0, reweighted: 0, left: 2, joined: 2 })
 const listed = (since: number): TrendStep => ({ sinceSnapshotId: since, stayed: 37, raised: 0, lowered: 0, reweighted: 0, left: 87, joined: 39 })
 
 /** Three monthly files with these typical prices; each step's providers as given. */
@@ -44,6 +48,13 @@ describe('trendChipText', () => {
   it('leaves out of the amount any move that only reflects who is listed', () => {
     expect(trendChipText(months([100, 150, 160], [listed(JUL), priced(AUG)]), SEP)).toBe('Up $10 since Aug')
     expect(trendChipText(months([100, 120, 150], [priced(JUL), listed(AUG)]), SEP)).toBe('Rates up since Jul')
+  })
+
+  it('gives no amount when providers also joined or left in the move', () => {
+    // Essential Plan 45378 surgery center, Aug to Sep: 24 of 25 kept their rate, 1 went up, 2 left and 2 joined.
+    expect(trendChipText(months([496, 481, 511], [priced(JUL), mixed(AUG)]), SEP)).toBe('Rates up since Aug')
+    expect(trendChipText(months([100, 110, 120], [mixed(JUL), priced(AUG)]), SEP)).toBe('Rates up since Jul')
+    expect(trendChipText(months([120, 110, 100], [priced(JUL), mixed(AUG)]), SEP)).toBe('Rates down since Jul')
   })
 
   it('agrees with the file on screen: only the files up to it count', () => {
