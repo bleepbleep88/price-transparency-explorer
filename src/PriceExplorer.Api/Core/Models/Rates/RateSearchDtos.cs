@@ -152,7 +152,8 @@ public sealed record RateRowsPage(int Total, int Page, int PageSize, IReadOnlyLi
 /// npi [0] for it). <paramref name="NpiCount"/> counts only the NPIs the file lists.</param>
 /// <param name="BusinessName">
 /// The name on the provider group(s) behind <c>FirstRateId</c>, the facility paid <c>Rate</c> (among the groups that
-/// matched when a provider filter is on). <c>OtherNames</c> lists the tax ID's other names.
+/// matched when a provider filter is on): the practice's own name when the plan's is a network's shared name or comes
+/// from an unreliable file (<see cref="ListedAs"/> then gives the plan's). <c>OtherNames</c> lists the tax ID's other names.
 /// </param>
 /// <param name="Rate">The provider's rate. With several rates, their NPI-weighted median: always one it is really paid.</param>
 /// <param name="Band">"low" (at or below the 25th percentile and under the median), "high" (at or above the 75th and over
@@ -193,6 +194,12 @@ public sealed record RateRow(
 
     /// <summary>"Check this" notes: the rate may be listed for a provider who doesn't perform the service.</summary>
     public IReadOnlyList<RowFlag> Flags { get; init; } = [];
+
+    /// <summary>
+    /// The plan's name as published when <see cref="BusinessName"/> replaced it ("Chinese American IPA Assoc/CAIPA"), several
+    /// joined by "; ". Null when the plan's own name is shown.
+    /// </summary>
+    public string? ListedAs { get; init; }
 }
 
 /// <summary>Who the NPIs behind a row are, from the national provider registry (NPPES) via the bundled directory.</summary>

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using PriceExplorer.Api.Configuration;
 using PriceExplorer.Api.Core.Data;
+using PriceExplorer.Api.Core.Reference;
 
 namespace PriceExplorer.Api.Core.Ingestion;
 
@@ -17,6 +18,7 @@ internal sealed class IngestionCoordinator(
     DuckDbIngestionWriter writer,
     SnapshotStatisticsBuilder statistics,
     AllowedAmountLoader allowedAmounts,
+    PracticeNames practiceNames,
     IngestionStatus status,
     ILogger<IngestionCoordinator> logger)
 {
@@ -91,6 +93,12 @@ internal sealed class IngestionCoordinator(
                 {
                     await CompleteSnapshotAsync(id, index, snapshotError);
                 }
+            }
+
+            // Its provider groups are saved: names that are a network's, or come from an unreliable file, can be resolved.
+            if (snapshotId is not null)
+            {
+                await practiceNames.RefreshAsync(cancellationToken);
             }
         }
 

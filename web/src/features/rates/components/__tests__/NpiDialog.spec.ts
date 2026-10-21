@@ -37,6 +37,7 @@ function makeRow(multipleRates: boolean): RateRow {
     wholeTaxIdRateId: null,
     profile: null,
     flags: [],
+    listedAs: null,
   }
 }
 
@@ -86,6 +87,16 @@ describe('NpiDialog', () => {
     expect(text).toContain('Not a valid NPI')
     // One rate behind the row: no price per NPI.
     expect(text).not.toContain('$')
+  })
+
+  it("names the practice, and keeps the plan's own name when it's a network's", async () => {
+    const dialog = await mountDialog({ ...makeRow(false), businessName: 'Newtown Gastroenterology PC', listedAs: 'Chinese American IPA Assoc/CAIPA' })
+    expect(dialog.querySelector('.dialog-title')!.textContent).toBe('Newtown Gastroenterology')
+    expect(dialog.querySelector('[data-testid="npi-listed-as"]')!.textContent).toBe('Listed by the plan as Chinese American IPA Assoc/CAIPA')
+  })
+
+  it("says nothing about the plan's name when it's the one shown", async () => {
+    expect((await mountDialog(makeRow(false))).querySelector('[data-testid="npi-listed-as"]')).toBeNull()
   })
 
   it("asks for every rate behind the row, the row's own first, and shows each NPI's price", async () => {

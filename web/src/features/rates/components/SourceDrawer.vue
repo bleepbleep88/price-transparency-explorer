@@ -6,6 +6,7 @@ import { copyText } from '@/lib/clipboard'
 import { megabytes, money, plural, shortDate } from '@/lib/format'
 import { ApiError } from '@/lib/apiClient'
 import { providerName as cleanName } from '@/lib/plainNames'
+import type { RateSourceProviderGroup } from '../api/types'
 import { useRateSource } from '../composables/useRateQueries'
 import { useReturnFocus } from '../composables/useReturnFocus'
 
@@ -58,6 +59,22 @@ const source = useRateSource(
 )
 
 const data = computed(() => source.data.value)
+
+// The plan's own name(s) for this provider when lists show its practice's name instead (a network's shared name, or a
+// name from a file whose names are unreliable): kept here so the shown name can be traced to the file.
+const listedAs = computed(() => {
+  const names = (data.value?.providerGroups ?? [])
+    .filter((group) => group.providerMatch && group.shownName && group.businessName)
+    .map((group) => group.businessName!)
+  return names.length ? [...new Set(names)].join('; ') : null
+})
+
+function groupLine(group: RateSourceProviderGroup): string {
+  const npis = group.wholeTaxId ? 'whole tax ID, no NPIs' : plural(group.npiCount, 'NPI')
+  const listed = group.shownName && group.businessName ? `Listed by the plan as ${group.businessName} · ` : ''
+  return `${listed}Tax ID ${group.taxIdDisplay} · ${npis} · group ${group.providerGroupId}`
+}
+
 const errorMessage = computed(() => (source.error.value instanceof ApiError ? source.error.value.message : source.error.value ? "Couldn't load the source." : null))
 
 const comparisons = computed(() => {
@@ -90,6 +107,7 @@ const comparisons = computed(() => {
       <div class="flex-grow-1">
         <h2 ref="heading" tabindex="-1" class="drawer-title">Source of this price</h2>
         <p v-if="providerName" class="muted">{{ cleanName(providerName) }}</p>
+        <p v-if="listedAs" class="muted" data-testid="source-listed-as">Listed by the plan as {{ listedAs }}</p>
       </div>
       <v-btn :icon="mdiClose" variant="text" aria-label="Close" @click="open = false" />
     </div>
@@ -206,8 +224,8 @@ const comparisons = computed(() => {
             <v-list-item
               v-for="group in data.providerGroups"
               :key="`${group.providerGroupId}-${group.groupIndex}`"
-              :title="group.businessName ?? 'Name not published'"
-              :subtitle="`Tax ID ${group.taxIdDisplay} · ${group.wholeTaxId ? 'whole tax ID, no NPIs' : plural(group.npiCount, 'NPI')} · group ${group.providerGroupId}`"
+              :title="group.shownName ?? group.businessName ?? 'Name not published'"
+              :subtitle="groupLine(group)"
             >
               <template v-if="group.providerMatch" #append>
                 <span class="match">This provider</span>

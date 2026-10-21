@@ -1,5 +1,6 @@
 -- The provider groups a rate covers, first 200 (a few rates list hundreds; the handler reports the full count).
 -- With a provider key, that provider's groups come first, so the row's own provider is always in the list.
+-- BusinessName is as published; ShownName is the name lists show for it (practice_name), the same when not replaced.
 SELECT
     pg.provider_ref_id AS ProviderGroupId,
     pg.group_idx       AS GroupIndex,
@@ -8,6 +9,7 @@ SELECT
     pg.ein             AS Ein,
     pg.ein_unverified  AS EinUnverified,
     pg.business_name   AS BusinessName,
+    practice_name(pg.file_id, pg.provider_key, pg.business_name) AS ShownName,
     pg.npi_count       AS NpiCount,
     pg.ein_level       AS EinLevel,
     pg.network_names   AS NetworkNames,

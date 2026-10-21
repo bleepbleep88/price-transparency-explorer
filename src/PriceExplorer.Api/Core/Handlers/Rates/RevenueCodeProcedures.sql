@@ -26,7 +26,8 @@ hits AS (
     WHERE $npi::BIGINT IS NULL AND $ein::VARCHAR IS NULL AND $provider::VARCHAR IS NULL
       AND $specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL
     UNION ALL
-    SELECT f.*, pg.provider_key, CASE WHEN pg.ein_unverified THEN NULL ELSE pg.ein END, pg.ein_unverified, pg.business_name
+    SELECT f.*, pg.provider_key, CASE WHEN pg.ein_unverified THEN NULL ELSE pg.ein END, pg.ein_unverified,
+           practice_name(pg.file_id, pg.provider_key, pg.business_name)
     FROM refiled f
     JOIN rate_provider_refs rr ON rr.rate_id = f.rate_id
     JOIN provider_groups pg ON pg.file_id = rr.file_id AND pg.provider_ref_id = rr.provider_ref_id
@@ -37,7 +38,7 @@ hits AS (
           WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
             AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
       AND ($ein::VARCHAR IS NULL OR pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR)
-      AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))
+      AND ($provider::VARCHAR IS NULL OR provider_name_matches(pg.file_id, pg.provider_key, pg.business_name, $provider::VARCHAR))
       AND (($specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL) OR EXISTS (
           SELECT 1 FROM group_npis gn
           JOIN directory_matches($specialty::VARCHAR, $county::VARCHAR) dm ON dm.npi = gn.npi
