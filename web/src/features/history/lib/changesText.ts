@@ -49,6 +49,13 @@ export function changeAmounts(from: number, to: number, shown: Shown = 'rate'): 
   }
 }
 
+/** "Up $12", "Down $4.50": the difference between two amounts as shown, without the share; null when they look the same. */
+export function upDown(from: number, to: number, shown: Shown = 'rate'): string | null {
+  const { value } = SHOWN[shown]
+  const difference = Math.round((value(to) - value(from)) * 100) / 100
+  return difference === 0 ? null : `${difference > 0 ? 'Up' : 'Down'} ${differenceText(difference)}`
+}
+
 /** Whether two amounts look the same as shown. */
 export function sameAsShown(a: number, b: number, shown: Shown = 'rate'): boolean {
   return SHOWN[shown].value(a) === SHOWN[shown].value(b)
