@@ -10,6 +10,8 @@ export const GAP_SORTS = ['gap', 'spread', 'range'] as const satisfies readonly 
 export const COMPARE_SORTS = ['difference', 'ratio', '-ratio'] as const satisfies readonly CompareSort[]
 export const INSIGHT_PAGE_SIZES = [10, 25, 50, 100] as const
 export const DEFAULT_INSIGHT_PAGE_SIZE = 25
+/** The plan comparison shows its biggest differences ten at a time. */
+export const COMPARE_PAGE_SIZE = 10
 
 export interface GapParams {
   product?: string
@@ -33,8 +35,6 @@ export interface CompareParams {
   setting?: string
   /** Also compare charges filed under a revenue code with no procedure named (off by default: not like for like). */
   includeFacilityCharges?: boolean
-  /** The "By kind of service" table's order, e.g. "label" or "-pairs"; page state only, never sent to the API. */
-  categorySort?: string
   sort: CompareSort
   page: number
   pageSize: number
@@ -83,10 +83,9 @@ export function parseCompareQuery(query: LocationQuery): CompareParams {
     category: first(query.category),
     setting: first(query.setting),
     includeFacilityCharges: first(query.includeFacilityCharges) === 'true' || undefined,
-    categorySort: categorySort.parse(first(query.categorySort)),
     sort: compareSort.parse(first(query.sort)),
     page: positiveInteger(first(query.page)) ?? 1,
-    pageSize: positiveInteger(first(query.pageSize), 100) ?? DEFAULT_INSIGHT_PAGE_SIZE,
+    pageSize: positiveInteger(first(query.pageSize), 100) ?? COMPARE_PAGE_SIZE,
     snapshot: positiveInteger(first(query.snapshot)),
   }
 }
@@ -96,13 +95,8 @@ export function gapApiQuery(params: GapParams): Record<string, QueryValue> {
 }
 
 export function compareApiQuery(params: CompareParams): Record<string, QueryValue> {
-  const api: Record<string, QueryValue> = { ...params }
-  delete api.categorySort
-  return api
+  return { ...params }
 }
-
-const CATEGORY_SORT_KEYS = ['label', 'pairs', 'identical', 'lower', 'higher', 'median'] as const
-const categorySort = z.enum([...CATEGORY_SORT_KEYS, ...CATEGORY_SORT_KEYS.map((key) => `-${key}` as const)]).optional().catch(undefined)
 
 export const SCORECARD_SORT_KEYS = ['code', 'providerCount', 'value', 'median', 'vsMedian'] as const
 const scorecardSort = z.enum([...SCORECARD_SORT_KEYS, ...SCORECARD_SORT_KEYS.map((key) => `-${key}` as const)]).optional().catch(undefined)
@@ -160,7 +154,12 @@ export function pickProducts(
  * Applies a patch to the current query. null or '' removes a key; defaults are dropped to keep URLs short. Changing
  * anything but the page starts again at page 1.
  */
-export function mergeInsightQuery(current: LocationQuery, patch: InsightPatch, defaultSort: string): LocationQueryRaw {
+export function mergeInsightQuery(
+  current: LocationQuery,
+  patch: InsightPatch,
+  defaultSort: string,
+  defaultPageSize: number = DEFAULT_INSIGHT_PAGE_SIZE,
+): LocationQueryRaw {
   const next: LocationQueryRaw = { ...current }
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue
@@ -170,6 +169,6 @@ export function mergeInsightQuery(current: LocationQuery, patch: InsightPatch, d
   if (!('page' in patch)) delete next.page
   if (next.sort === defaultSort) delete next.sort
   if (next.page === '1') delete next.page
-  if (next.pageSize === String(DEFAULT_INSIGHT_PAGE_SIZE)) delete next.pageSize
+  if (next.pageSize === String(defaultPageSize)) delete next.pageSize
   return next
 }

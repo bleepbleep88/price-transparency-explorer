@@ -1,9 +1,10 @@
 import type { ModifierRef } from '@/features/rates/api/types'
 import { modifierText } from '@/features/rates/lib/lenses'
-import { ABOUT_THE_SAME, aboutTimes, differenceDollars, differenceLine, feeLabel, minus, positionLabel, shownDollars, TIMES_FROM } from '@/lib/plainNumbers'
+import { billName, serviceTitle } from '@/lib/plainNames'
+import { ABOUT_THE_SAME, aboutTimes, capitalize, differenceDollars, feeLabel, minus, shownDollars, TIMES_FROM } from '@/lib/plainNumbers'
 
-// The insights pages' own plain words, built on the shared ones in web/src/lib/plainNumbers.ts (decision 89): the same
-// thresholds, so "about the same" means within 5% and "times" starts at twice, everywhere.
+// The insights pages' own plain words, built on the shared ones in web/src/lib/plainNumbers.ts: the same thresholds, so
+// "about" means within 5% and "times" starts at twice, everywhere (decision 89), in as few words as can say it (90).
 
 /** A rate as money() shows it, to the cent. */
 export function cents(value: number): number {
@@ -11,29 +12,21 @@ export function cents(value: number): number {
 }
 
 /**
- * A provider's price against the typical price, as a position and a difference that never contradict each other:
- * - "About typical" only within 5% of typical, and then alone (the shared positionParts rule);
- * - a provider placed "Lower than most" or "Higher than most" always gets its dollars, even within 5%;
- * - from twice the typical price, "about 2.4 times the typical price";
- * - otherwise the dollars and the share they're ranked by: "$221 less than typical (about 87% less)".
- * `unit` (" per unit") goes after the dollars. Without a typical price (under 5 providers), neither.
+ * A price against the typical price in three or four words: "18% above typical", "About 2.1 times typical", "About
+ * typical". A price placed lower or higher than most (`band`) gets its dollars even within 5% ("$0.95 below typical"),
+ * taken between the rate as shown (to the cent) and the typical price as shown, so the two never contradict each other.
+ * Null without a typical price (under 5 places).
  */
-export function position(band: string | null | undefined, rate: number, typical: number | null | undefined, unit = '') {
-  if (typical == null || typical <= 0) return { label: null, difference: null }
+export function versusTypical(rate: number, typical: number | null | undefined, band?: string | null): string | null {
+  if (typical == null || typical <= 0) return null
   const ratio = rate / typical
-  const within = Math.abs(ratio - 1) < ABOUT_THE_SAME
-  if (band === 'typical' && within) return { label: positionLabel(band), difference: null }
-  const label = band === 'typical' ? null : positionLabel(band)
-  if (ratio >= TIMES_FROM) return { label, difference: `${aboutTimes(ratio)} the typical price` }
-  if (within && band !== 'low' && band !== 'high') return { label, difference: differenceLine(rate, typical) }
-  // Between the figures as shown (the rate to the cent, the typical price as dollars() shows it), so they add up. If
-  // rounding leaves no difference, or one the wrong way, the label stands alone, as in the shared positionParts.
+  if (ratio >= TIMES_FROM) return `${capitalize(aboutTimes(ratio))} typical`
+  if (Math.abs(ratio - 1) >= ABOUT_THE_SAME) return `${Math.round(Math.abs(ratio - 1) * 100)}% ${ratio < 1 ? 'below' : 'above'} typical`
+  if (band !== 'low' && band !== 'high') return 'About typical'
   const gap = minus(cents(rate), shownDollars(typical))
-  if (gap === 0 || (band === 'low' && gap > 0) || (band === 'high' && gap < 0)) return { label, difference: null }
-  const direction = gap < 0 ? 'less' : 'more'
-  const percent = Math.round(Math.abs(ratio - 1) * 100)
-  const share = percent >= ABOUT_THE_SAME * 100 ? ` (about ${percent}% ${direction})` : ''
-  return { label, difference: `${differenceDollars(gap)}${unit} ${direction} than typical${share}` }
+  // Rounding the typical price can leave no difference, or one the wrong way: then only "about".
+  if (gap === 0 || (band === 'low' && gap > 0) || (band === 'high' && gap < 0)) return 'About typical'
+  return `${differenceDollars(gap)} ${gap < 0 ? 'below' : 'above'} typical`
 }
 
 /**
@@ -60,38 +53,80 @@ export function pairWords(pair: { same: boolean; productValue: number; versusVal
   return paysWords(ratio) ?? '—'
 }
 
-/**
- * How far most providers' prices run, as the leaderboard's row says it: "most providers get about the same price" within
- * 5%, "the high end is $144 more than the low end" under twice, "the high end is about 6 times the low end" from twice.
- */
-export function rangeWords(low: number | null, high: number | null, unit = ''): string | null {
-  if (low == null || high == null || low <= 0) return null
-  if (high <= low) return 'most providers get the same price'
-  const ratio = high / low
-  if (ratio - 1 < ABOUT_THE_SAME) return 'most providers get about the same price'
-  if (ratio < TIMES_FROM) {
-    // Between the two ends as shown beside it.
-    const difference = minus(shownDollars(high), shownDollars(low))
-    return difference > 0 ? `the high end is ${differenceDollars(difference)}${unit} more than the low end` : 'most providers get about the same price'
-  }
-  return `the high end is ${aboutTimes(ratio)} the low end`
+/** The dollars between the two ends of a range as they're shown ("$389 – $625" → "$236"). */
+export function spreadDollars(low: number, high: number): string {
+  return differenceDollars(minus(shownDollars(high), shownDollars(low)))
 }
 
-/** "Essential Plan · Facility fee · Ambulatory surgery center · Left side (modifier LT)": the same service, setting and plan. */
+/** "$389 – $625", or one price when both ends are the same. */
+export function rangeText(low: number, high: number, format: (value: number) => string): string {
+  return format(low) === format(high) ? format(low) : `${format(low)} – ${format(high)}`
+}
+
+/**
+ * What to call a service on the main view: its plain name ("Colonoscopy", "Office visit, level 3"), or "Facility charge"
+ * for a hospital revenue code nobody named, instead of "Code 0460".
+ */
+export function serviceLabel(item: { codeType: string; code: string; codeName: string | null }): string {
+  if (!item.codeName && item.codeType === 'RC') return 'Facility charge'
+  return serviceTitle(item.code, item.codeName)
+}
+
+/** A plan's everyday name: "Ambetter from Fidelis Care" → "Ambetter"; "Essential Plan" stays. */
+export function planName(label: string): string {
+  return label.replace(/\s+from\s+.+$/i, '').trim() || label
+}
+
+/**
+ * Modifiers in at most two short phrases, without the bracketed parts or codes (one with no plain name is left out):
+ * "left side, right side", "separate
+ * visit on the same day as a procedure, +2 more". A video visit drops its own telehealth modifiers (the bill says video).
+ */
+export function fewModifiers(modifiers: ModifierRef[], settingKey = ''): string {
+  const phrases = modifiers
+    .map((modifier) => modifier.label.replace(/\s*\([^)]*\)/g, '').trim())
+    // A modifier with no plain name reads "Modifier SS": that's a code, so it stays in Details.
+    .filter((label) => label && !/^modifier\b/i.test(label) && !(settingKey.startsWith('telehealth') && /^telehealth/i.test(label)))
+    .map((label) => label.charAt(0).toLowerCase() + label.slice(1))
+  const unique = [...new Set(phrases)]
+  if (unique.length <= 2) return unique.join(', ')
+  return `${unique[0]}, +${unique.length - 1} more`
+}
+
+/**
+ * The second line under a service on the main view: the bill in plain words, its modifiers in short, the plan, and
+ * "per unit" for drugs and supplies. "Doctor · in the office · Essential Plan", "Surgery center · Ambetter".
+ */
+export function rowLine(item: {
+  feeType: string
+  settingKey: string
+  settingLabel: string
+  modifiers: ModifierRef[]
+  productLabel?: string
+  perUnit: boolean
+}): string {
+  const { name, where } = billName(item)
+  return [name, where, fewModifiers(item.modifiers, item.settingKey), item.productLabel ? planName(item.productLabel) : null, item.perUnit ? 'per unit' : null]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+/** "Essential Plan · Facility fee · Ambulatory surgery center · Left side (modifier LT)": the precise group, for Details and the filter. */
 export function groupLine(item: { productLabel?: string; feeType: string; settingLabel: string; modifiers: ModifierRef[] }): string {
   const parts = [item.productLabel, feeLabel(item.feeType), item.settingLabel].filter(Boolean)
   const modifiers = item.modifiers.length ? ` · ${modifierText(item.modifiers)}` : ''
   return `${parts.join(' · ')}${modifiers}`
 }
 
-/** " per unit" after every dollar figure of a per-unit price (drugs, supplies); nothing otherwise. */
+/** " per unit" after a dollar figure of a per-unit price (drugs, supplies); nothing otherwise. */
 export function unitSuffix(item: { perUnit: boolean }): string {
   return item.perUnit ? ' per unit' : ''
 }
 
-/** What a facility charge with no procedure named says instead of a comparison. */
-export const FACILITY_CHARGE_MARK = 'Facility charge, no procedure named'
+/** What a scorecard row for a facility charge with no procedure named says instead of a comparison. */
+export const FACILITY_CHARGE_MARK = 'Facility-only charge'
 
-/** Why those charges are left out, said once next to each page's switch. */
+/** Why those charges are left out, for Details. */
 export const FACILITY_CHARGE_REASON =
-  'Charges filed under a hospital revenue code alone, like "RC 0360 Operating room", cover whatever each hospital bundles under them, so they don\'t compare like for like and are left out unless you include them.'
+  'Facility-only charges are filed under a hospital revenue code with no procedure named, like "RC 0360 Operating room". ' +
+  "Each hospital bundles different things under them, so they don't compare like for like and are left out unless you include them."

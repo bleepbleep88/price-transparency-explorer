@@ -1,18 +1,31 @@
 import type { ScorecardGroup } from '../api/types'
 import { serviceName } from './insightText'
-import { FACILITY_CHARGE_MARK, groupLine } from './plainWords'
+import { FACILITY_CHARGE_MARK, groupLine, rowLine, serviceLabel } from './plainWords'
 
-// The scorecard's "Filter by code, name, plan or setting" box. Vuetify's table search only looks at its own column
-// values (the code, the raw group key), so the page filters the rows itself, on what each row shows.
+// The scorecard's filter box. Vuetify's table search only looks at its own column values (the code, the raw group key),
+// so the page filters the rows itself: on what each row shows (plain names) and on the precise names in Details.
 
 type FilterableGroup = Pick<
   ScorecardGroup,
-  'codeType' | 'code' | 'codeName' | 'categoryLabel' | 'facilityCharge' | 'productLabel' | 'feeType' | 'settingLabel' | 'modifiers' | 'unit'
+  | 'codeType'
+  | 'code'
+  | 'codeName'
+  | 'categoryLabel'
+  | 'facilityCharge'
+  | 'productLabel'
+  | 'feeType'
+  | 'settingKey'
+  | 'settingLabel'
+  | 'modifiers'
+  | 'unit'
+  | 'perUnit'
 >
 
-/** What a row says, as the filter reads it: service, category, plan, fee, setting, modifiers and unit. */
+/** What a row says, as the filter reads it: plain name and bill, code, category, plan, fee, setting, modifiers and unit. */
 export function scorecardRowText(group: FilterableGroup): string {
   return [
+    serviceLabel(group),
+    rowLine(group),
     serviceName(group),
     group.categoryLabel,
     group.facilityCharge ? FACILITY_CHARGE_MARK : '',
