@@ -130,3 +130,38 @@ test('picking the other plan and another bill keeps both in the address', async 
   await expect(page).toHaveURL(/[?&]sort=-rate(&|$)/)
   await expect(page.getByTestId('place-row').first()).toContainText('$1,154')
 })
+
+test('an office visit leads with the doctor’s office, never a health center, and Back undoes a tab or bill pick', async ({ page }) => {
+  // 99214, Ambetter: the doctor in the office (in person) and the hospital's bill. The health center's all-in price and
+  // video visits are in "Other prices".
+  await page.goto('/?code=99214')
+  const tiles = page.getByTestId('price-tile')
+  await expect(tiles.first()).toContainText('Doctor in the office')
+  await expect(tiles.nth(1)).toContainText('Hospital')
+  await expect(tiles.filter({ hasText: 'Health center' })).toHaveCount(0)
+
+  // A plan tab and a bill are each a step Back can undo.
+  const start = page.url()
+  await page.getByTestId('plan-tabs').getByRole('button', { name: 'Essential Plan' }).click()
+  await expect(page).toHaveURL(/[?&]plan=essential-plan(&|$)/)
+  const afterTab = page.url()
+  await tiles.nth(1).click()
+  await expect(page).not.toHaveURL(afterTab)
+  await page.goBack()
+  await expect(page).toHaveURL(afterTab)
+  await page.goBack()
+  await expect(page).toHaveURL(start)
+})
+
+test('a mangled group in a pasted link is dropped and the search runs', async ({ page }) => {
+  await page.goto('/?code=45378&group=garbage')
+  await expect(page.getByRole('heading', { name: 'Colonoscopy', level: 1 })).toBeVisible()
+  await expect(page.getByTestId('price-tile').first()).toBeVisible()
+  await expect(page).not.toHaveURL(/group=garbage/)
+  await expect(page.getByText('Some search inputs need fixing')).toHaveCount(0)
+
+  // A bad NPI in a link still has the page's heading over the message.
+  await page.goto('/?code=45378&npi=123')
+  await expect(page.getByRole('heading', { name: 'Colonoscopy', level: 1 })).toBeVisible()
+  await expect(page.getByText('Fix the highlighted fields to search.')).toBeVisible()
+})

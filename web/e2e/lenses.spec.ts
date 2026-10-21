@@ -75,12 +75,13 @@ test('the provider role takes an NPI or tax ID right where it asks for one', asy
   await expect(page.getByTestId('your-id')).toContainText('Enter a 10-digit NPI or a 9-digit tax ID.')
   await expect(page).not.toHaveURL(/[?&](npi|ein)=/)
 
-  // A tax ID, dash optional: the line says where it stands, right there, and the URL keeps it with the role.
+  // A tax ID, dash optional: its price is marked once, under the tile, and the URL keeps it with the role.
   await box.fill('11-3466729')
   await page.getByTestId('your-id-show').click()
   await expect(page).toHaveURL(/[?&]ein=113466729(&|$)/)
   await expect(page).toHaveURL(/[?&]lens=providers(&|$)/)
-  await expect(strip.getByTestId('role-line')).toContainText(/^Yours: \$[\d,.]+/)
+  await expect(strip.getByTestId('role-line')).toHaveText('Your price is marked above.')
+  await expect(page.getByText(/^Yours: \$/)).toHaveCount(1)
 
   // "Change" brings the box back with the cursor in it. An NPI from the results works the same way.
   await strip.getByTestId('change-id').click()
@@ -89,7 +90,8 @@ test('the provider role takes an NPI or tax ID right where it asks for one', asy
   await box.fill('1043383789')
   await box.press('Enter')
   await expect(page).toHaveURL(/[?&]npi=1043383789(&|$)/)
-  await expect(strip.getByTestId('role-line')).toContainText(/^Yours: \$[\d,.]+/)
+  await expect(strip.getByTestId('role-line')).toHaveText('Your price is marked above.')
+  await expect(page.getByText(/^Yours: \$/)).toHaveCount(1)
 
   // An NPI the files don't list for this service: the page says so plainly.
   await strip.getByTestId('change-id').click()

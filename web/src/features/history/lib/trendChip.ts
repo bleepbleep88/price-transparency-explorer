@@ -9,6 +9,8 @@ import { comparablePoints, monthOf } from './trend'
 // - An amount is given only when the same providers are listed all along (nobody joined or left, and nobody's clinicians
 //   moved between its rates, in the steps the chip covers). Otherwise the typical price's move is partly about who's
 //   listed, so the chip says which way rates went, with no amount: "Rates up since Aug".
+// - Unless that's only a few of them: when fewer than 1 in 10 of the providers listed in both files changed their rate,
+//   the typical price moved mostly because of who's listed, so the chip says "Rates mostly steady since Aug".
 
 /** A group's history across the loaded files, as GET /api/v1/rates/trend returns it. */
 export type TrendGroup = GroupTrend
@@ -32,6 +34,17 @@ function stepBetween(before: TrendPoint, after: TrendPoint): Step {
 /** The same providers all along: nobody joined or left, and nobody's clinicians moved between its rates. */
 function sameProviders(steps: readonly Step[]): boolean {
   return steps.every((step) => step.providers && !step.providers.joined && !step.providers.left && !step.providers.reweighted)
+}
+
+/** Fewer than this share of the providers listed in both files changing their rate is "mostly steady". */
+const FEW_CHANGED = 0.1
+
+/** Under 1 in 10 of the providers in both files changed their rate in these steps; false when the API can't say. */
+function fewChanged(steps: readonly Step[]): boolean {
+  if (!steps.every((step) => step.providers)) return false
+  const stayed = steps.reduce((total, step) => total + step.providers!.stayed, 0)
+  const changed = steps.reduce((total, step) => total + step.providers!.raised + step.providers!.lowered, 0)
+  return stayed > 0 && changed / stayed < FEW_CHANGED
 }
 
 /** Which way rates went in these steps: "up", "down", "mixed"; the typical price's way when the API can't say. */
@@ -69,5 +82,8 @@ export function trendChipText(trend: TrendGroup | null | undefined, selectedSnap
   const counted = steps.slice(start)
 
   const amount = sameProviders(counted) ? upDown(shown[start]!.median!, shown[end]!.median!, 'typical') : null
-  return amount ? `${amount} since ${since}` : `Rates ${rateWay(counted, way(last))} since ${since}`
+  if (amount) return `${amount} since ${since}`
+  // Rate changes are counted over the run of price moves, not the steady steps after it.
+  if (fewChanged(steps.slice(start, last + 1))) return `Rates mostly steady since ${since}`
+  return `Rates ${rateWay(counted, way(last))} since ${since}`
 }

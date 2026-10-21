@@ -20,7 +20,7 @@ describe('parseRouteQuery', () => {
       provider: 'nyu',
       specialty: ' gastro ',
       county: 'Manhattan',
-      group: 'g1',
+      group: 'essential-plan|CPT|45378|facility|asc||negotiated',
       sort: '-rate',
       page: '3',
       pageSize: '50',
@@ -37,7 +37,7 @@ describe('parseRouteQuery', () => {
       provider: 'nyu',
       specialty: 'gastro',
       county: 'Manhattan',
-      group: 'g1',
+      group: 'essential-plan|CPT|45378|facility|asc||negotiated',
       sort: '-rate',
       page: 3,
       pageSize: 50,
@@ -53,6 +53,15 @@ describe('parseRouteQuery', () => {
     expect(params.pageSize).toBe(25)
     expect(params.feeType).toBeUndefined()
     expect(params.snapshot).toBeUndefined()
+  })
+})
+
+describe('groupKey', () => {
+  it('keeps a group key from search results and drops a mangled one, so the search still runs', () => {
+    expect(parseRouteQuery({ code: '45378', group: 'essential-plan|CPT|45378|facility|asc||negotiated' }).group).toBe('essential-plan|CPT|45378|facility|asc||negotiated')
+    for (const group of ['garbage', 'a|b|c', 'a|b|c|d|e|f|g|h', `a|b|c|d|e|f|${'x'.repeat(300)}`, 'a|b|c|d|e|f|']) {
+      expect(parseRouteQuery({ code: '45378', group }).group).toBeUndefined()
+    }
   })
 })
 

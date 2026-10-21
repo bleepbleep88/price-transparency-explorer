@@ -60,6 +60,15 @@ function positiveInteger(value: string | undefined, max = Number.MAX_SAFE_INTEGE
   return Number.isInteger(number) && number >= 1 && number <= max ? number : undefined
 }
 
+/**
+ * A comparison group key as search results give it, by the API's rule: seven parts joined by "|", at most 300
+ * characters, no control characters. Anything else (a mangled pasted link) is dropped, so the search still runs.
+ */
+export function groupKey(value: string | undefined): string | undefined {
+  if (!value || value.length > 300 || value.split('|').length !== 7) return undefined
+  return [...value].some((c) => c.charCodeAt(0) < 32 || (c.charCodeAt(0) >= 127 && c.charCodeAt(0) <= 159)) ? undefined : value
+}
+
 /** Decimals a dose can have. */
 export const DOSE_DECIMALS = 6
 
@@ -92,7 +101,7 @@ export function parseRouteQuery(query: LocationQuery): SearchParams {
     provider: first(query.provider),
     specialty: first(query.specialty),
     county: first(query.county),
-    group: first(query.group),
+    group: groupKey(first(query.group)),
     sort: (SORTS as readonly string[]).includes(sort ?? '') ? (sort as SortKey) : 'rate',
     page: positiveInteger(first(query.page)) ?? 1,
     pageSize: positiveInteger(first(query.pageSize), 100) ?? DEFAULT_PAGE_SIZE,

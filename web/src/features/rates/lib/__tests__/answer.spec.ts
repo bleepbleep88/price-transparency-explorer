@@ -117,6 +117,30 @@ describe('bill tiles', () => {
     expect(tileFor(jw, result([jw]))).toMatchObject({ label: 'Doctor', where: 'in the office, for drug thrown away' })
   })
 
+  it('leads an office visit with the office, and never with a health center when another place has a price', () => {
+    // Office visit, level 4 (99214), Ambetter, Sep 28: the office price in person (35 places) and the hospital's bill
+    // (9), not the health center's all-in price (71) or the doctor at a hospital (39). Video visits (95) come after.
+    const visit = (key: string, overrides: Partial<RateGroup>) =>
+      group({ key, code: '99214', productKey: 'ambetter-from-fidelis-care', productLabel: 'Ambetter from Fidelis Care', ...overrides })
+    const video = visit('video', { feeType: 'professional', settingKey: 'telehealth-other', modifiers: [{ code: '25', label: 'Separate visit (modifier 25)' }], providerCount: 464 })
+    const officeVideo = visit('office-95', { feeType: 'professional', settingKey: 'office', modifiers: [{ code: '95', label: 'Telehealth (modifier 95)' }], providerCount: 131 })
+    const hospitalDoctor = visit('hospital-doctor', { feeType: 'professional', settingKey: 'hospital-outpatient', providerCount: 39 })
+    const office = visit('office', { feeType: 'professional', settingKey: 'office', modifiers: [{ code: 'SA', label: 'Nurse practitioner (modifier SA)' }], providerCount: 35 })
+    const healthCenter = visit('fqhc', { feeType: 'facility', settingKey: 'fqhc', providerCount: 71 })
+    const hospital = visit('hospital', { feeType: 'facility', settingKey: 'hospital-outpatient', providerCount: 9 })
+    const officeVisit = result([video, officeVideo, hospitalDoctor, office, healthCenter, hospital])
+    expect(tileGroups(officeVisit, 'ambetter-from-fidelis-care').map((g) => g.key)).toEqual(['office', 'hospital'])
+    expect(leadGroup(officeVisit, 'ambetter-from-fidelis-care')?.key).toBe('office')
+    // A health center still shows when it's the only place with a facility price, after the doctor.
+    expect(tileGroups(result([office, healthCenter]), 'ambetter-from-fidelis-care').map((g) => g.key)).toEqual(['office', 'fqhc'])
+    // A procedure keeps the place most providers bill from: the colonoscopy doctor at the surgery center, not the office.
+    const officeColonoscopy = group({ key: 'office-colonoscopy', feeType: 'professional', settingKey: 'office', providerCount: 51 })
+    expect(tileGroups(result([essentialDoctor, officeColonoscopy, essentialCenter]), 'essential-plan').map((g) => g.key)).toEqual([
+      essentialDoctor.key,
+      essentialCenter.key,
+    ])
+  })
+
   it('says each bill in a few plain words', () => {
     expect(tileFor(essentialCenter, colonoscopy)).toMatchObject({ label: 'Surgery center', where: null, price: 510.83, line: 'Most: $389 – $625', count: '27 places' })
     expect(tileFor(essentialDoctor, colonoscopy)).toMatchObject({ label: 'Doctor', where: 'at a surgery center', line: 'Most: $167 – $174' })
@@ -164,7 +188,8 @@ describe('role lines', () => {
       query: { ...colonoscopy.query, npi: '1234567893' },
     })
     expect(tileFor(pinned.groups[0]!, pinned).yours).toBe('Yours: $247.85 · Lower than most · $263.15 less than typical')
-    expect(roleLines('providers', pinned, pinned.groups[0]!)).toEqual([{ text: 'Yours: $247.85 · Lower than most · $263.15 less than typical' }])
+    // The tile already says it; the role line points to it, so it isn't said twice.
+    expect(roleLines('providers', pinned, pinned.groups[0]!)).toEqual([{ text: 'Your price is marked above.' }])
   })
 
   it('never asks for an NPI or tax ID the search already has', () => {

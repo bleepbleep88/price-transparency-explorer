@@ -36,10 +36,11 @@ export function useProviderScorecard(
   })
 }
 
-export function useProductComparison(params: MaybeRefOrGetter<CompareParams>) {
+export function useProductComparison(params: MaybeRefOrGetter<CompareParams>, enabled: MaybeRefOrGetter<boolean> = true) {
   return useQuery({
     queryKey: computed(() => insightKeys.compare(toValue(params))),
     queryFn: ({ signal }) => insightsApi.compare(toValue(params), signal),
+    enabled: computed(() => toValue(enabled)),
     placeholderData: keepPreviousData,
   })
 }
