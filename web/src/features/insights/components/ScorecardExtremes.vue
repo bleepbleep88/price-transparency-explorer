@@ -5,21 +5,23 @@ import { lowerFirst } from '@/lib/plainNumbers'
 import PlaceList, { type PlaceItem } from '@/components/simple/PlaceList.vue'
 import type { ScorecardGroup } from '../api/types'
 import { searchLocation } from '../lib/insightLinks'
-import { rowLine, serviceLabel, versusTypical } from '../lib/plainWords'
+import { rowLine, serviceLabel, tellApart, versusTypical } from '../lib/plainWords'
 
 // A provider's services furthest above (or below) the typical price: plain name, the bill and how far off, its price.
 // Each opens the search that shows it.
 const props = defineProps<{ title: string; groups: ScorecardGroup[]; tone: 'low' | 'high'; empty: string }>()
 const router = useRouter()
 
-const items = computed<PlaceItem[]>(() =>
-  props.groups.map((group) => ({
+// A modifier shows only when it tells a row apart from another with the same service, bill and plan in this list.
+const items = computed<PlaceItem[]>(() => {
+  const apart = tellApart(props.groups, (group) => [group.code, group.feeType, group.settingKey, group.productKey].join('|'))
+  return props.groups.map((group) => ({
     key: group.groupKey,
     name: serviceLabel(group),
-    place: [rowLine(group), lowerFirst(versusTypical(group.value, group.median, group.band) ?? '')].filter(Boolean).join(' · '),
+    place: [rowLine(group, apart.get(group)), lowerFirst(versusTypical(group.value, group.median, group.band) ?? '')].filter(Boolean).join(' · '),
     price: group.value,
-  })),
-)
+  }))
+})
 
 function open(key: string) {
   const group = props.groups.find((g) => g.groupKey === key)

@@ -17,29 +17,43 @@ import { useGapLeaderboard } from '@/features/insights/composables/useInsightQue
 import { searchLocation } from '@/features/insights/lib/insightLinks'
 import { mergeInsightQuery, parseGapQuery, type InsightPatch } from '@/features/insights/lib/insightParams'
 import { serviceName, statisticsLine } from '@/features/insights/lib/insightText'
-import { cents, FACILITY_CHARGE_REASON, groupLine, rangeText, rowLine, serviceLabel, spreadDollars } from '@/features/insights/lib/plainWords'
+import { cents, FACILITY_CHARGE_REASON, groupLine, planName, rangeText, rowLine, serviceLabel, spreadDollars, tellApart } from '@/features/insights/lib/plainWords'
 
 const route = useRoute()
 const router = useRouter()
 
 const params = computed(() => parseGapQuery(route.query))
-const leaderboard = useGapLeaderboard(params)
 const snapshots = useSnapshots()
 const reference = useReferenceLists()
-
-const result = computed(() => (leaderboard.isError.value ? undefined : leaderboard.data.value))
-const apiError = computed(() => (leaderboard.error.value instanceof ApiError ? leaderboard.error.value : null))
-const problem = computed(() => (apiError.value ? (Object.values(apiError.value.fieldErrors).flat()[0] ?? apiError.value.message) : null))
-const filtered = computed(() => Boolean(params.value.product || params.value.category || params.value.setting || params.value.feeType || params.value.code))
-// Until the first statistics build there is nothing to rank; the note says so, and the page claims nothing else.
-const saved = computed(() => result.value?.statistics.builtAt != null)
-const byRange = computed(() => params.value.sort === 'range')
 
 const snapshot = computed(() => {
   const list = snapshots.data.value ?? []
   return list.find((s) => s.snapshotId === params.value.snapshot) ?? list.find((s) => s.isLatest) ?? null
 })
-const productItems = computed(() => (snapshot.value?.products ?? []).map((p) => ({ title: p.productLabel, value: p.productKey })))
+// One plan at a time, like search: the plan with the most prices first, then "Both plans". Without a plan in the
+// address the first tab shows; `product=both` ranks both together and names the plan on each row.
+const BOTH = 'both'
+const plans = computed(() =>
+  [...(snapshot.value?.products ?? [])]
+    .sort((a, b) => (b.uniqueRates ?? 0) - (a.uniqueRates ?? 0))
+    .map((p) => ({ key: p.productKey, label: planName(p.productLabel) })),
+)
+const plan = computed(() => {
+  const asked = params.value.product
+  if (asked === BOTH || plans.value.length < 2) return BOTH
+  return plans.value.find((p) => p.key === asked)?.key ?? plans.value[0]?.key ?? BOTH
+})
+const apiParams = computed(() => ({ ...params.value, product: plan.value === BOTH ? undefined : plan.value }))
+const leaderboard = useGapLeaderboard(apiParams, () => !snapshots.isPending.value)
+
+const result = computed(() => (leaderboard.isError.value ? undefined : leaderboard.data.value))
+const apiError = computed(() => (leaderboard.error.value instanceof ApiError ? leaderboard.error.value : null))
+const problem = computed(() => (apiError.value ? (Object.values(apiError.value.fieldErrors).flat()[0] ?? apiError.value.message) : null))
+const filtered = computed(() => Boolean(params.value.category || params.value.setting || params.value.feeType || params.value.code))
+// Until the first statistics build there is nothing to rank; the note says so, and the page claims nothing else.
+const saved = computed(() => result.value?.statistics.builtAt != null)
+const byRange = computed(() => params.value.sort === 'range')
+
 const settingItems = computed(() => (reference.data.value?.settings ?? []).map((s) => ({ title: settingName(s.key, s.label), value: s.key })))
 const categoryItems = computed(() => (result.value?.categories ?? []).map((c) => ({ title: c.label, value: c.key })))
 const billItems = [
@@ -61,10 +75,15 @@ function update(patch: InsightPatch) {
 }
 
 function clearFilters() {
-  void update({ product: null, category: null, setting: null, feeType: null, code: null })
+  void update({ category: null, setting: null, feeType: null, code: null })
 }
 
 const summaryOf = (row: GapRow): PriceSummary => ({ providers: row.providerCount, ...row.stats })
+
+// A modifier shows only when it tells a row apart from another with the same service, bill and plan on this page.
+const apart = computed(() => tellApart(result.value?.rows.items ?? [], (row) => [row.code, row.feeType, row.settingKey, row.productKey].join('|')))
+// The plan goes on each row only when both are ranked together.
+const line = (row: GapRow) => rowLine(plan.value === BOTH ? row : { ...row, productLabel: undefined }, apart.value.get(row))
 
 // When whole dollars would show the typical price and the cheapest quarter as the same ($269 and $269), the row shows
 // both to the cent so the difference beside them adds up.
@@ -101,20 +120,25 @@ function spread(row: GapRow): string {
     <StatisticsNote v-if="result" :basis="result.statistics" />
 
     <div class="d-flex flex-column ga-4">
+      <v-btn-toggle
+        v-if="plans.length > 1"
+        :model-value="plan"
+        mandatory
+        divided
+        variant="outlined"
+        density="comfortable"
+        color="primary"
+        class="align-self-start"
+        aria-label="Plan"
+        data-testid="gaps-plans"
+        @update:model-value="(value: string) => update({ product: value === plans[0]?.key ? null : value })"
+      >
+        <v-btn v-for="tab in plans" :key="tab.key" :value="tab.key" :aria-pressed="plan === tab.key" :data-testid="`gaps-plan-${tab.key}`">
+          {{ tab.label }}
+        </v-btn>
+        <v-btn :value="BOTH" :aria-pressed="plan === BOTH" data-testid="gaps-plan-both">Both plans</v-btn>
+      </v-btn-toggle>
       <div class="filters">
-        <v-select
-          :model-value="params.product ?? null"
-          :items="productItems"
-          label="Plan"
-          placeholder="All plans"
-          persistent-placeholder
-          clearable
-          hide-details="auto"
-          density="compact"
-          :error-messages="apiError?.fieldErrors.product ?? []"
-          data-testid="gaps-plan"
-          @update:model-value="(value) => update({ product: value })"
-        />
         <v-select
           :model-value="params.category ?? null"
           :items="categoryItems"
@@ -208,7 +232,12 @@ function spread(row: GapRow): string {
         </template>
         <template v-else>
           <p class="text-body-large">{{ filtered ? 'No gaps for these filters.' : 'No gaps yet.' }}</p>
-          <v-btn v-if="filtered" variant="tonal" color="primary" @click="clearFilters">Clear filters</v-btn>
+          <div class="d-flex flex-wrap ga-2">
+            <v-btn v-if="plan !== BOTH" variant="tonal" color="primary" data-testid="gaps-both" @click="update({ product: BOTH })">
+              Show both plans
+            </v-btn>
+            <v-btn v-if="filtered" variant="tonal" color="primary" @click="clearFilters">Clear filters</v-btn>
+          </div>
         </template>
       </div>
 
@@ -224,12 +253,12 @@ function spread(row: GapRow): string {
           </thead>
           <tbody>
             <tr v-for="row in result.rows.items" :key="row.groupKey" data-testid="gap-row">
-              <td class="py-2">
+              <td>
                 <router-link :to="searchLocation(row.search)" class="service-link" data-testid="gap-search">
                   {{ serviceLabel(row) }}
                 </router-link>
                 <span class="code"> {{ row.code }}</span>
-                <div class="text-body-medium text-medium-emphasis">{{ rowLine(row) }}</div>
+                <div class="text-body-medium text-medium-emphasis">{{ line(row) }}</div>
                 <!-- On a phone the two middle figures sit under the name. -->
                 <div class="text-body-medium d-sm-none">
                   Typical {{ figure(row, row.stats.median) }} ·
@@ -281,7 +310,7 @@ function spread(row: GapRow): string {
 <style scoped>
 .filters {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -310,6 +339,12 @@ function spread(row: GapRow): string {
 .gaps-table th {
   font-size: 1rem;
   vertical-align: top;
+}
+
+/* Room between rows, so the list reads as a list and not a grid of numbers. */
+.gaps-table td {
+  padding-top: 16px;
+  padding-bottom: 16px;
 }
 
 .gaps-table th {

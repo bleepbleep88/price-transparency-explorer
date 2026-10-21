@@ -1,4 +1,5 @@
 import { plural, shortDate } from '@/lib/format'
+import { providerName } from '@/lib/plainNames'
 import { MIN_PROVIDERS_FOR_TYPICAL, MIN_SERVICES_FOR_SCORECARD } from '@/lib/plainNumbers'
 import type { ProviderScorecard, StatisticsBasis } from '../api/types'
 import { versusTypical } from './plainWords'
@@ -25,6 +26,20 @@ export function overallReading(scorecard: Pick<ProviderScorecard, 'index'>): { f
     return { figure: 'Too few to say', line: `Needs ${MIN_SERVICES_FOR_SCORECARD} services with ${MIN_PROVIDERS_FOR_TYPICAL}+ places`, tone: 'neutral' }
   }
   return { figure: versusTypical(index.value, 1) ?? 'About typical', line: `Across ${plural(index.groupsCounted, 'service')}`, tone: toneOf(index.value) }
+}
+
+/**
+ * One line under a scorecard's title saying it's the provider the reader came from: "Also listed as The Trustees of
+ * Columbia University in the City of NY". `cameAs` (the name on the search row that linked here) counts only when it's
+ * one of the provider's own names; without it, the first other name. Null when there's nothing different to say.
+ */
+export function alsoListedAs(provider: Pick<ProviderScorecard['provider'], 'name' | 'otherNames'>, cameAs?: string | null): string | null {
+  const key = (name: string) => providerName(name).toLowerCase()
+  const line = (name: string) => `Also listed as ${providerName(name)}`
+  const known = [provider.name, ...provider.otherNames]
+  if (cameAs && known.some((name) => key(name) === key(cameAs))) return key(cameAs) === key(provider.name) ? null : line(cameAs)
+  const other = provider.otherNames.find((name) => key(name) !== key(provider.name))
+  return other ? line(other) : null
 }
 
 /** How the overall reading is worked out, for Details: true whichever way the provider leans. */

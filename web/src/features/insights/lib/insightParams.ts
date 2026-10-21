@@ -103,6 +103,8 @@ const scorecardSort = z.enum([...SCORECARD_SORT_KEYS, ...SCORECARD_SORT_KEYS.map
 
 /** A scorecard page's own state: the table's filter text, order and page, and whether facility charges count. */
 export interface ScorecardParams {
+  /** The name the reader came from (a search row), so the page can say it's the same provider. */
+  as?: string
   q?: string
   sort?: string
   page: number
@@ -112,6 +114,7 @@ export interface ScorecardParams {
 
 export function parseScorecardQuery(query: LocationQuery): ScorecardParams {
   return {
+    as: first(query.as)?.slice(0, 200),
     q: first(query.q),
     sort: scorecardSort.parse(first(query.sort)),
     page: positiveInteger(first(query.page)) ?? 1,
