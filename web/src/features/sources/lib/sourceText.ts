@@ -126,9 +126,17 @@ export function priceTotals(snapshot: SourceSnapshot): { published: number; uniq
   )
 }
 
-/** "573,393 prices → 17,140" */
+/** What the big figure's second number is, said next to it. */
+export const AFTER_COPIES = 'after removing copies'
+
+/** "573,393 prices → 17,140 after removing copies" */
 export function totalsText(totals: { published: number; unique: number }): string {
-  return `${plural(totals.published, 'price')} → ${wholeNumber(totals.unique)}`
+  return `${plural(totals.published, 'price')} → ${wholeNumber(totals.unique)} ${AFTER_COPIES}`
+}
+
+/** A file link with its size, since it downloads the whole file: "Prices · 91 MB". Just the name when the size is unknown. */
+export function fileLinkText(name: string, file: SourceFile): string {
+  return file.contentLength == null ? name : `${name} · ${fileSize(file.contentLength)}`
 }
 
 /** The month whose numbers lead the page: the one shown by default, else the newest. */

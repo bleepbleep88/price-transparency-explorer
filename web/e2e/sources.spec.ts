@@ -23,8 +23,8 @@ test('the sources page leads with one total, then each month with its two plans 
   await expect(page.getByRole('heading', { name: 'Where the data comes from', level: 1 })).toBeVisible()
 
   // The newest month's rate files: every published price, and what's left once exact copies count once.
-  await expect(page.getByTestId('sources-total')).toContainText(/^[\d,]+ prices → [\d,]+/)
-  await expect(page.getByTestId('sources-total')).toContainText(/[A-Z][a-z]{2} \d{1,2}, \d{4} files, exact copies counted once/)
+  await expect(page.getByTestId('sources-total')).toContainText(/^[\d,]+ prices → [\d,]+ after removing copies/)
+  await expect(page.getByTestId('sources-total')).toContainText(/[A-Z][a-z]{2} \d{1,2}, \d{4} files/)
 
   const months = page.getByTestId('source-snapshot')
   await expect(months).toHaveCount(3)
@@ -35,6 +35,9 @@ test('the sources page leads with one total, then each month with its two plans 
   await expect(plans).toHaveCount(2)
   await expect(plans.first().getByTestId('source-link-prices')).toHaveAttribute('href', /in-network\.json$/)
   await expect(plans.first().getByTestId('source-link-oon')).toHaveAttribute('href', /allowed-amounts\.json$/)
+  // Each link downloads the whole file (the rate files run 85 to 175 MB), so it says how big it is.
+  await expect(plans.first().getByTestId('source-link-prices')).toHaveText(/^Prices · \d+ MB\s*$/)
+  await expect(plans.first().getByTestId('source-link-oon')).toHaveText(/^Out of network · [\d,]+ (KB|MB)\s*$/)
   await expect(page.getByTestId('source-plan-problem')).toHaveCount(0)
   // The month picker has nothing to pick here, and the status chip is gone once the data is ready.
   await expect(page.getByTestId('data-status')).toHaveCount(0)
