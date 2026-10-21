@@ -1,18 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { mdiOpenInNew } from '@mdi/js'
 import type { RateGroup, RateSearchResult } from '../api/types'
 import { ROLE_OPTIONS, roleLines } from '../lib/answer'
 import { compareLink, gapsLink, scorecardLink } from '@/features/insights/lib/insightLinks'
 import { apiSearchUrl } from '../lib/lenses'
-import { MAX_CASES, type Lens, type QueryPatch, type SearchParams } from '../lib/searchParams'
+import { MAX_CASES, npiCheckDigitWarning, PROVIDER_ID_ERROR, providerIdPatch, type Lens, type QueryPatch, type SearchParams } from '../lib/searchParams'
 
 // "I'm a…": one or two short lines for the reader's role, about the bill picked above.
 const props = defineProps<{ result: RateSearchResult; params: SearchParams; group: RateGroup | null; tiles?: RateGroup[] }>()
 const emit = defineEmits<{
   update: [patch: QueryPatch]
   cases: [cases: number | null]
-  focusNpi: []
   search: [code: string]
 }>()
 
@@ -47,6 +46,44 @@ function choose(next: Lens) {
   emit('update', { lens: lens.value === next ? null : next, page: props.params.page })
 }
 
+// The provider role asks for an NPI or tax ID right here, under its line, and "Change" brings the box back.
+const searchedId = computed(() => props.params.npi ?? props.params.ein ?? null)
+const askForId = computed(() => lens.value === 'providers' && !searchedId.value && lines.value.some((line) => line.action === 'npi'))
+const idText = ref('')
+const idError = ref('')
+const idWarning = computed(() => npiCheckDigitWarning(idText.value))
+const idField = useTemplateRef<{ focus: () => void }>('idField')
+let focusBox = false
+
+function onIdInput(value: string | null) {
+  idText.value = value ?? ''
+  idError.value = ''
+}
+
+function showMine() {
+  const patch = providerIdPatch(idText.value)
+  if (!patch) {
+    idError.value = PROVIDER_ID_ERROR
+    return
+  }
+  emit('update', { ...patch, lens: 'providers' })
+}
+
+function changeId() {
+  idText.value = searchedId.value ?? ''
+  idError.value = ''
+  focusBox = true
+  emit('update', { npi: null, ein: null })
+}
+
+// After "Change", the box comes back once the search without the ID is on screen: put the cursor in it.
+watch(askForId, async (asking) => {
+  if (!asking || !focusBox) return
+  focusBox = false
+  await nextTick()
+  idField.value?.focus()
+})
+
 function onCases(value: string | null) {
   casesText.value = value ?? ''
   const cases = Number((value ?? '').replace(/,/g, ''))
@@ -75,11 +112,22 @@ function onCases(value: string | null) {
 
     <div v-if="lens" class="role-lines" :data-testid="`lens-${lens}`">
       <template v-for="(line, index) in lines" :key="index">
-        <p class="role-line" data-testid="role-line">{{ line.text }}</p>
-        <div v-if="line.action === 'npi'">
-          <v-btn variant="outlined" size="small" data-testid="add-npi" @click="emit('focusNpi')">Add NPI</v-btn>
+        <div class="role-row">
+          <p class="role-line" data-testid="role-line">{{ line.text }}</p>
+          <v-btn
+            v-if="lens === 'providers' && searchedId && index === lines.length - 1"
+            variant="text"
+            size="small"
+            color="primary"
+            class="px-1"
+            aria-label="Change NPI or tax ID"
+            data-testid="change-id"
+            @click="changeId"
+          >
+            Change
+          </v-btn>
         </div>
-        <div v-else-if="line.action === 'api'">
+        <div v-if="line.action === 'api'">
           <v-btn variant="text" size="small" class="px-0" color="primary" :href="apiUrl" target="_blank" rel="noopener" :append-icon="mdiOpenInNew">
             This search in the API
           </v-btn>
@@ -88,6 +136,23 @@ function onCases(value: string | null) {
           <v-btn variant="outlined" size="small" @click="emit('search', 'J0585')">See Botox</v-btn>
         </div>
       </template>
+      <form v-if="askForId" class="your-id" data-testid="your-id" @submit.prevent="showMine">
+        <v-text-field
+          ref="idField"
+          :model-value="idText"
+          label="Your NPI or tax ID"
+          inputmode="numeric"
+          autocomplete="off"
+          density="compact"
+          :error-messages="idError"
+          :messages="idWarning ? [idWarning] : []"
+          hide-details="auto"
+          class="your-id-field"
+          data-testid="your-id-input"
+          @update:model-value="onIdInput"
+        />
+        <v-btn type="submit" color="primary" variant="flat" data-testid="your-id-show">Show me</v-btn>
+      </form>
       <div v-if="nextLink">
         <v-btn variant="text" size="small" class="px-0" color="primary" :to="nextLink.to" data-testid="role-link">{{ nextLink.label }}</v-btn>
       </div>
@@ -136,6 +201,13 @@ function onCases(value: string | null) {
   gap: 8px;
 }
 
+.role-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+}
+
 .role-line {
   font-size: 1rem;
 }
@@ -149,5 +221,21 @@ function onCases(value: string | null) {
 
 .cases-field {
   flex: 0 0 200px;
+}
+
+.your-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 16px;
+}
+
+.your-id-field {
+  flex: 0 1 260px;
+  min-width: 200px;
+}
+
+.your-id .v-btn {
+  height: 40px;
 }
 </style>

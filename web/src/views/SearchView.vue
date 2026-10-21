@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { mdiRefresh } from '@mdi/js'
 import { ApiError } from '@/lib/apiClient'
 import { plural } from '@/lib/format'
@@ -79,7 +79,6 @@ const sourceOpen = ref(false)
 const sourceRow = ref<RateRow | null>(null)
 const npiOpen = ref(false)
 const npiRow = ref<RateRow | null>(null)
-const searchForm = useTemplateRef<InstanceType<typeof SearchForm>>('searchForm')
 
 function openSource(row: RateRow) {
   sourceRow.value = row
@@ -112,7 +111,6 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
       <PageHeader v-if="!hasCode" title="What does it cost?" subtitle="What the plan pays each place, for one service." />
 
       <SearchForm
-        ref="searchForm"
         :params="params"
         :products="products"
         :settings="settings"
@@ -198,7 +196,6 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
                 :tiles="tiles"
                 @update="update"
                 @cases="(cases) => replace({ cases })"
-                @focus-npi="searchForm?.focusNpi()"
                 @search="(code) => startOver(code)"
               />
 

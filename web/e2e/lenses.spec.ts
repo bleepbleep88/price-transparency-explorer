@@ -62,3 +62,39 @@ test("buttons keep Vuetify's button type", async ({ page }) => {
   await expect(page.getByTestId('price-tile').first()).toBeVisible()
   await expect(page.getByTestId('search-submit')).toHaveCSS('font-weight', '500')
 })
+
+test('the provider role takes an NPI or tax ID right where it asks for one', async ({ page }) => {
+  await page.goto('/?code=45378&lens=providers')
+  const strip = page.getByTestId('lens-providers')
+  await expect(strip.getByTestId('role-line')).toHaveText('Add your NPI or tax ID to see where you stand.')
+  const box = page.getByTestId('your-id-input').locator('input')
+
+  // Neither an NPI nor a tax ID: a short error, and no search.
+  await box.fill('12345')
+  await box.press('Enter')
+  await expect(page.getByTestId('your-id')).toContainText('Enter a 10-digit NPI or a 9-digit tax ID.')
+  await expect(page).not.toHaveURL(/[?&](npi|ein)=/)
+
+  // A tax ID, dash optional: the line says where it stands, right there, and the URL keeps it with the role.
+  await box.fill('11-3466729')
+  await page.getByTestId('your-id-show').click()
+  await expect(page).toHaveURL(/[?&]ein=113466729(&|$)/)
+  await expect(page).toHaveURL(/[?&]lens=providers(&|$)/)
+  await expect(strip.getByTestId('role-line')).toContainText(/^Yours: \$[\d,.]+/)
+
+  // "Change" brings the box back with the cursor in it. An NPI from the results works the same way.
+  await strip.getByTestId('change-id').click()
+  await expect(page).not.toHaveURL(/[?&]ein=/)
+  await expect(box).toBeFocused()
+  await box.fill('1043383789')
+  await box.press('Enter')
+  await expect(page).toHaveURL(/[?&]npi=1043383789(&|$)/)
+  await expect(strip.getByTestId('role-line')).toContainText(/^Yours: \$[\d,.]+/)
+
+  // An NPI the files don't list for this service: the page says so plainly.
+  await strip.getByTestId('change-id').click()
+  await box.fill('1234567893')
+  await box.press('Enter')
+  await expect(page).toHaveURL(/[?&]npi=1234567893(&|$)/)
+  await expect(page.getByTestId('no-prices')).toHaveText('No prices for this NPI here.')
+})

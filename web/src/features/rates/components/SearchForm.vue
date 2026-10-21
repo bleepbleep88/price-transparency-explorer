@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { mdiMagnify } from '@mdi/js'
 import { plural } from '@/lib/format'
 import { looksLikeCode, plainNameMatches, serviceTitle, settingName } from '@/lib/plainNames'
@@ -34,15 +34,6 @@ const props = defineProps<{
   busy?: boolean
 }>()
 const emit = defineEmits<{ submit: [patch: QueryPatch]; clear: [] }>()
-
-const npiField = useTemplateRef<{ focus: () => void }>('npiField')
-/** The provider role sends readers here to add their NPI: open the filters, then focus the field. */
-async function focusNpi() {
-  filtersOpen.value = [0]
-  await nextTick()
-  npiField.value?.focus()
-}
-defineExpose({ focusNpi })
 
 // Comboboxes hold null when empty: Vuetify treats '' as a chosen value and hides the placeholder.
 const draft = reactive({
@@ -245,7 +236,6 @@ function onSubmit() {
           <v-row density="compact">
             <v-col cols="12" sm="6" md="4">
               <v-text-field
-                ref="npiField"
                 v-model="draft.npi"
                 label="NPI"
                 inputmode="numeric"

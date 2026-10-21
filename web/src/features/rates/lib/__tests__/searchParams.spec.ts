@@ -4,6 +4,7 @@ import {
   mergeQuery,
   npiCheckDigitWarning,
   parseRouteQuery,
+  providerIdPatch,
   toApiQuery,
   validateSearchForm,
 } from '../searchParams'
@@ -167,5 +168,19 @@ describe('npiCheckDigitWarning', () => {
     expect(npiCheckDigitWarning('1861171663')).toMatch(/fails the standard check-digit test/)
     expect(npiCheckDigitWarning('1396747861')).toBeNull()
     expect(npiCheckDigitWarning('123')).toBeNull()
+  })
+})
+
+describe('providerIdPatch', () => {
+  it('reads 10 digits as an NPI and 9 as a tax ID, with the form rules, and clears the other', () => {
+    expect(providerIdPatch(' 1043383789 ')).toEqual({ npi: '1043383789', ein: null })
+    expect(providerIdPatch('11-3466729')).toEqual({ ein: '113466729', npi: null })
+    expect(providerIdPatch('113466729')).toEqual({ ein: '113466729', npi: null })
+  })
+
+  it('gives nothing for anything else', () => {
+    for (const text of ['', '   ', '12345', '1043383789012', 'abc', '11-346672x', null]) {
+      expect(providerIdPatch(text)).toBeNull()
+    }
   })
 })

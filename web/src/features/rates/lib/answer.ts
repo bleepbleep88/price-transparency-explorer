@@ -186,7 +186,7 @@ export interface RoleLine {
   yearly?: string | null
   /** Employers: a case count can give a yearly figure here, so the cases box shows. */
   cases?: boolean
-  /** A follow-up the line offers: add an NPI, open the API, try a drug. */
+  /** A follow-up the line offers: a box for an NPI or tax ID, a link to the API, a drug to try. */
   action?: 'npi' | 'api' | 'drug' | null
 }
 
@@ -210,6 +210,9 @@ export function roleLines(lens: Lens, result: RateSearchResult, group: RateGroup
     case 'providers': {
       const tile = group ? tileFor(group, result) : null
       if (tile?.yours) return [{ text: tile.yours }]
+      // An NPI or tax ID is in the search, but not on this bill.
+      if (pinsProvider(result)) return [{ text: 'Not on this bill. Pick another above.' }]
+      // The strip shows a box for the NPI or tax ID under this line.
       return [{ text: 'Add your NPI or tax ID to see where you stand.', action: 'npi' }]
     }
     case 'plans': {
