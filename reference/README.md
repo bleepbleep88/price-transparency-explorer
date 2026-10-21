@@ -10,7 +10,7 @@ Name, specialty, and practice location for every NPI that appears in the loaded 
 |---|---|
 | `npi`, `entity_type`, `name`, `credential`, `city`, `state`, `zip5`, `deactivated`, `nppes_last_updated` | CMS NPPES monthly file (`NPPES_Data_Dissemination_<Month>_<Year>_V2.zip`) |
 | `taxonomy_code` | The provider's primary taxonomy in NPPES |
-| `specialty`, `specialty_group` | NUCC Health Care Provider Taxonomy code set (display name and grouping) |
+| `specialty`, `specialty_group` | CMS's Medicare Provider and Supplier Taxonomy Crosswalk: the Medicare specialty for the NPI's taxonomy code (`specialty_group` is "Physician" for physician specialties) |
 | `county_fips`, `county`, `borough` | Census 2020 ZCTA-to-county relationship file (the county holding most of the ZIP's land area; NYC counties named as boroughs). A ZIP the file lacks (a PO box or a building's own ZIP), or one in another state than the address, gives way to the county that 90% or more of the same city's NPIs share. Practices outside the US get none. |
 
 Street addresses and phone numbers are left out on purpose. `provider_directory.source.json` records the exact source URLs, when it was built, and how many NPIs matched.
@@ -23,7 +23,7 @@ dotnet run --project tools/PriceExplorer.ReferenceBuilder -c Release -- provider
 
 Caveats: NPPES addresses are self-reported and can be stale or out of state; a provider's specialty is its primary taxonomy only; a deactivated NPI keeps only its number and dates (no name, type, specialty or place).
 
-**NUCC taxonomy notice.** `specialty` and `specialty_group` are the NUCC Health Care Provider Taxonomy code set's own display names and groupings, unaltered (where a code has no display name, the builder joins its classification and specialization, a format change only). Used under the NUCC's royalty-free permission (https://nucc.org/index.php/nucc-structure-mainmenu-36/contact-us-mainmenu-34?id=111), in the United States only. Copyright 2026 American Medical Association; all rights reserved. Neither the AMA nor the NUCC endorses this project.
+**Specialty names.** Only CMS's columns of the crosswalk are used (Medicare specialty code and description, public domain), never its taxonomy descriptions, which are the NUCC's. CMS lists some codes under several specialties; the builder takes the most specific, with a few picks written in `MedicareSpecialties.cs`. Codes CMS doesn't list (Medicare doesn't enroll every provider type, about 5% of NPIs) read "Other physician" or "Other provider type". If the NPPES download page is down, `--nppes <zip>` builds from a monthly file already downloaded.
 
 ## hcpcs_names.csv.gz
 

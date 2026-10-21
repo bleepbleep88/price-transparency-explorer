@@ -58,7 +58,7 @@ public sealed record SuggestProvidersQuery(string? Q, int? Snapshot = null, int 
 /// <summary>Option lists for the search filters, and where the provider directory came from.</summary>
 public sealed record GetReferenceListsQuery : IRequest<ReferenceLists>;
 
-/// <summary>Typeahead: specialties (NUCC, from the national provider registry) among the NPIs in the files.</summary>
+/// <summary>Typeahead: specialties (CMS's Medicare names, from the national provider registry) among the NPIs in the files.</summary>
 public sealed record SuggestSpecialtiesQuery(string? Q, int Limit = 10) : IRequest<IReadOnlyList<SpecialtySuggestion>>;
 
 /// <summary>Input rules shared by the rate detail and typeahead queries.</summary>

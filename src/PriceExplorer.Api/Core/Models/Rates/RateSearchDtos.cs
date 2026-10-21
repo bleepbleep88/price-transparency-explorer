@@ -232,7 +232,7 @@ public sealed record ProviderProfile(
     public int CardiacReaders { get; init; }
 }
 
-/// <param name="Group">The NUCC grouping, e.g. "Hospitals" or "Ambulatory Health Care Facilities".</param>
+/// <param name="Group">"Physician" for a physician specialty ("Gastroenterology"); null for other provider types.</param>
 public sealed record SpecialtyCount(string Specialty, string? Group, int Npis);
 
 /// <summary>A "check this" note on a row.</summary>

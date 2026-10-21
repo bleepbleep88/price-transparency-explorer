@@ -20,7 +20,7 @@ internal static class ProviderFlags
         }
 
         var category = ServiceCategories.Classify(group.CodeType, group.Code);
-        // "anesthe" covers both "Anesthesiology ..." physicians and "Certified Registered Nurse Anesthetist".
+        // "anesthe" covers both "Anesthesiology" physicians and "Certified Registered Nurse Anesthetist (CRNA)".
         if (active > 0 && group.FeeType == "professional" && category.Key == "anesthesia" && !Has(profile, "anesthe"))
         {
             flags.Add(new RowFlag("anesthesia_without_anesthesia_clinician",

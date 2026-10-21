@@ -115,6 +115,4 @@ Prices come from the payer's public Transparency in Coverage files. CMS data (NP
 
 Service names are our own words, or CMS's category with the code. The app never shows or keeps CPT or CDT descriptions.
 
-Specialty names are the NUCC taxonomy, unaltered, used under the NUCC's permission in the US only. Copyright 2026 American Medical Association; all rights reserved. Neither the AMA nor the NUCC endorses this project.
-
 CPT® is a registered trademark of the American Medical Association. CDT is a trademark of the American Dental Association.

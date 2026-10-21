@@ -10,9 +10,9 @@ function makeProfile(overrides: Partial<ProviderProfile> = {}): ProviderProfile 
     individuals: 35,
     deactivated: 0,
     specialties: [
-      { specialty: 'Gastroenterology Physician', group: 'Allopathic & Osteopathic Physicians', npis: 31 },
-      { specialty: 'Family Nurse Practitioner', group: 'Physician Assistants & Advanced Practice Nursing Providers', npis: 3 },
-      { specialty: 'Internal Medicine Physician', group: 'Allopathic & Osteopathic Physicians', npis: 1 },
+      { specialty: 'Gastroenterology', group: 'Physician', npis: 31 },
+      { specialty: 'Nurse Practitioner', group: null, npis: 3 },
+      { specialty: 'Internal Medicine', group: 'Physician', npis: 1 },
     ],
     locations: ['Brooklyn, NY', 'Bronx, NY', 'New City, NY (Rockland County)'],
     locationCount: 11,
@@ -23,9 +23,9 @@ function makeProfile(overrides: Partial<ProviderProfile> = {}): ProviderProfile 
 describe('whoLine', () => {
   it('leads with the first specialty and place the API lists, and keeps the rest for "+N more"', () => {
     const who = whoLine(makeProfile())!
-    expect(who.specialty).toBe('Gastroenterology Physician')
+    expect(who.specialty).toBe('Gastroenterology')
     expect(who.location).toBe('Brooklyn, NY')
-    expect(who.otherSpecialties).toEqual(['Family Nurse Practitioner (3 NPIs)', 'Internal Medicine Physician (1 NPI)'])
+    expect(who.otherSpecialties).toEqual(['Nurse Practitioner (3 NPIs)', 'Internal Medicine (1 NPI)'])
     expect(who.otherLocations).toEqual(['Bronx, NY', 'New City, NY (Rockland County)'])
     expect(who.unlistedPlaces).toBe(8)
     expect(moreCount(who)).toBe(12)
@@ -73,7 +73,7 @@ describe('registryNote', () => {
 describe('moreLines', () => {
   it('lists other specialties and places in plain words, counting places the API left out', () => {
     expect(moreLines(whoLine(makeProfile())!)).toEqual([
-      'Also: Family Nurse Practitioner (3 NPIs); Internal Medicine Physician (1 NPI)',
+      'Also: Nurse Practitioner (3 NPIs); Internal Medicine (1 NPI)',
       'Other places: Bronx, NY; New City, NY (Rockland County); and 8 more places',
     ])
   })

@@ -6,7 +6,7 @@ using PriceExplorer.ReferenceBuilder;
 //   dotnet run --project tools/PriceExplorer.ReferenceBuilder -- codes
 //
 // "providers": names, specialties and locations for every NPI in the loaded rate files, from CMS's monthly NPPES file
-// (streamed straight out of the ~1.1 GB zip), NUCC taxonomy names, and Census ZIP-to-county data.
+// (streamed straight out of the ~1.1 GB zip), CMS's Medicare specialty names, and Census ZIP-to-county data.
 // "codes": CMS HCPCS Level II names (newest quarterly file) and CMS RBCS categories (newest taxonomy file).
 
 var command = args.FirstOrDefault();
@@ -21,6 +21,7 @@ try
                 database: options.Required("--database"),
                 output: options.Optional("--out") ?? Path.Combine("reference", "provider_directory.csv.gz"),
                 cache: options.Optional("--cache") ?? Path.Combine(".data", "reference-cache"),
+                nppes: options.Optional("--nppes"),
                 CancellationToken.None);
             return 0;
         case "codes":
@@ -30,7 +31,7 @@ try
                 CancellationToken.None);
             return 0;
         default:
-            Console.Error.WriteLine("Usage: PriceExplorer.ReferenceBuilder providers --database <explorer.duckdb> [--out reference/provider_directory.csv.gz] [--cache .data/reference-cache]");
+            Console.Error.WriteLine("Usage: PriceExplorer.ReferenceBuilder providers --database <explorer.duckdb> [--out reference/provider_directory.csv.gz] [--cache .data/reference-cache] [--nppes <downloaded NPPES zip>]");
             Console.Error.WriteLine("       PriceExplorer.ReferenceBuilder codes [--out reference] [--cache .data/reference-cache]");
             return 2;
     }
