@@ -269,14 +269,24 @@ CREATE TABLE IF NOT EXISTS provider_values (
 );
 
 -- The practice's own name for provider groups whose published name is a network's shared name or comes from an
--- unreliable file (Core/Reference/PracticeNames.sql rebuilds it; practice_name() reads it). Startup also creates it for
--- databases made before it existed (PracticeNameMacro.sql), so adding it needed no schema version bump.
+-- unreliable file (Core/Reference/PracticeNames.sql rebuilds it; practice_name() reads it). Startup also creates these
+-- two tables for databases made before they existed (PracticeNameMacro.sql), so adding them needed no schema version bump.
 CREATE TABLE IF NOT EXISTS practice_names (
-    file_id       INTEGER NOT NULL,
-    provider_key  VARCHAR NOT NULL,
-    plan_name     VARCHAR NOT NULL,   -- provider_groups.business_name, as published
-    practice_name VARCHAR NOT NULL,
-    source        VARCHAR NOT NULL    -- plan | organization | clinician: where the name came from
+    file_id        INTEGER NOT NULL,
+    provider_key   VARCHAR NOT NULL,
+    plan_name      VARCHAR NOT NULL,  -- provider_groups.business_name, as published
+    practice_name  VARCHAR NOT NULL,
+    source         VARCHAR NOT NULL,  -- plan | organization | clinician: where the name came from
+    source_file_id INTEGER            -- with source plan: the rate file the name comes from
+);
+
+-- Whether each rate file's provider names can be trusted (Core/Reference/NameChecks.sql).
+CREATE TABLE IF NOT EXISTS name_checks (
+    file_id        INTEGER NOT NULL,
+    compared_files INTEGER NOT NULL,  -- other files sharing enough tax IDs to compare with
+    best_agreement DOUBLE,            -- the most of their shared tax IDs any of them names the same way; NULL = none compared
+    median_agreement DOUBLE,          -- the middle share against the files that aren't unreliable
+    unreliable     BOOLEAN NOT NULL
 );
 
 -- One row per snapshot with saved statistics: what they were built from. They stay current (SavedStatistics.sql) until

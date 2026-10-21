@@ -9,6 +9,7 @@ import {
   fileSize,
   kindLabel,
   leadSnapshot,
+  namesLine,
   planFiles,
   planProblems,
   priceTotals,
@@ -111,6 +112,28 @@ describe('source readings', () => {
     expect(snapshotProblem(sourceSnapshot())).toBeNull()
     expect(snapshotProblem({ ...sourceSnapshot(), status: 'failed' })).toBe("This month's list of files couldn't be read")
     expect(snapshotProblem({ ...sourceSnapshot(), status: 'partial' })).toBe('Some files were only partly read')
+  })
+
+  it('says when a file mislabels providers, and where the names shown come from instead', () => {
+    expect(namesLine(sourceFile())).toBeNull()
+    const mislabelled = sourceFile({
+      providerNames: {
+        agreementPct: 9,
+        typicalAgreementPct: 98,
+        namesFrom: [
+          { productLabel: 'Ambetter from Fidelis Care', indexDate: '2026-09-28' },
+          { productLabel: 'Essential Plan', indexDate: '2026-08-31' },
+        ],
+      },
+    })
+    expect(namesLine(mislabelled)).toBe(
+      'Provider names in this file match the other files for only 9% of the same tax IDs (about 98% between the other files). ' +
+        "Names shown come from the same tax ID in Ambetter's Sep 28 file, else Essential Plan's Aug 31 file.",
+    )
+    expect(namesLine(sourceFile({ providerNames: { agreementPct: 9, typicalAgreementPct: null, namesFrom: [] } }))).toBe(
+      'Provider names in this file match the other files for only 9% of the same tax IDs. ' +
+        'Names shown come from the national provider registry where it names the practice.',
+    )
   })
 
   it('puts the three dates of a file on one line, and keeps every cleaning rule short', () => {

@@ -5,7 +5,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PriceExplorer.Api.Configuration;
 using PriceExplorer.Api.Core.Data;
+using PriceExplorer.Api.Core.Handlers.Sources;
 using PriceExplorer.Api.Core.Ingestion;
+using PriceExplorer.Api.Core.Models.Sources;
+using PriceExplorer.Api.Core.Queries.Sources;
 using PriceExplorer.Api.Core.Reference;
 
 namespace PriceExplorer.Tests.Search;
@@ -140,6 +143,73 @@ public sealed class PracticeNamesTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_month_with_one_plan_takes_names_from_the_nearest_month_then_the_registry_then_keeps_the_plans()
+    {
+        // Sep 28 has only the Essential Plan file, and its names match neither other month's.
+        await FileAsync(1, snapshot: 1, "essential");
+        await FileAsync(2, snapshot: 2, "essential");
+        await FileAsync(3, snapshot: 3, "essential");
+        await ManyAsync(2, "'Practice ' || i");
+        await ManyAsync(3, "'Old Practice ' || i");
+        await ManyAsync(1, "'Shuffled ' || ((i + 7) % 120)");
+        await ManyAsync(3, "'Practice ' || i", firstGroup: 1000);
+        // Tax IDs only Sep 28 lists: the registry names them when it can.
+        await GroupAsync(1, "x1", "Shuffled A", 7001, 7002);
+        await GroupAsync(1, "x2", "Shuffled B", 7003);
+        await GroupAsync(1, "x3", "Shuffled C", 7004, 7005);
+        await RegisteredAsync(7001, "organization", "X1 Health Center Inc");
+        await RegisteredAsync(7002, "individual", "Al Bo", "MD");
+        await RegisteredAsync(7003, "individual", "Cy Do", "NP");
+        await RegisteredAsync(7004, "individual", "Ed Fu", "MD");
+        await RegisteredAsync(7005, "individual", "Gu Ha", "MD");
+        await RefreshAsync();
+
+        (await ShownAsync(1, "t5", "Shuffled 12")).Should().Be("Practice 5", "Aug 31 is nearer than Jul 27");
+        (await QueryAsync<int>("SELECT source_file_id FROM practice_names WHERE file_id = 1 AND provider_key = 't5'")).Should().Equal(2);
+        (await ShownAsync(1, "x1", "Shuffled A")).Should().Be("X1 Health Center Inc");
+        (await ShownAsync(1, "x2", "Shuffled B")).Should().Be("Cy Do, NP");
+        (await ShownAsync(1, "x3", "Shuffled C")).Should().Be("Shuffled C");
+
+        // The sources page says so, and cites the file the names came from.
+        var file = (await new ListSourcesHandler(_connections).Handle(new ListSourcesQuery(), TestContext.Current.CancellationToken))
+            .SelectMany(snapshot => snapshot.Files).Single(candidate => candidate.FileId == 1);
+        file.ProviderNames.Should().BeEquivalentTo(new SourceFileNames(0, 100, [new SourceFileRef("essential", new DateOnly(2026, 8, 31))]));
+    }
+
+    [Fact]
+    public async Task The_oldest_month_takes_names_from_the_next_one()
+    {
+        await FileAsync(1, snapshot: 1, "essential");
+        await FileAsync(2, snapshot: 2, "essential");
+        await FileAsync(3, snapshot: 3, "essential");
+        await ManyAsync(1, "'Practice ' || i");
+        await ManyAsync(2, "'Practice ' || i");
+        await ManyAsync(3, "'Shuffled ' || ((i + 7) % 120)");
+        await RefreshAsync();
+
+        (await ShownAsync(3, "t5", "Shuffled 12")).Should().Be("Practice 5");
+        (await QueryAsync<int>("SELECT DISTINCT source_file_id FROM practice_names")).Should().Equal(2);
+    }
+
+    [Fact]
+    public async Task Another_month_lends_its_name_from_the_same_plan_first()
+    {
+        await FileAsync(1, snapshot: 1, "ambetter");
+        await FileAsync(2, snapshot: 2, "essential");
+        await FileAsync(3, snapshot: 2, "ambetter");
+        foreach (var key in new[] { "k0", "k0", "k1", "k2", "k3", "k4" })
+        {
+            await GroupAsync(1, key, "Big IPA", 1000);
+        }
+
+        await GroupAsync(2, "k1", "K1 Essential Name", 1000);
+        await GroupAsync(3, "k1", "K1 Ambetter Name", 1000);
+        await RefreshAsync();
+
+        (await ShownAsync(1, "k1", "Big IPA")).Should().Be("K1 Ambetter Name");
+    }
+
+    [Fact]
     public async Task Statistics_go_stale_when_a_snapshots_shown_names_change()
     {
         await FileAsync(1, snapshot: 1, "ambetter");
@@ -197,14 +267,17 @@ public sealed class PracticeNamesTests : IAsyncLifetime
         }
     }
 
-    /// <summary>120 tax IDs, t0 to t119, one group each, named by <paramref name="nameSql"/> (a SQL expression of i).</summary>
-    private Task ManyAsync(int file, string nameSql) => ExecuteAsync(
+    /// <summary>
+    /// Enough tax IDs to compare files by (t0, t1, …), one group each from <paramref name="firstGroup"/>, named by
+    /// <paramref name="nameSql"/> (a SQL expression of i).
+    /// </summary>
+    private Task ManyAsync(int file, string nameSql, int firstGroup = 0) => ExecuteAsync(
         $"""
         INSERT INTO provider_groups (file_id, provider_ref_id, group_idx, tin_type, tin_value, ein, business_name, npi_count,
                                      ein_level, ein_unverified, network_names, provider_key)
-        SELECT $file, i, 0, 'ein', 't' || i, 't' || i, {nameSql}, 1, false, false, NULL, 't' || i
-        FROM range(120) r(i)
-        """, new { file });
+        SELECT $file, $firstGroup + i, 0, 'ein', 't' || i, 't' || i, {nameSql}, 1, false, false, NULL, 't' || i
+        FROM range($count) r(i)
+        """, new { file, firstGroup, count = PracticeNames.ComparableTaxIds + 20 });
 
     private Task RegisteredAsync(long npi, string type, string name, string? credential = null, bool deactivated = false) => ExecuteAsync(
         "INSERT INTO provider_directory VALUES ($npi, $type, $name, $credential, $deactivated)", new { npi, type, name, credential, deactivated });

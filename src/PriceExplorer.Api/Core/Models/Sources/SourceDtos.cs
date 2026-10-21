@@ -39,7 +39,23 @@ public sealed record SourceFile(
     string? ReportingEntityName,
     SourceFileCounts? Counts,
     IReadOnlyList<SourceReject> Rejects,
-    SourceFileTiming Timing);
+    SourceFileTiming Timing)
+{
+    /// <summary>Set when the file's provider names can't be trusted, and lists show names from other files instead.</summary>
+    public SourceFileNames? ProviderNames { get; init; }
+}
+
+/// <summary>
+/// A rate file whose provider names disagree with the other files for the same tax IDs (see Core/Reference/NameChecks.sql).
+/// </summary>
+/// <param name="AgreementPct">Of the tax IDs it shares with another file, the share it names the same way (the middle one
+/// across the other files), in percent.</param>
+/// <param name="TypicalAgreementPct">The same between the other files (their middle one), in percent; null with no other to compare.</param>
+/// <param name="NamesFrom">The files the names shown instead come from, the most names first (at most two).</param>
+public sealed record SourceFileNames(int AgreementPct, int? TypicalAgreementPct, IReadOnlyList<SourceFileRef> NamesFrom);
+
+/// <summary>A rate file by its plan and the date of its list of files.</summary>
+public sealed record SourceFileRef(string ProductLabel, DateOnly? IndexDate);
 
 /// <summary>The three dates a file has. They differ: 2026-08-31 in the index's name, 2026-09-02 inside, served 2026-09-04.</summary>
 /// <param name="IndexDate">The date in the index file's name (the snapshot).</param>
