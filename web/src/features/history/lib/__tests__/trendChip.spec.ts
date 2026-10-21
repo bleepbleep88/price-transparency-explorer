@@ -71,13 +71,6 @@ describe('trendChipText', () => {
   })
 
   it('gives an amount only when nobody joined or left in the steps it covers', () => {
-    // Colonoscopy, Essential Plan, surgery center, Aug to Sep: 24 of 25 kept their rate, 1 got a higher one, 2 left, 2 joined.
-    const colonoscopy = churned(AUG, { stayed: 25, raised: 1, lowered: 0, left: 2, joined: 2 })
-    expect(trendChipText(months([511, 511, 541], [priced(JUL), colonoscopy]), SEP)).toBe('Rates up since Aug')
-    // The doctor's bill: up $1 while 65 joined.
-    expect(trendChipText(months([168, 168, 169], [priced(JUL), churned(AUG, { stayed: 120, raised: 2, left: 0, joined: 65 })]), SEP)).toBe(
-      'Rates up since Aug',
-    )
     // The same providers all along: the amount is about their rates.
     expect(trendChipText(months([100, 100, 112], [priced(JUL), { ...priced(AUG), lowered: 1 }]), SEP)).toBe('Up $12 since Aug')
     // Clinicians moving between the same rates move the typical price too.
@@ -86,9 +79,26 @@ describe('trendChipText', () => {
     expect(trendChipText(months([100, 110, 120], [priced(JUL), churned(AUG, {})]), SEP)).toBe('Rates up since Jul')
   })
 
+  it('says "mostly steady" when fewer than 1 in 10 of the providers in both files changed their rate', () => {
+    // Colonoscopy, Essential Plan, surgery center, Aug to Sep: $481 to $511, while 24 of 25 kept their rate, 1 got a higher
+    // one, 2 left and 2 joined. The move is mostly about who's listed.
+    const colonoscopy = churned(AUG, { stayed: 25, raised: 1, lowered: 0, left: 2, joined: 2 })
+    expect(trendChipText(months([496, 481, 511], [churned(JUL, { stayed: 27, raised: 2, lowered: 1, left: 5, joined: 0 }), colonoscopy]), SEP)).toBe(
+      'Rates mostly steady since Aug',
+    )
+    // The doctor's bill: up $1 while 2 of 120 changed and 65 joined.
+    expect(trendChipText(months([168, 168, 169], [priced(JUL), churned(AUG, { stayed: 120, raised: 2, left: 0, joined: 65 })]), SEP)).toBe(
+      'Rates mostly steady since Aug',
+    )
+    // 1 in 10 is a real move.
+    expect(trendChipText(months([100, 100, 130], [priced(JUL), churned(AUG, { stayed: 20, raised: 2, lowered: 0 })]), SEP)).toBe('Rates up since Aug')
+    // With the same providers all along the amount still holds, however few changed.
+    expect(trendChipText(months([100, 100, 112], [priced(JUL), { ...priced(AUG), stayed: 40, raised: 1 }]), SEP)).toBe('Up $12 since Aug')
+  })
+
   it('says which way the rates went, not the typical price, when someone joined or left', () => {
-    // The typical price went up because higher-priced places joined, but the one rate that changed went down.
-    expect(trendChipText(months([100, 100, 130], [priced(JUL), churned(AUG, { raised: 0, lowered: 1, joined: 5 })]), SEP)).toBe(
+    // The typical price went up because higher-priced places joined, but the rates that changed went down.
+    expect(trendChipText(months([100, 100, 130], [priced(JUL), churned(AUG, { raised: 0, lowered: 3, joined: 5 })]), SEP)).toBe(
       'Rates down since Aug',
     )
     expect(trendChipText(months([100, 100, 130], [priced(JUL), churned(AUG, { raised: 2, lowered: 3 })]), SEP)).toBe('Rates mixed since Aug')
@@ -111,6 +121,7 @@ describe('trendChipText', () => {
       trendChipText(months([100, 110, 120]), SEP),
       trendChipText(months([100, 120, 150], [priced(JUL), listed(AUG)]), SEP),
       trendChipText(months([100, 100, 130], [priced(JUL), churned(AUG, { raised: 2, lowered: 3 })]), SEP),
+      trendChipText(months([496, 481, 511], [priced(JUL), churned(AUG, { stayed: 25, raised: 1 })]), SEP),
     ]
     for (const chip of chips) {
       expect(chip!.split(' ').length).toBeLessThanOrEqual(5)

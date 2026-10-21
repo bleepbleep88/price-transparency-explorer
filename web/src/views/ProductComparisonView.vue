@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { mdiRefresh, mdiSwapHorizontal } from '@mdi/js'
 import { ApiError } from '@/lib/apiClient'
@@ -26,9 +26,34 @@ const route = useRoute()
 const router = useRouter()
 
 const params = computed(() => parseCompareQuery(route.query))
-const comparison = useProductComparison(params)
 const snapshots = useSnapshots()
 const reference = useReferenceLists()
+
+// The plan menus come from the loaded files, so they still work when a stale or mistyped plan made the request fail.
+const snapshot = computed(() => {
+  const list = snapshots.data.value ?? []
+  return list.find((s) => s.snapshotId === params.value.snapshot) ?? list.find((s) => s.isLatest) ?? null
+})
+// A plan from an old or mistyped link that isn't loaded: say so once, drop it, and compare the plans that are.
+const planMissing = ref(false)
+const unknownPlan = computed(() => {
+  const keys = snapshot.value?.products.map((p) => p.productKey)
+  return keys != null && [params.value.product, params.value.versus].some((key) => key != null && !keys.includes(key))
+})
+watch(
+  unknownPlan,
+  (unknown) => {
+    if (!unknown) return
+    planMissing.value = true
+    void router.replace({ name: 'compare', query: mergeInsightQuery(route.query, { product: null, versus: null }, 'difference', COMPARE_PAGE_SIZE) })
+  },
+  { immediate: true },
+)
+// With a plan in the link, wait for the loaded plans to check it, so a mistyped one never shows an error first.
+const comparison = useProductComparison(
+  params,
+  computed(() => !unknownPlan.value && (!(params.value.product || params.value.versus) || snapshot.value != null)),
+)
 
 const result = computed(() => (comparison.isError.value ? undefined : comparison.data.value))
 const apiError = computed(() => (comparison.error.value instanceof ApiError ? comparison.error.value : null))
@@ -43,11 +68,6 @@ const product = computed(() => planName(result.value?.product.label ?? 'The firs
 const versus = computed(() => planName(result.value?.versus.label ?? 'the second'))
 const providers = computed(() => result.value?.summary.providers ?? 0)
 
-// The plan menus come from the loaded files, so they still work when a stale or mistyped plan made the request fail.
-const snapshot = computed(() => {
-  const list = snapshots.data.value ?? []
-  return list.find((s) => s.snapshotId === params.value.snapshot) ?? list.find((s) => s.isLatest) ?? null
-})
 const productItems = computed(() => (snapshot.value?.products ?? []).map((p) => ({ title: p.productLabel, value: p.productKey })))
 const productKey = computed(() => params.value.product ?? result.value?.product.key ?? null)
 const versusKey = computed(() => params.value.versus ?? result.value?.versus.key ?? null)
@@ -70,6 +90,7 @@ const codeChip = computed(() => {
 })
 
 function update(patch: InsightPatch) {
+  planMissing.value = false
   return router.push({ name: 'compare', query: mergeInsightQuery(route.query, patch, 'difference', COMPARE_PAGE_SIZE) })
 }
 
@@ -144,6 +165,7 @@ const kinds = computed(() => [...(result.value?.byCategory ?? [])].sort((a, b) =
 <template>
   <v-container class="py-10 d-flex flex-column ga-6" max-width="960">
     <PageHeader title="Compare plans" subtitle="Same place, same service, two plans." />
+    <p v-if="planMissing" class="text-medium-emphasis" data-testid="compare-plan-missing">That plan isn't loaded. Showing both plans.</p>
     <StatisticsNote v-if="result" :basis="result.statistics" />
 
     <div class="d-flex flex-column ga-4">

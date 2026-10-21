@@ -11,6 +11,8 @@ const props = defineProps<{
   rows: RateRowsPage
   groups: RateGroup[]
   group: RateGroup | null
+  /** The group the rows were fetched for (the search's group=); until it's the picked one, the rows are another bill's. */
+  rowsGroup?: string | null
   sort: SortKey
   loading?: boolean
   yours?: boolean
@@ -25,8 +27,13 @@ const emit = defineEmits<{
 const SHOWN = 5
 const showAll = ref(false)
 const priciest = computed(() => props.sort === '-rate')
-// Right after a new pick, the rows still belong to the last bill: wait for this one's.
-const stale = computed(() => props.group != null && props.rows.items.some((row) => row.groupKey !== props.group!.key))
+// Right after a new pick, or while a new search still has every bill's rows, the rows (and their count) aren't this
+// bill's yet: wait for its own.
+const stale = computed(
+  () =>
+    props.group != null &&
+    ((props.rowsGroup !== undefined && props.rowsGroup !== props.group.key) || props.rows.items.some((row) => row.groupKey !== props.group!.key)),
+)
 const items = computed<PlaceItem[]>(() =>
   props.rows.items.slice(0, SHOWN).map((row) => ({
     key: `${row.groupKey}::${row.providerKey}`,

@@ -2,7 +2,7 @@
 // Pure functions of the API result, so the wording is unit-tested.
 
 import { money, plural } from '@/lib/format'
-import { billLine, billName, placesCount, serviceTitle } from '@/lib/plainNames'
+import { ALL_IN, billLine, billName, isVisitCode, placesCount, serviceTitle } from '@/lib/plainNames'
 import { dollars, gapOf, lessPerCase, positionLine, bandFor, typicalPrice, yearlyLine, type PriceSummary } from '@/lib/plainNumbers'
 import type { RateGroup, RateSearchResult } from '../api/types'
 import { isDrugCode, pinsProvider, priceSummary } from './lenses'
@@ -50,16 +50,28 @@ function byVideo(group: RateGroup): boolean {
   return group.settingKey.startsWith('telehealth') || group.modifiers.some((modifier) => ['95', 'GT', 'GQ', '93', 'FQ'].includes(modifier.code))
 }
 
+/** For a visit, where it happens, in the order a tile row reads best: the doctor's office, a surgery center, a hospital. */
+const VISIT_SETTING_ORDER = ['office', 'asc', 'hospital-outpatient']
+
+function visitSettingRank(group: RateGroup): number {
+  if (!isVisitCode(group.code)) return 0
+  const rank = VISIT_SETTING_ORDER.indexOf(group.settingKey)
+  return rank === -1 ? VISIT_SETTING_ORDER.length : rank
+}
+
 /**
- * The order tiles and other prices come in: never a thrown-away-drug price first; a price with a typical before one
- * without; in person before video (an office visit leads with the office, when the office has a typical); then the most
- * providers.
+ * The order tiles and other prices come in: never a thrown-away-drug price first; a health center's all-in price only
+ * when no other place has a price for the code; a price with a typical before one without; in person before video; for
+ * a visit, the doctor's office, then a surgery center, then a hospital; then the most providers. (A procedure keeps the
+ * place most providers bill from: a colonoscopy's doctor is at the surgery center, not in the office.)
  */
 function byStrength(a: RateGroup, b: RateGroup): number {
   return (
     Number(forDiscardedDrug(a)) - Number(forDiscardedDrug(b)) ||
+    Number(ALL_IN.has(a.settingKey)) - Number(ALL_IN.has(b.settingKey)) ||
     Number(hasTypical(b)) - Number(hasTypical(a)) ||
     Number(byVideo(a)) - Number(byVideo(b)) ||
+    visitSettingRank(a) - visitSettingRank(b) ||
     b.providerCount - a.providerCount
   )
 }
@@ -209,7 +221,8 @@ export function roleLines(lens: Lens, result: RateSearchResult, group: RateGroup
   switch (lens) {
     case 'providers': {
       const tile = group ? tileFor(group, result) : null
-      if (tile?.yours) return [{ text: tile.yours }]
+      // The "Yours" line already sits under the price tile: say where, once, instead of repeating it.
+      if (tile?.yours) return [{ text: 'Your price is marked above.' }]
       // An NPI or tax ID is in the search, but not on this bill.
       if (pinsProvider(result)) return [{ text: 'Not on this bill. Pick another above.' }]
       // The strip shows a box for the NPI or tax ID under this line.

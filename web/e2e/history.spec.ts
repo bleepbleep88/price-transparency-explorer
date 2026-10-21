@@ -77,6 +77,15 @@ test('the changes page leads with four big counts and the biggest changes as nam
   expect(await firstScreenWords(page)).toBeLessThan(150)
 })
 
+test('a month that is not loaded says so and shows the newest', async ({ page }) => {
+  await page.goto('/changes?from=999')
+  await expect(page.getByTestId('changes-month-missing')).toHaveText("That month isn't loaded. Showing the newest.")
+  await expect(page).not.toHaveURL(/from=/)
+  await expect(page.getByText('Aug 31 to Sep 28, 2026')).toBeVisible()
+  await expect(page.getByTestId('changes-kind-new')).toContainText(/New[\d,]+/)
+  await expect(page.getByTestId('changes-error')).toHaveCount(0)
+})
+
 test('a count is the filter: rises, then one code, then a row opens and leads to its rates in search', async ({ page }) => {
   await page.goto('/changes')
   await page.getByTestId('changes-kind-increased').click()

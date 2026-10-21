@@ -33,13 +33,29 @@ const { snapshots, current, isPending: snapshotsPending } = useSnapshotChoice()
 const older = computed(() => olderSnapshots(snapshots.value, current.value))
 const canCompare = computed(() => older.value.length > 0)
 
-const changes = useChanges(params, canCompare)
+// A month from an old link that isn't loaded, or isn't older than the month on screen: say so once and use the default.
+const monthMissing = ref(false)
+const unknownFrom = computed(
+  () => params.value.from != null && canCompare.value && !older.value.some((snapshot) => snapshot.snapshotId === params.value.from),
+)
+watch(
+  unknownFrom,
+  (unknown) => {
+    if (!unknown) return
+    monthMissing.value = true
+    void router.replace({ name: 'changes', query: mergeChangesQuery(route.query, { from: null }) })
+  },
+  { immediate: true },
+)
+
+const changes = useChanges(params, computed(() => canCompare.value && !unknownFrom.value))
 const apiError = computed(() => (changes.error.value instanceof ApiError ? changes.error.value : null))
 const result = computed(() => (changes.isError.value ? undefined : changes.data.value))
 // Until both files' numbers are saved and current the API sends no counts or rows (refreshed when loading ends).
 const counts = computed(() => (result.value?.current ? result.value.counts : null))
 
 function update(patch: ChangesPatch) {
+  monthMissing.value = false
   const next = 'page' in patch ? patch : { ...patch, page: null }
   return router.push({ name: 'changes', query: mergeChangesQuery(route.query, next) })
 }
@@ -102,6 +118,7 @@ const notCompared = computed(() => result.value?.products.filter((product) => !p
 <template>
   <v-container class="py-6 d-flex flex-column ga-6" max-width="960">
     <PageHeader title="Rate changes" :subtitle="subtitle" />
+    <p v-if="monthMissing" class="text-medium-emphasis" data-testid="changes-month-missing">That month isn't loaded. Showing the newest.</p>
 
     <v-skeleton-loader v-if="snapshotsPending" type="card" />
     <LoadingPanel v-else-if="!snapshots.length" />

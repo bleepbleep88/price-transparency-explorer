@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { mdiRefresh } from '@mdi/js'
 import { ApiError } from '@/lib/apiClient'
 import { plural } from '@/lib/format'
+import { serviceTitle } from '@/lib/plainNames'
 import PageHeader from '@/components/simple/PageHeader.vue'
 import LoadingPanel from '@/features/status/components/LoadingPanel.vue'
 import BillTiles from '@/features/rates/components/BillTiles.vue'
@@ -55,6 +56,10 @@ const fieldErrors = computed(() => ({
   ...(apiError.value?.status === 400 ? apiError.value.fieldErrors : {}),
 }))
 const result = computed(() => (search.isError.value ? undefined : search.data.value))
+// A search that can't run (a bad NPI or tax ID in a link, a month that isn't loaded) still has a heading: the service's
+// name when the code is fine, else "Search".
+const showsError = computed(() => !canSearch.value || (apiError.value != null && !stillLoading.value))
+const errorTitle = computed(() => (urlErrors.value.code ? 'Search' : serviceTitle(params.value.code.trim().toUpperCase(), null)))
 const outOfNetworkResult = computed(() => outOfNetwork.data.value ?? null)
 const showOutOfNetwork = computed(() => visibleGroups(outOfNetworkResult.value, params.value).length > 0)
 
@@ -93,11 +98,12 @@ function openNpis(row: RateRow) {
 function pickPlan(next: string) {
   if (!result.value) return
   const first = tileGroups(result.value, next, null)[0]
-  void replace({ plan: next, group: first?.key ?? null, page: 1 })
+  // A history entry, so Back returns to the tab before.
+  void update({ plan: next, group: first?.key ?? null, page: 1 })
 }
 
 function pickGroup(groupKey: string, productKey?: string) {
-  void replace({ group: groupKey, plan: productKey ?? plan.value, page: 1 })
+  void update({ group: groupKey, plan: productKey ?? plan.value, page: 1 })
 }
 
 function onTableOptions(options: { page: number; pageSize: number; sort: SortKey }) {
@@ -131,6 +137,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
       </template>
 
       <template v-else>
+        <PageHeader v-if="showsError" :title="errorTitle" />
         <v-alert v-if="!canSearch" type="warning" variant="tonal">Fix the highlighted fields to search.</v-alert>
         <LoadingPanel v-else-if="stillLoading" />
         <v-alert v-else-if="apiError?.status === 400" type="warning" variant="tonal">{{ apiError.message }}</v-alert>
@@ -167,6 +174,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
                 :rows="result.rows"
                 :groups="result.groups"
                 :group="lead"
+                :rows-group="result.query.group"
                 :sort="params.sort"
                 :loading="search.isFetching.value"
                 :yours="marksSearchedProvider(result)"

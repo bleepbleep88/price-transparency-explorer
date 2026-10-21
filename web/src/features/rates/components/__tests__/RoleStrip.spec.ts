@@ -83,7 +83,7 @@ describe('RoleStrip, provider role', () => {
   it('shows where the searched provider stands, with Change to clear it', async () => {
     const strip = mountStrip({ lens: 'providers', npi: '1043383789' }, '1043383789')
     expect(strip.find('[data-testid="your-id"]').exists()).toBe(false)
-    expect(strip.get('[data-testid="role-line"]').text()).toMatch(/^Yours: \$247\.85/)
+    expect(strip.get('[data-testid="role-line"]').text()).toBe('Your price is marked above.')
 
     await strip.get('[data-testid="change-id"]').trigger('click')
     expect(strip.emitted('update')).toEqual([[{ npi: null, ein: null }]])
