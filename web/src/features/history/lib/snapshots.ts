@@ -20,12 +20,6 @@ export function currentSnapshot(snapshots: readonly SnapshotSummary[], id: numbe
   return snapshots.find((snapshot) => snapshot.snapshotId === id) ?? snapshots.find((snapshot) => snapshot.isLatest) ?? null
 }
 
-/** The newest snapshot older than this one, or null for the oldest. */
-export function previousSnapshot(snapshots: readonly SnapshotSummary[], snapshot: SnapshotSummary | null): SnapshotSummary | null {
-  if (!snapshot?.indexDate) return null
-  return usableSnapshots(snapshots).find((other) => other.indexDate != null && other.indexDate < snapshot.indexDate!) ?? null
-}
-
 /** Snapshots older than this one, newest first: what it can be compared with. */
 export function olderSnapshots(snapshots: readonly SnapshotSummary[], snapshot: SnapshotSummary | null): SnapshotSummary[] {
   if (!snapshot?.indexDate) return []

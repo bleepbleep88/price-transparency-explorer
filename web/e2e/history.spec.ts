@@ -35,7 +35,7 @@ test("the month picker shows just the date, moves search to another month and ba
   await expect(picker).toHaveText('Aug 31, 2026')
 
   // A new search stays on the picked month.
-  await page.getByRole('combobox', { name: 'Billing code' }).fill('29881')
+  await page.getByRole('combobox', { name: 'Service or code' }).fill('29881')
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page).toHaveURL(/[?&]code=29881(&|$)/)
   await expect(page).toHaveURL(/[?&]snapshot=\d+(&|$)/)
@@ -49,11 +49,13 @@ test("the month picker shows just the date, moves search to another month and ba
 
 test('a price whose typical moved only because different providers are listed says who stayed, never a price change', async ({ page }) => {
   // Ambetter 99213 office with modifier 25: all 37 providers in both the Aug 31 and Sep 28 files kept their rate (#11, H1).
-  await page.goto('/?code=99213&product=ambetter-from-fidelis-care&setting=office')
-  const card = page.locator('[data-group-key="ambetter-from-fidelis-care|CPT|99213|professional|office|25|negotiated"]')
-  await expect(card.getByTestId('trend-who')).toContainText('Aug–Sep: 37 kept their rate, 87 left, 39 joined')
-  await expect(card.getByTestId('trend-typical')).toContainText(/^Typical: Jul \$[\d,.]+ · Aug \$[\d,.]+ · Sep \$[\d,.]+$/)
-  await expect(card.getByTestId('trend-line')).not.toContainText(/went up|times as much/)
+  const group = 'ambetter-from-fidelis-care|CPT|99213|professional|office|25|negotiated'
+  await page.goto(`/?code=99213&product=ambetter-from-fidelis-care&group=${encodeURIComponent(group)}`)
+  await page.getByTestId('search-details-toggle').click()
+  const line = page.getByTestId('search-details').getByTestId('trend-line')
+  await expect(line.getByTestId('trend-who')).toHaveText('Aug–Sep: 37 kept their rate, 87 left, 39 joined')
+  await expect(line.getByTestId('trend-typical')).toHaveText(/^Typical: Jul \$[\d,.]+ · Aug \$[\d,.]+ · Sep \$[\d,.]+$/)
+  await expect(line).not.toContainText(/went up|times as much/)
 })
 
 test('the changes page leads with four big counts and the biggest changes as name, service and old to new price', async ({ page }) => {
@@ -122,15 +124,4 @@ test('the changes page fits a phone in one column', async ({ page }) => {
   await page.goto('/changes')
   await expect(page.getByTestId('change-row').first()).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
-})
-
-test('the lens history lines are a few words with no statistics words', async ({ page }) => {
-  for (const route of ['/?code=99213&ein=061036715&lens=providers', '/?code=45378&lens=employers', '/?code=45378&lens=plans']) {
-    await page.goto(route)
-    const line = page.getByTestId('lens-history')
-    await expect(line).toBeVisible()
-    const text = await line.innerText()
-    expect(text).not.toMatch(STATISTICS_WORDS)
-    expect(text.split(/\s+/).filter((word) => /\w/.test(word)).length).toBeLessThanOrEqual(14)
-  }
 })

@@ -92,17 +92,6 @@ export function priceMove(row: Pick<RateChange, 'kind' | 'from' | 'to'>): string
   return dollars(from) === dollars(to) ? `${money(from)} → ${money(to)}` : `${dollars(from)} → ${dollars(to)}`
 }
 
-/** A lens's line of counts: "56 up · 57 down · 683 new · 618 gone"; "no changes" when there are none. */
-export function countsLine(counts: ChangeCounts): string {
-  const parts = [
-    counts.increased ? `${wholeNumber(counts.increased)} up` : '',
-    counts.decreased ? `${wholeNumber(counts.decreased)} down` : '',
-    counts.new ? `${wholeNumber(counts.new)} new` : '',
-    counts.dropped ? `${wholeNumber(counts.dropped)} gone` : '',
-  ].filter(Boolean)
-  return parts.length ? parts.join(' · ') : 'no changes'
-}
-
 /** How many new and gone rates are only listed differently; null when none are. */
 export function listedElsewhereSummary(counts: ChangeCounts): string | null {
   const parts: string[] = []

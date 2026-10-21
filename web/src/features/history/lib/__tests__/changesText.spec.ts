@@ -3,7 +3,6 @@ import type { ChangeCounts } from '../../api/types'
 import {
   changeAmounts,
   changeText,
-  countsLine,
   listedElsewhereSummary,
   priceMove,
   upDown,
@@ -32,12 +31,6 @@ describe('changes in words', () => {
     expect(priceMove(change({ from: 100.21, to: 100.4 }))).toBe('$100.21 → $100.40')
     expect(priceMove(change({ kind: 'new', from: null, to: 750 }))).toBe('New · $750')
     expect(priceMove(change({ kind: 'dropped', from: 450, to: null }))).toBe('Gone · $450')
-  })
-
-  it('counts the kinds in one short line for a lens', () => {
-    expect(countsLine(counts)).toBe('1,975 up · 1,957 down · 14,632 new · 16,776 gone')
-    expect(countsLine({ ...none, new: 3 })).toBe('3 new')
-    expect(countsLine(none)).toBe('no changes')
   })
 
   it('says up or down by the amounts as shown', () => {

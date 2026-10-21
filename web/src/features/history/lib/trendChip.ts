@@ -1,60 +1,47 @@
-import type { GroupTrend, TrendPoint } from '../api/types'
-import { sameAsShown, upDown, type Shown } from './changesText'
+import type { GroupTrend, TrendPoint, TrendStep } from '../api/types'
+import { sameAsShown, upDown } from './changesText'
 import { comparablePoints, monthOf } from './trend'
 
-// The history chip on a price tile (decision 90): a few words on how the typical price moved up to the month on
-// screen. "Rates steady since Jul", "Up $12 since Aug", "Down $9 since Aug". A move that only reflects which providers are
-// listed is never called a price change (H1 of the #11 review): when every provider listed in both files kept its rate,
-// the chip says "Rates steady" even if the typical price moved.
+// The history chip on a price tile (decision 90): a few words on how rates moved up to the month on screen.
+// "Rates steady since Jul", "Up $12 since Aug", "Rates up since Aug". Two rules keep it honest:
+// - A move that only reflects which providers are listed is never called a price change (H1 of the #11 review): when
+//   every provider listed in both files kept its rates, the chip says "Rates steady" even if the typical price moved.
+// - An amount is given only when the same providers are listed all along (nobody joined or left, and nobody's clinicians
+//   moved between its rates, in the steps the chip covers). Otherwise the typical price's move is partly about who's
+//   listed, so the chip says which way rates went, with no amount: "Rates up since Aug".
 
 /** A group's history across the loaded files, as GET /api/v1/rates/trend returns it. */
 export type TrendGroup = GroupTrend
 
-/**
- * same: the typical price looks the same in both files. listed: it moved, but every provider listed in both kept its
- * rates (only who is listed changed). mixed: rates changed and providers also joined or left, so the dollar move is
- * partly who's listed. priced: it moved and rates changed with the same providers, or the API can't say (no step).
- */
-type StepKind = 'same' | 'listed' | 'mixed' | 'priced'
-
-function stepKind(before: TrendPoint, after: TrendPoint): StepKind {
-  if (sameAsShown(before.median!, after.median!, 'typical')) return 'same'
-  const step = after.sincePrevious?.sinceSnapshotId === before.snapshotId ? after.sincePrevious : null
-  if (step && step.raised === 0 && step.lowered === 0) return 'listed'
-  return step && (step.left > 0 || step.joined > 0) ? 'mixed' : 'priced'
+interface Step {
+  /**
+   * same: the typical price looks the same in both files. listed: it moved, but every provider listed in both kept its
+   * rates. priced: it moved and rates changed, or the API can't say (no step between the two files).
+   */
+  kind: 'same' | 'listed' | 'priced'
+  /** Who stayed, moved, joined or left; null when the API gives no step between these two files. */
+  providers: TrendStep | null
 }
 
-const movesPrice = (kind: StepKind | undefined) => kind === 'priced' || kind === 'mixed'
-
-interface Reading {
-  date: string | null
-  value: number
+function stepBetween(before: TrendPoint, after: TrendPoint): Step {
+  const providers = after.sincePrevious?.sinceSnapshotId === before.snapshotId ? after.sincePrevious : null
+  if (sameAsShown(before.median!, after.median!, 'typical')) return { kind: 'same', providers }
+  return { kind: providers && providers.raised === 0 && providers.lowered === 0 ? 'listed' : 'priced', providers }
 }
 
-/**
- * The chip for readings up to the file on screen, with how each step moved (kinds[i]: readings[i] to readings[i + 1]):
- * "<steady> since Jul" with no price move, else the last run of price moves the same way ("Up $20 since Jul" for $100,
- * $110, $120). No amount when part of the move is who's listed: a step where providers also joined or left, or a
- * who's-listed move after it ("Rates up since Aug").
- */
-function chipFor(readings: readonly Reading[], kinds: readonly StepKind[], shown: Shown, steady: string): string {
-  let last = kinds.length - 1
-  while (last >= 0 && !movesPrice(kinds[last])) last--
-  if (last === -1) return `${steady} since ${monthOf(readings[0]!.date)}`
-  const direction = Math.sign(readings[last + 1]!.value - readings[last]!.value)
-  let start = last
-  while (start > 0 && movesPrice(kinds[start - 1]) && Math.sign(readings[start]!.value - readings[start - 1]!.value) === direction) start--
-  const since = monthOf(readings[start]!.date)
-  const partlyListed = kinds.slice(start, last + 1).includes('mixed') || kinds.slice(last + 1).includes('listed')
-  if (partlyListed) return `Rates ${direction > 0 ? 'up' : 'down'} since ${since}`
-  const amount = upDown(readings[start]!.value, readings[readings.length - 1]!.value, shown)
-  return amount ? `${amount} since ${since}` : `${steady} since ${since}`
+/** The same providers all along: nobody joined or left, and nobody's clinicians moved between its rates. */
+function sameProviders(steps: readonly Step[]): boolean {
+  return steps.every((step) => step.providers && !step.providers.joined && !step.providers.left && !step.providers.reweighted)
 }
 
-/** The complete points with a value up to the file on screen (the newest when none is picked); none when it has none. */
-function upTo(points: readonly TrendPoint[], selectedId: number | null): TrendPoint[] {
-  const end = selectedId == null ? points.length - 1 : points.findIndex((point) => point.snapshotId === selectedId)
-  return end < 1 ? [] : points.slice(0, end + 1)
+/** Which way rates went in these steps: "up", "down", "mixed"; the typical price's way when the API can't say. */
+function rateWay(steps: readonly Step[], typicalWay: number): string {
+  const known = steps.every((step) => step.kind !== 'priced' || step.providers)
+  const raised = steps.reduce((total, step) => total + (step.providers?.raised ?? 0), 0)
+  const lowered = steps.reduce((total, step) => total + (step.providers?.lowered ?? 0), 0)
+  if (!known || (!raised && !lowered)) return typicalWay > 0 ? 'up' : 'down'
+  if (raised && lowered) return 'mixed'
+  return raised ? 'up' : 'down'
 }
 
 /**
@@ -64,21 +51,23 @@ function upTo(points: readonly TrendPoint[], selectedId: number | null): TrendPo
  */
 export function trendChipText(trend: TrendGroup | null | undefined, selectedSnapshotId: number | null): string | null {
   if (!trend) return null
-  const shown = upTo(comparablePoints(trend).filter((point) => point.median != null), selectedSnapshotId)
-  if (shown.length < 2) return null
-  const kinds = shown.slice(1).map((after, index) => stepKind(shown[index]!, after))
-  return chipFor(shown.map((point) => ({ date: point.indexDate, value: point.median! })), kinds, 'typical', 'Rates steady')
-}
+  const points = comparablePoints(trend).filter((point) => point.median != null)
+  const end = selectedSnapshotId == null ? points.length - 1 : points.findIndex((point) => point.snapshotId === selectedSnapshotId)
+  if (end < 1) return null
+  const shown = points.slice(0, end + 1)
+  // steps[i] is the step from shown[i] to shown[i + 1].
+  const steps = shown.slice(1).map((after, index) => stepBetween(shown[index]!, after))
 
-/**
- * The searched provider's own rate, for the providers lens: "Steady since Jul", "Up $17.41 since Jul" (to the cent, as
- * its rate shows). Its own rate moving is a price change, so there's no who's-listed rule here.
- */
-export function providerChipText(trend: TrendGroup | null | undefined, selectedSnapshotId: number | null): string | null {
-  if (!trend) return null
-  const shown = upTo(comparablePoints(trend).filter((point) => point.provider), selectedSnapshotId)
-  if (shown.length < 2) return null
-  const readings = shown.map((point) => ({ date: point.indexDate, value: point.provider!.rate }))
-  const kinds = readings.slice(1).map((after, index): StepKind => (sameAsShown(readings[index]!.value, after.value, 'rate') ? 'same' : 'priced'))
-  return chipFor(readings, kinds, 'rate', 'Steady')
+  const last = steps.map((step) => step.kind).lastIndexOf('priced')
+  if (last === -1) return `Rates steady since ${monthOf(shown[0]!.indexDate)}`
+
+  // The run of price moves the same way that ends with the last one: "Up $20 since Jul" for $100, $110, $120.
+  const way = (index: number) => Math.sign(shown[index + 1]!.median! - shown[index]!.median!)
+  let start = last
+  while (start > 0 && steps[start - 1]!.kind === 'priced' && way(start - 1) === way(last)) start--
+  const since = monthOf(shown[start]!.indexDate)
+  const counted = steps.slice(start)
+
+  const amount = sameProviders(counted) ? upDown(shown[start]!.median!, shown[end]!.median!, 'typical') : null
+  return amount ? `${amount} since ${since}` : `Rates ${rateWay(counted, way(last))} since ${since}`
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { currentSnapshot, olderSnapshots, partialProducts, previousSnapshot, snapshotNote, usableSnapshots } from '../snapshots'
+import { currentSnapshot, olderSnapshots, partialProducts, snapshotNote, usableSnapshots } from '../snapshots'
 import { product, snapshot, SNAPSHOTS } from './fixtures'
 
 describe('snapshots', () => {
@@ -20,8 +20,6 @@ describe('snapshots', () => {
   })
 
   it('compares a snapshot with the ones before it', () => {
-    expect(previousSnapshot(SNAPSHOTS, SNAPSHOTS[0]!)?.indexDate).toBe('2026-08-31')
-    expect(previousSnapshot(SNAPSHOTS, SNAPSHOTS[2]!)).toBeNull()
     expect(olderSnapshots(SNAPSHOTS, SNAPSHOTS[0]!).map((s) => s.indexDate)).toEqual(['2026-08-31', '2026-07-27'])
   })
 
