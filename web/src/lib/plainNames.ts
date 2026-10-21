@@ -26,6 +26,9 @@ export function settingName(settingKey: string, fallback?: string): string {
   return SETTING_NAMES[settingKey] ?? fallback ?? 'Other place'
 }
 
+/** Settings paid one all-inclusive price per visit. */
+export const ALL_IN: ReadonlySet<string> = new Set(['fqhc', 'rhc'])
+
 const DOCTOR_WHERE: Record<string, string> = {
   asc: 'at a surgery center',
   'hospital-outpatient': 'at a hospital',
@@ -47,6 +50,8 @@ const DOCTOR_WHERE: Record<string, string> = {
  */
 export function billName(group: { feeType: string; settingKey: string; settingLabel?: string }): { name: string; where: string | null } {
   if (group.feeType === 'professional') return { name: 'Doctor', where: DOCTOR_WHERE[group.settingKey] ?? null }
+  // Health centers and rural clinics are paid one all-in price per visit, not a bill on top of the doctor's.
+  if (ALL_IN.has(group.settingKey)) return { name: `${settingName(group.settingKey, group.settingLabel)} visit (all in one price)`, where: null }
   return { name: settingName(group.settingKey, group.settingLabel), where: null }
 }
 
@@ -105,6 +110,13 @@ const COMMON_NAMES: Record<string, string> = {
   '86709': 'Hepatitis A blood test',
   '87341': 'Hepatitis B blood test',
   '99395': 'Checkup, age 18 to 39',
+  '90935': 'Dialysis',
+  '36475': 'Vein ablation',
+  '93925': 'Leg artery ultrasound',
+  '93970': 'Leg vein ultrasound',
+  '76770': 'Kidney ultrasound',
+  '43239': 'Upper endoscopy with biopsy',
+  '93880': 'Neck artery ultrasound',
   '99396': 'Checkup, age 40 to 64',
   '80053': 'Blood test panel',
   '85025': 'Blood count',

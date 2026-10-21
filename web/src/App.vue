@@ -103,6 +103,7 @@ const isCurrent = (item: { names: string[] }) => item.names.includes(String(rout
 :deep(.v-app-bar-title) {
   flex: 0 0 auto;
   min-width: max-content;
+  margin-inline-end: 16px;
 }
 
 .app-footer {

@@ -55,6 +55,16 @@ h2,
   white-space: normal;
 }
 
+/* Section titles inside a page (decision 90): the body face, 18px, 600. Page titles and big figures keep Fraunces. */
+h2.section-title,
+h3.section-title,
+.section-title {
+  font-family: var(--v-font-body);
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
 /* Big numbers stay in the body face so every figure in the app shares one set of digits. */
 .stat-figure {
   font-family: var(--v-font-body);

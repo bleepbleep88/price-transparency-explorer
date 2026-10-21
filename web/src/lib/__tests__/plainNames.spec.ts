@@ -8,6 +8,8 @@ describe('plain names', () => {
     expect(settingName('nope', 'Some place')).toBe('Some place')
     expect(billName({ feeType: 'facility', settingKey: 'asc' })).toEqual({ name: 'Surgery center', where: null })
     expect(billName({ feeType: 'professional', settingKey: 'office' })).toEqual({ name: 'Doctor', where: 'in the office' })
+    // A health center is paid one price for the whole visit, not a bill on top of the doctor's.
+    expect(billName({ feeType: 'facility', settingKey: 'fqhc' })).toEqual({ name: 'Health center visit (all in one price)', where: null })
     expect(billLine({ feeType: 'professional', settingKey: 'asc', modifiers: [{ code: '33', label: 'Preventive service (modifier 33)' }] })).toBe(
       'Doctor · at a surgery center · preventive service',
     )
@@ -16,7 +18,8 @@ describe('plain names', () => {
 
   it('calls common services by plain names, else the plan name in sentence case', () => {
     expect(serviceTitle('45378', 'DIAGNOSTIC COLONOSCOPY')).toBe('Colonoscopy')
-    expect(serviceTitle('93925', 'LOWER EXTREMITY STUDY')).toBe('Lower extremity study')
+    expect(serviceTitle('93971', 'EXTREMITY STUDY')).toBe('Extremity study')
+    expect(serviceTitle('93925', 'LOWER EXTREMITY STUDY')).toBe('Leg artery ultrasound')
     expect(serviceTitle('0490', null)).toBe('Code 0490')
     expect(sentenceCase('CT HEAD/BRAIN W/O DYE')).toBe('CT head/brain w/o dye')
     expect(sentenceCase('Already Mixed Case')).toBe('Already Mixed Case')

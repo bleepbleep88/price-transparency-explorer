@@ -6,6 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Search and compare negotiated rates from health plan price transparency files.">
     <title>Price Explorer</title>
+    <!-- Vuetify's CSS layer order, declared before any stylesheet loads. Shared chunks' CSS can be linked ahead of
+         Vuetify's own; the first declaration of a layer sets its place, and a wrong order lets the reset's
+         `button { font: inherit }` beat every button. -->
+    <style>
+      @layer vuetify-core.reset, vuetify-core.base, vuetify-components, vuetify-overrides, vuetify-utilities.theme-base,
+        vuetify-utilities.typography, vuetify-utilities.helpers, vuetify-utilities.theme-background,
+        vuetify-utilities.theme-foreground, vuetify-final.transitions, vuetify-final.trumps;
+    </style>
   </head>
   <body>
     <div id="app"></div>

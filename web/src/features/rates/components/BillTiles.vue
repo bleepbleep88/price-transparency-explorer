@@ -5,6 +5,7 @@ import type { RateTrendResult } from '@/features/history/api/types'
 import { trendFor } from '@/features/history/lib/trend'
 import { trendChipText } from '@/features/history/lib/trendChip'
 import type { RateSearchResult } from '../api/types'
+import { ALL_IN } from '@/lib/plainNames'
 import { planTabs, tileFor, tileGroups } from '../lib/answer'
 
 // The answer: one tile per bill for the plan picked, the doctor's and the place's. Picking a tile shows its places.
@@ -17,8 +18,11 @@ const props = defineProps<{
 const emit = defineEmits<{ plan: [plan: string]; select: [groupKey: string] }>()
 
 const tabs = computed(() => planTabs(props.result))
+const groups = computed(() => tileGroups(props.result, props.plan, props.selected))
+// "Each is a separate bill" only holds when no tile is an all-in visit price (a health center's).
+const separateBills = computed(() => groups.value.length > 1 && groups.value.every((group) => !ALL_IN.has(group.settingKey)))
 const tiles = computed(() =>
-  tileGroups(props.result, props.plan, props.selected).map((group) => ({
+  groups.value.map((group) => ({
     ...tileFor(group, props.result),
     chip: trendChipText(trendFor(props.trend, group.key), props.trend?.selected.snapshotId ?? null),
   })),
@@ -61,7 +65,7 @@ const tiles = computed(() =>
         <p v-if="tile.yours" class="yours" data-testid="tile-yours">{{ tile.yours }}</p>
       </div>
     </div>
-    <p v-if="tiles.length > 1" class="hint">Each is a separate bill. Pick one to see its places.</p>
+    <p v-if="tiles.length > 1" class="hint">{{ separateBills ? 'Each is a separate bill. ' : '' }}Pick one to see its places.</p>
   </section>
 </template>
 
