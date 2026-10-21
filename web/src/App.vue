@@ -100,7 +100,10 @@ const isCurrent = (item: { names: string[] }) => item.names.includes(String(rout
 
 .app-footer {
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
+  align-content: center;
+  align-items: center;
   justify-content: center;
   gap: 8px 24px;
   padding: 16px max(16px, env(safe-area-inset-left, 0px));

@@ -170,7 +170,6 @@ export function biggestGap(groups: RateGroup[]): { group: RateGroup; gap: number
  */
 export function roleLines(lens: Lens, result: RateSearchResult, group: RateGroup | null, cases?: number | null, tiles: RateGroup[] = []): RoleLine[] {
   const summary = group ? priceSummary(group) : null
-  const gap = summary ? gapOf(summary) : null
   switch (lens) {
     case 'providers': {
       const tile = group ? tileFor(group, result) : null
