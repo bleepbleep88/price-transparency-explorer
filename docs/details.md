@@ -116,7 +116,7 @@ Three pages read each month's saved statistics, so they look across every code a
   - 125 are facility charges with no procedure named.
   - That leaves 191 to rank.
 - **Providers** (`/providers`, then `/providers/:key`): one tax ID in every comparison group it is in, each placed exactly as a search with its EIN places it. A scorecard reached from a search says when it's listed under another name.
-  - With 5 or more shared services, an overall line: "Usually about 8% more than typical (across 26 services)".
+  - With 5 or more shared services, an overall line, like Queens Boulevard ASC's (`/providers/274614930`): "Usually 28% above typical, across 7 services".
   - Lists of the services where it is lower or higher than most.
   - A masked tax ID can be found by its full number, but only its key comes back.
 - **Compare plans** (`/insights/compare`): the same provider in the same comparison group under both plans. "The same" means exactly the same rate. On the Sep 28 files, 6,401 of the 7,871 provider-and-service pairs priced under both plans (81%) are paid exactly the same, with health centers left out by default. Pairs priced in different units are left out and counted.
