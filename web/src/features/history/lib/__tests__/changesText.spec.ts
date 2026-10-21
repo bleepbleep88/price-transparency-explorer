@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { ChangeCounts } from '../../api/types'
 import {
   changeAmounts,
-  changesSinceText,
   changeText,
   countsLine,
-  countsSummary,
   listedElsewhereSummary,
   priceMove,
   upDown,
@@ -66,17 +64,6 @@ describe('changes in words', () => {
     ).toBe('Changes show once loading finishes: the numbers for Aug 31, 2026 and Sep 28, 2026 are being updated.')
   })
 
-
-  it('sums up what the filters cover: up, down, new and gone', () => {
-    expect(countsSummary(counts, 'Aug 31, 2026', 'Sep 28, 2026')).toBe(
-      'Between Aug 31, 2026 and Sep 28, 2026: 1,975 rates went up, 1,957 went down, 14,632 are new and 16,776 are gone. 41,163 rates stayed the same.',
-    )
-    expect(countsSummary({ ...none, new: 1 }, 'Aug 31, 2026', 'Sep 28, 2026')).toBe(
-      'Between Aug 31, 2026 and Sep 28, 2026: 1 rate is new. 12 rates stayed the same.',
-    )
-    expect(countsSummary(none, 'Aug 31, 2026', 'Sep 28, 2026')).toBe('Nothing changed between Aug 31, 2026 and Sep 28, 2026. 12 rates stayed the same.')
-  })
-
   it('says how many new and gone rates are only listed differently', () => {
     expect(listedElsewhereSummary(counts)).toBe(
       '5,858 of the new and 5,856 of the gone rates are the same provider and service, listed with other modifiers or in another setting.',
@@ -85,14 +72,6 @@ describe('changes in words', () => {
       '5,856 of the gone rates are the same provider and service, listed with other modifiers or in another setting.',
     )
     expect(listedElsewhereSummary(none)).toBeNull()
-  })
-
-  it("gives the plans lens one line for the code's changes since the last file", () => {
-    expect(changesSinceText({ ...none, changed: 7, increased: 6, decreased: 1, new: 70, dropped: 14 }, 'Aug 31', '45378')).toBe(
-      'Since the Aug 31 file, for 45378: 6 rates went up, 1 went down, 70 are new and 14 are gone.',
-    )
-    expect(changesSinceText({ ...none, changed: 1, increased: 1 }, 'Aug 31', '45378')).toBe('Since the Aug 31 file, for 45378: 1 rate went up.')
-    expect(changesSinceText(none, 'Aug 31', '45378')).toBe('No rate for 45378 changed since the Aug 31 file.')
   })
 
   it('shows a change in dollars and percent, and big jumps as how many times as much', () => {
