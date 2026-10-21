@@ -22,7 +22,8 @@ internal static class SourceKinds
 internal sealed class AllowedAmountWriter(DuckDbConnectionFactory connections, TimeProvider time)
 {
     /// <summary>Bump when the allowed-amount clean-up rules change: every such file is re-parsed even if its bytes didn't.</summary>
-    public const int ParserVersion = 1;
+    /// <remarks>2: item names and descriptions are kept only for HCPCS Level II codes (PublishedText).</remarks>
+    public const int ParserVersion = 2;
 
     public async Task WriteAsync(
         int fileId, AllowedAmountFileBuilder builder, DownloadedFile download, ParseOutcome outcome, TimeSpan parseTime,

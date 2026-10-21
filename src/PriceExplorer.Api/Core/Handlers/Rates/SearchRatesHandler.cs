@@ -41,7 +41,7 @@ public sealed class SearchRatesHandler(
         var rows = await ProfileRowsAsync(connection, assembled.Rows, assembled.Groups, search);
 
         var codeInfo = await DescribeCodeAsync(connection, snapshot, facts, assembled.Groups, search.CodeType);
-        var hints = await new SearchHints(connection, snapshot, catalog, search).ForAsync(facts, assembled, codeInfo);
+        var hints = await new SearchHints(connection, snapshot, catalog, codes, search).ForAsync(facts, assembled, codeInfo);
         hints = await new HintLinkChecker(connections, snapshot, catalog, logger)
             .KeepLinksThatFindRatesAsync(request, search, facts, hints, cancellationToken);
 
@@ -211,7 +211,10 @@ public sealed class SearchRatesHandler(
         var cmsName = primary.CodeType == BillingCodes.Hcpcs
             ? await connection.QueryFirstOrDefaultAsync<string?>(SqlFile.For<SearchRatesHandler>("HcpcsName.sql"), new { code = primary.Code })
             : null;
-        var (name, description, source) = described is not null ? (described.Name, described.Description, "payer_file")
+        // A CPT or CDT code is named from CMS's RBCS, never the AMA's or ADA's text (PublishedText).
+        var rbcsName = PublishedText.IsLicensed(primary.Code) ? codes.RbcsName(primary.CodeType, primary.Code) : null;
+        var (name, description, source) = PublishedText.IsLicensed(primary.Code) ? (rbcsName, null, rbcsName is null ? "none" : "rbcs")
+            : described is not null ? (described.Name, described.Description, "payer_file")
             : cmsName is not null ? (CodeNames.Short(cmsName), CodeNames.Short(cmsName) == cmsName ? null : cmsName, "cms_hcpcs")
             : (null, null, "none");
         var category = ServiceCategories.Classify(primary.CodeType, primary.Code);

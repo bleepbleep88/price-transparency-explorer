@@ -149,7 +149,7 @@ public sealed class AllowedAmountIngestionTests
     {
         var ct = TestContext.Current.CancellationToken;
         var allowed = File([
-            Item("CPT", "99214", "OFFICE VISIT",
+            Item("CPT", "99214", "Item 1",
                 Entry("""{ "type": "ein", "value": "071234567" }""", "[\"11\"]", "professional", Payment("150.00")),
                 Entry("""{ "type": "ein", "value": "71234568" }""", "[\"11\"]", "professional", Payment("151.00"))),
         ]);
@@ -157,7 +157,7 @@ public sealed class AllowedAmountIngestionTests
         {
             http.ServeJson(FixtureHttpHandler.EssentialUrl, TicFileBuilder.File(
                 [TicFileBuilder.CountyClinicWholeTin],
-                [TicFileBuilder.Item("CPT", "99214", "OFFICE VISIT", "[2]", TicFileBuilder.Price("150.29"))]));
+                [TicFileBuilder.Item("CPT", "99214", "Item 1", "[2]", TicFileBuilder.Price("150.29"))]));
             http.ServeJson(FixtureHttpHandler.EssentialAllowedUrl, allowed);
         });
         _ = factory.Services;

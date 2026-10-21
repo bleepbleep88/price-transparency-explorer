@@ -5,11 +5,11 @@
   "last_updated_on": "2026-08-31",
   "out_of_network": [
     {
-      "name": "ANESTH, LENS SURGERY",
+      "name": "Item 1",
       "billing_code_type": "CPT",
       "billing_code_type_version": "2022",
       "billing_code": "142",
-      "description": "ANESTHESIA FOR PROCEDURES ON EYE; LENS SURGERY",
+      "description": "Item 1 description",
       "allowed_amounts": [
         {
           "tin": {
@@ -37,11 +37,11 @@
       ]
     },
     {
-      "name": "THER/PROPH/DIAG IV INF INIT",
+      "name": "Item 2",
       "billing_code_type": "RC",
       "billing_code_type_version": "2022",
       "billing_code": "450",
-      "description": "INTRAVENOUS INFUSION, FOR THERAPY, PROPHYLAXIS, OR DIAGNOSIS (SPECIFY SUBSTANCE OR DRUG); INITIAL, U",
+      "description": "Item 2 description",
       "allowed_amounts": [
         {
           "tin": {
@@ -338,11 +338,11 @@
       ]
     },
     {
-      "name": "THER/PROPH/DIAG IV INF ADDON",
+      "name": "Item 3",
       "billing_code_type": "RC",
       "billing_code_type_version": "2022",
       "billing_code": "450",
-      "description": "INTRAVENOUS INFUSION, FOR THERAPY, PROPHYLAXIS, OR DIAGNOSIS (SPECIFY SUBSTANCE OR DRUG); EACH ADDIT",
+      "description": "Item 3 description",
       "allowed_amounts": [
         {
           "tin": {
@@ -639,11 +639,11 @@
       ]
     },
     {
-      "name": "CT ABD & PELV W/CONTRAST",
+      "name": "Item 4",
       "billing_code_type": "CPT",
       "billing_code_type_version": "2022",
       "billing_code": "74177",
-      "description": "COMPUTED TOMOGRAPHY, ABDOMEN AND PELVIS; WITH CONTRAST MATERIAL(S)",
+      "description": "Item 4 description",
       "allowed_amounts": [
         {
           "tin": {
@@ -927,11 +927,11 @@
       ]
     },
     {
-      "name": "ANES LWR INTST SCR COLSC",
+      "name": "Item 5",
       "billing_code_type": "CPT",
       "billing_code_type_version": "2022",
       "billing_code": "812",
-      "description": "ANESTHESIA FOR LOWER INTESTINAL ENDOSCOPIC PROCEDURES, ENDOSCOPE INTRODUCED DISTAL TO DUODENUM; SCRE",
+      "description": "Item 5 description",
       "allowed_amounts": [
         {
           "tin": {

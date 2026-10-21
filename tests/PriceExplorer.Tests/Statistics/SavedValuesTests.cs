@@ -20,7 +20,7 @@ public sealed class SavedValuesTests
         var ct = TestContext.Current.CancellationToken;
         await using var factory = ServingEssential(File(
             [Minkowitz],
-            [Item("CPT", "88305", "Tissue exam by pathologist", "[1]",
+            [Item("CPT", "88305", "Item 1", "[1]",
                 Price(rate: "41.50", serviceCode: "[\"11\"]", billingClass: "professional"),
                 Price(rate: "55.00", serviceCode: "[\"11\"]", billingClass: "professional"))]));
 
@@ -38,7 +38,7 @@ public sealed class SavedValuesTests
         var ct = TestContext.Current.CancellationToken;
         await using var factory = ServingEssential(File(
             [Minkowitz, CountyClinicWholeTin],
-            [Item("CPT", "88305", "Tissue exam by pathologist", "[1, 2]", Price(rate: "41.50", serviceCode: "[\"11\"]", billingClass: "professional"))]));
+            [Item("CPT", "88305", "Item 1", "[1, 2]", Price(rate: "41.50", serviceCode: "[\"11\"]", billingClass: "professional"))]));
 
         var saved = await SearchComparison.SavedEqualsSearchAsync(factory, "88305", ct);
 
@@ -60,11 +60,11 @@ public sealed class SavedValuesTests
         await using var factory = ServingEssential(File(
             [Minkowitz, CountyClinicWholeTin],
             [
-                Item("CPT", "88305", "Tissue exam by pathologist", "[1]",
+                Item("CPT", "88305", "Item 1", "[1]",
                     Price(rate: "41.50", serviceCode: "[\"11\"]", billingClass: "professional", expiration: "2098-06-30")),
-                Item("CPT", "88305", "Tissue exam by pathologist", "[2]",
+                Item("CPT", "88305", "Item 1", "[2]",
                     Price(rate: "55.00", serviceCode: "[\"11\"]", billingClass: "professional", expiration: "2099-12-31")),
-                Item("CPT", "88305", "Tissue exam by pathologist", "[1]",
+                Item("CPT", "88305", "Item 1", "[1]",
                     Price(rate: "39.00", serviceCode: "[\"11\"]", billingClass: "professional", expiration: "2020-01-01")),
             ]));
 

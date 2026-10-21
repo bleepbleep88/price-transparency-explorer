@@ -127,14 +127,20 @@ public sealed class SearchApiTests(ExplorerApiFactory factory) : IClassFixture<E
     }
 
     [Fact(Timeout = 60_000)]
-    public async Task Typeahead_finds_codes_by_name_and_by_number_without_leading_zeros()
+    public async Task Typeahead_finds_codes_by_their_CMS_name_and_by_number_without_leading_zeros_never_by_the_plans_CPT_text()
     {
         using var client = await ReadyClientAsync(TestContext.Current.CancellationToken);
 
-        var byName = await client.GetFromJsonAsync<JsonElement>("/api/v1/codes?q=colonoscopy", TestContext.Current.CancellationToken);
+        // 45378 is in RBCS's "Lower GI Endoscopy - Other"; the fixture's item names are placeholders ("Item 1"), and a CPT
+        // code's published text is never searched or returned (PublishedText).
+        var byName = await client.GetFromJsonAsync<JsonElement>("/api/v1/codes?q=endoscopy", TestContext.Current.CancellationToken);
+        var byPlanText = await client.GetFromJsonAsync<JsonElement>("/api/v1/codes?q=item", TestContext.Current.CancellationToken);
         var byNumber = await client.GetFromJsonAsync<JsonElement>("/api/v1/codes?q=812", TestContext.Current.CancellationToken);
 
-        byName.EnumerateArray().Select(c => c.GetProperty("code").GetString()).Should().Contain("45378");
+        var colonoscopy = byName.EnumerateArray().Single(c => c.GetProperty("code").GetString() == "45378");
+        colonoscopy.GetProperty("name").GetString().Should().Be("Lower GI endoscopy");
+        colonoscopy.GetProperty("description").ValueKind.Should().Be(JsonValueKind.Null);
+        byPlanText.EnumerateArray().Select(c => c.GetProperty("code").GetString()).Should().NotContain(["45378", "99214", "00812"]);
         byNumber[0].GetProperty("code").GetString().Should().Be("00812");
     }
 

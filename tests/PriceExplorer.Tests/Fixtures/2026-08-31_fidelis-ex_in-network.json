@@ -10356,11 +10356,11 @@
   "in_network": [
     {
       "negotiation_arrangement": "ffs",
-      "name": "REMOVAL OF FOREIGN BODY",
+      "name": "Item 1",
       "billing_code_type": "RC",
       "billing_code_type_version": "2022",
       "billing_code": "490",
-      "description": "REMOVAL OF FOREIGN BODY IN MUSCLE OR TENDON SHEATH; DEEP OR COMPLICATED",
+      "description": "Item 1 description",
       "negotiated_rates": [
         {
           "negotiated_prices": [
@@ -10438,11 +10438,11 @@
     },
     {
       "negotiation_arrangement": "ffs",
-      "name": "TREATMENT OF ANKLE FRACTURE",
+      "name": "Item 2",
       "billing_code_type": "RC",
       "billing_code_type_version": "2022",
       "billing_code": "490",
-      "description": "OPEN TREATMENT OF DISTAL FIBULAR FRACTURE (LATERAL MALLEOLUS), INCLUDES INTERNAL FIXATION, WHEN PERF",
+      "description": "Item 2 description",
       "negotiated_rates": [
         {
           "negotiated_prices": [
@@ -10520,11 +10520,11 @@
     },
     {
       "negotiation_arrangement": "ffs",
-      "name": "DIAGNOSTIC COLONOSCOPY",
+      "name": "Item 3",
       "billing_code_type": "CPT",
       "billing_code_type_version": "2022",
       "billing_code": "45378",
-      "description": "COLONOSCOPY, FLEXIBLE; DIAGNOSTIC, INCLUDING COLLECTION OF SPECIMEN(S) BY BRUSHING OR WASHING, WHEN",
+      "description": "Item 3 description",
       "negotiated_rates": [
         {
           "negotiated_prices": [
@@ -10683,11 +10683,11 @@
     },
     {
       "negotiation_arrangement": "ffs",
-      "name": "ANES LWR INTST SCR COLSC",
+      "name": "Item 4",
       "billing_code_type": "CPT",
       "billing_code_type_version": "2022",
       "billing_code": "812",
-      "description": "ANESTHESIA FOR LOWER INTESTINAL ENDOSCOPIC PROCEDURES, ENDOSCOPE INTRODUCED DISTAL TO DUODENUM; SCRE",
+      "description": "Item 4 description",
       "negotiated_rates": [
         {
           "negotiated_prices": [
@@ -10713,11 +10713,11 @@
     },
     {
       "negotiation_arrangement": "ffs",
-      "name": "Emergency Room General",
+      "name": "Item 5",
       "billing_code_type": "RC",
       "billing_code_type_version": "2022",
       "billing_code": "450",
-      "description": "Emergency Room General",
+      "description": "Item 5 description",
       "negotiated_rates": [
         {
           "negotiated_prices": [
@@ -10867,11 +10867,11 @@
     },
     {
       "negotiation_arrangement": "ffs",
-      "name": "OFFICE/OUTPATIENT VISIT EST",
+      "name": "Item 6",
       "billing_code_type": "CPT",
       "billing_code_type_version": "2022",
       "billing_code": "99214",
-      "description": "OFFICE OR OTH OUTPATIENT VISIT FOR THE EVALUATION AND MANAGEMENT OF AN ESTABLISHED PATIENT, WHICH RE",
+      "description": "Item 6 description",
       "negotiated_rates": [
         {
           "negotiated_prices": [

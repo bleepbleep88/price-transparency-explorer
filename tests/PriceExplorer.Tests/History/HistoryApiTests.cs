@@ -76,7 +76,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
 
         alpha.GetProperty("groupKey").GetString().Should().Be(AmbetterColonoscopyAsc);
         alpha.GetProperty("productLabel").GetString().Should().Be("Ambetter from Fidelis Care");
-        alpha.GetProperty("codeName").GetString().Should().Be("COLONOSCOPY");
+        alpha.GetProperty("codeName").GetString().Should().Be("Lower GI endoscopy", "a CPT code is named from CMS's RBCS, never the plan's text");
         alpha.GetProperty("feeTypeLabel").GetString().Should().Be("Facility fee");
         alpha.GetProperty("settingLabel").GetString().Should().Be("Ambulatory surgery center");
         alpha.GetProperty("unit").GetString().Should().Be("per procedure");

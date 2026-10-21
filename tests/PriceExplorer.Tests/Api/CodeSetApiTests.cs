@@ -24,7 +24,7 @@ public sealed class CodeSetApiTests(CodeSetApiTests.Factory factory) : IClassFix
         """;
 
     private static string Visit(string code, int office, decimal rate) =>
-        Item("CPT", code, "OFFICE VISIT", $"[{21 + office}]",
+        Item("CPT", code, "Item 1", $"[{21 + office}]",
             Price(rate: rate.ToString(System.Globalization.CultureInfo.InvariantCulture), serviceCode: "[\"11\"]", billingClass: "professional"));
 
     private static readonly string SyntheticFile = File(
@@ -36,11 +36,11 @@ public sealed class CodeSetApiTests(CodeSetApiTests.Factory factory) : IClassFix
             Visit("99215", 0, 170),
             Visit("99215", 1, 180),
             // A facility drug charge: the drug code is only in the notes, so the plan never names it.
-            Item("RC", "0636", "DRUGS REQUIRING DETAILED CODING", "[21]", Price(rate: "12.50", additionalInformation: "J2704")),
+            Item("RC", "0636", "Item 2", "[21]", Price(rate: "12.50", additionalInformation: "J2704")),
             // A facility rate under a revenue code alone, with no procedure code: RBCS has no class for it.
-            Item("RC", "0450", "EMERGENCY ROOM", "[22]", Price(rate: "500.00", serviceCode: "[\"23\"]")),
+            Item("RC", "0450", "Item 3", "[22]", Price(rate: "500.00", serviceCode: "[\"23\"]")),
             // 80% of billed charges: not a dollar amount, so the ladder leaves it out.
-            Item("CPT", "99213", "OFFICE VISIT", "[23]",
+            Item("CPT", "99213", "Item 1", "[23]",
                 Price(rate: "80", serviceCode: "[\"11\"]", billingClass: "professional").Replace("\"negotiated\"", "\"percentage\"", StringComparison.Ordinal)),
         ]);
 
@@ -206,7 +206,9 @@ public sealed class CodeSetApiTests(CodeSetApiTests.Factory factory) : IClassFix
 
             code.GetProperty("classification").GetProperty("source").GetString().Should().Be("code_ranges");
             code.GetProperty("classification").GetProperty("key").GetString().Should().Be("surgery");
-            code.GetProperty("descriptionSource").GetString().Should().Be("payer_file");
+            // A CPT code never takes the plan's text (PublishedText), so without RBCS it has no name at all.
+            code.GetProperty("descriptionSource").GetString().Should().Be("none");
+            code.GetProperty("name").ValueKind.Should().Be(JsonValueKind.Null);
             tree.GetProperty("categories").EnumerateArray().Select(node => node.GetProperty("key").GetString()).Should().Equal("code-ranges");
         }
         finally

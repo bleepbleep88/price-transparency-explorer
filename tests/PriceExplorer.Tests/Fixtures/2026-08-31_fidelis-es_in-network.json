@@ -2185,11 +2185,11 @@
   "in_network": [
     {
       "negotiation_arrangement": "ffs",
-      "name": "DELAYED BREAST PROSTHESIS",
+      "name": "Item 1",
       "billing_code_type": "RC",
       "billing_code_type_version": "2022",
       "billing_code": "490",
-      "description": "DELAYED INSERTION OF BREAST PROSTHESIS FOLLOWING MASTOPEXY, MASTECTOMY OR IN RECONSTRUCTION",
+      "description": "Item 1 description",
       "negotiated_rates": [
         {
           "negotiated_prices": [
@@ -2249,11 +2249,11 @@
     },
     {
       "negotiation_arrangement": "ffs",
-      "name": "DIAGNOSTIC COLONOSCOPY",
+      "name": "Item 2",
       "billing_code_type": "CPT",
       "billing_code_type_version": "2022",
       "billing_code": "45378",
-      "description": "COLONOSCOPY, FLEXIBLE; DIAGNOSTIC, INCLUDING COLLECTION OF SPECIMEN(S) BY BRUSHING OR WASHING, WHEN",
+      "description": "Item 2 description",
       "negotiated_rates": [
         {
           "negotiated_prices": [

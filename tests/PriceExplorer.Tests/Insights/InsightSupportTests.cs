@@ -9,13 +9,25 @@ public sealed class InsightSupportTests
     private static readonly ReferenceCatalog Catalog = new();
 
     [Fact]
-    public void A_code_is_named_as_the_plan_names_it_and_a_revenue_code_by_the_label_search_shows()
+    public void A_HCPCS_code_is_named_as_the_plan_names_it_a_revenue_code_by_our_label_and_a_CPT_code_by_CMS_RBCS()
     {
-        var names = new Dictionary<(string CodeType, string Code), string> { [("CPT", "45378")] = "Colonoscopy" };
+        var codes = new CodeReference();
+        codes.Set([
+            ("45378", new RbcsClass("P", "Procedure", "PG", "Digestive/Gastrointestinal", "004", "Lower GI Endoscopy - Other")),
+            ("00731", new RbcsClass("A", "Anesthesia", "AA", "Anesthesia", null, null)),
+        ]);
+        // The plan's text for a CPT code is never used, even if a saved database still held some (PublishedText).
+        var names = new Dictionary<(string CodeType, string Code), string>
+        {
+            [("HCPCS", "J0585")] = "Botulinum toxin injection",
+            [("CPT", "45378")] = "Service 45378",
+        };
 
-        InsightSupport.NameOf(names, Catalog, "CPT", "45378").Should().Be("Colonoscopy");
-        InsightSupport.NameOf(names, Catalog, "RC", "0360").Should().Be("Operating room", "the 036x category's label");
-        InsightSupport.NameOf(names, Catalog, "CPT", "99213").Should().BeNull("the files publish no name for it");
+        InsightSupport.NameOf(names, Catalog, codes, "HCPCS", "J0585").Should().Be("Botulinum toxin injection");
+        InsightSupport.NameOf(names, Catalog, codes, "RC", "0360").Should().Be("Operating room", "the 036x category's label");
+        InsightSupport.NameOf(names, Catalog, codes, "CPT", "45378").Should().Be("Lower GI endoscopy");
+        InsightSupport.NameOf(names, Catalog, codes, "CPT", "00731").Should().Be("Anesthesia");
+        InsightSupport.NameOf(names, Catalog, codes, "CPT", "99213").Should().BeNull("RBCS doesn't list it here");
     }
 
     [Fact]

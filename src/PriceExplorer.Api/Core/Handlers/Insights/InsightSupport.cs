@@ -48,8 +48,8 @@ internal static class InsightSupport
     }
 
     /// <summary>
-    /// Each code's name as the plan's files publish it (the search's own lookup, CodeDescriptions.sql): the short name,
-    /// else the description; missing when the files have neither.
+    /// Each HCPCS Level II code's name as the plan's files publish it (the search's own lookup, CodeDescriptions.sql): the
+    /// short name, else the description; missing when the files have neither, and always for a CPT or CDT code.
     /// </summary>
     public static async Task<IReadOnlyDictionary<(string CodeType, string Code), string>> CodeNamesAsync(
         DuckDBConnection connection, int snapshotId, IEnumerable<string> codes, DbTransaction transaction)
@@ -68,12 +68,15 @@ internal static class InsightSupport
     }
 
     /// <summary>
-    /// What to call a code: its name in the plan's files, else for a revenue code (which the files never name) the short
-    /// label search shows ("Operating room"), else nothing.
+    /// What to call a code: a HCPCS Level II code's name in the plan's files; for a revenue code (which the files never
+    /// name) the short label search shows ("Operating room"); for a CPT or CDT code CMS's RBCS name, never the AMA's or ADA's
+    /// text (PublishedText); else nothing.
     /// </summary>
     public static string? NameOf(
-        IReadOnlyDictionary<(string CodeType, string Code), string> names, ReferenceCatalog catalog, string codeType, string code) =>
-        names.TryGetValue((codeType, code), out var name) ? name
+        IReadOnlyDictionary<(string CodeType, string Code), string> names, ReferenceCatalog catalog, CodeReference codes,
+        string codeType, string code) =>
+        PublishedText.IsLicensed(code) ? codes.RbcsName(codeType, code)
+        : names.TryGetValue((codeType, code), out var name) ? name
         : codeType == BillingCodes.RevenueCode ? catalog.RevenueCodeLabel(code)
         : null;
 

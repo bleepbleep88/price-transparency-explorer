@@ -37,8 +37,8 @@ public sealed class PracticeNameTests(PracticeNameTests.Factory factory) : IClas
         Groups,
         [
             .. new[] { 11, 12, 13, 14, 15, 16, 17, 19, 20, 21, 22 }.Select(id =>
-                Item("CPT", "99213", "Office visit", $"[{id}]", Price(rate: $"{80 + id}.00", serviceCode: "[\"11\"]", billingClass: "professional"))),
-            Item("CPT", "99214", "Office visit", "[18]", Price(rate: "140.00", serviceCode: "[\"11\"]", billingClass: "professional")),
+                Item("CPT", "99213", "Item 1", $"[{id}]", Price(rate: $"{80 + id}.00", serviceCode: "[\"11\"]", billingClass: "professional"))),
+            Item("CPT", "99214", "Item 1", "[18]", Price(rate: "140.00", serviceCode: "[\"11\"]", billingClass: "professional")),
         ]);
 
     [Fact(Timeout = 120_000)]

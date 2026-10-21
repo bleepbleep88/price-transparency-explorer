@@ -2,6 +2,7 @@
 // The API keeps the precise labels; Details panels can still show them.
 
 import type { ModifierRef } from '@/features/rates/api/types'
+import { ALIASES, CODE_NAMES } from './codeNames'
 
 const SETTING_NAMES: Record<string, string> = {
   asc: 'Surgery center',
@@ -123,66 +124,11 @@ export function modifierWords(modifiers: ModifierRef[]): string {
   return [...new Set(words.filter(Boolean))].join(', ')
 }
 
-const COMMON_NAMES: Record<string, string> = {
-  '45378': 'Colonoscopy',
-  '45380': 'Colonoscopy with biopsy',
-  '45385': 'Colonoscopy, polyp removal',
-  '66984': 'Cataract surgery',
-  '66982': 'Cataract surgery, complex',
-  '29881': 'Knee scope',
-  '73721': 'Leg joint MRI',
-  '70450': 'Head CT',
-  '70553': 'Brain MRI',
-  '74177': 'Belly CT',
-  '76856': 'Pelvic ultrasound',
-  '99202': 'Office visit, new patient, level 2',
-  '99203': 'Office visit, new patient, level 3',
-  '99204': 'Office visit, new patient, level 4',
-  '99205': 'Office visit, new patient, level 5',
-  '99211': 'Office visit, level 1',
-  '99212': 'Office visit, level 2',
-  '99213': 'Office visit, level 3',
-  '99214': 'Office visit, level 4',
-  '99215': 'Office visit, level 5',
-  '99281': 'ER visit, level 1',
-  '99282': 'ER visit, level 2',
-  '99283': 'ER visit, level 3',
-  '99284': 'ER visit, level 4',
-  '99285': 'ER visit, level 5',
-  '97110': 'Physical therapy exercises',
-  '90837': 'Therapy session, 1 hour',
-  '90834': 'Therapy session, 45 minutes',
-  '90832': 'Therapy session, 30 minutes',
-  '90785': 'Therapy, complex add-on',
-  '90791': 'Mental health evaluation',
-  '90792': 'Mental health evaluation, with medicine',
-  '97112': 'Physical therapy, balance',
-  '97140': 'Physical therapy, hands-on',
-  '45330': 'Sigmoidoscopy',
-  '86709': 'Hepatitis A blood test',
-  '87341': 'Hepatitis B blood test',
-  '99395': 'Checkup, age 18 to 39',
-  '90935': 'Dialysis',
-  '36475': 'Vein ablation',
-  '93925': 'Leg artery ultrasound',
-  '93970': 'Leg vein ultrasound',
-  '76770': 'Kidney ultrasound',
-  '43239': 'Upper endoscopy with biopsy',
-  '93880': 'Neck artery ultrasound',
-  '99396': 'Checkup, age 40 to 64',
-  '80053': 'Blood test panel',
-  '85025': 'Blood count',
-  '00812': 'Colonoscopy anesthesia',
-  J0585: 'Botox',
-  J1100: 'Dexamethasone',
-  J3301: 'Kenalog shot',
-  G0463: 'Hospital clinic visit',
-}
 
 const SMALL_WORDS = new Set(['a', 'an', 'and', 'at', 'by', 'for', 'in', 'of', 'on', 'or', 'the', 'to', 'with', 'w/', 'w/o'])
 const KEEP_UPPER = new Set(['CT', 'MRI', 'PET', 'ER', 'IV', 'GI', 'US', 'EKG', 'ECG', 'HIV', 'COVID', 'DNA', 'RNA', 'ASC', 'NY', 'NYC'])
 
-/** "DIAGNOSTIC COLONOSCOPY" → "Diagnostic colonoscopy"; a name with lower-case letters is kept as published. */
+/** Turns an all-capitals name (HCPCS short names are) into sentence case, keeping acronyms such as CT and MRI; a name with lower-case letters is kept as published. */
 export function sentenceCase(text: string): string {
   if (/[a-z]/.test(text)) return text
   const words = text.toLowerCase().split(/(\s+|\/|-)/)
@@ -235,7 +181,7 @@ const ABBREVIATIONS: Record<string, string> = {
   dxa: 'bone density scan',
 }
 
-/** The plan's short name with its abbreviations spelled out: "ANES UPR GI NDSC PX NOS" → "Anesthesia upper GI endoscopy procedure". */
+/** A HCPCS Level II short name (CMS's) with its abbreviations spelled out: "INJ METHYLPREDNISOLONE 80 MG" → "Injection methylprednisolone 80 mg". */
 export function expandShortName(name: string): string {
   const words = name.split(/\s+/).flatMap((word) => {
     const key = word.toLowerCase().replace(/[,.;]+$/, '')
@@ -246,8 +192,8 @@ export function expandShortName(name: string): string {
 }
 
 /**
- * The start of a long description, as a title: up to the first comma, semicolon or parenthesis, at most 8 words.
- * "SCREENING MAMMOGRAPHY, BILATERAL (2-VIEW…" → "Screening mammography". A one-word start keeps the next part:
+ * The start of a HCPCS Level II long name (CMS's), as a title: up to the first comma, semicolon or parenthesis, at most 8
+ * words. "GROUND MILEAGE, PER STATUTE MILE" → "Ground mileage". A one-word start keeps the next part:
  * "INJECTION, ONABOTULINUMTOXINA, 1 UNIT" → "Injection, onabotulinumtoxina".
  */
 export function descriptionTitle(description: string): string | null {
@@ -260,14 +206,33 @@ export function descriptionTitle(description: string): string | null {
   return sentenceCase(title.toUpperCase())
 }
 
+/** A CPT code (the AMA's) or a CDT code (the ADA's): we have no license for their text, so the app never shows it. */
+export function isLicensedCode(code: string): boolean {
+  return /^(\d{4}[0-9A-Z]|D\d{4})$/i.test(code.trim())
+}
+
+/** Our own plain name for a code (codeNames.ts), or null. */
+export function ownName(code: string): string | null {
+  return CODE_NAMES[code.trim().toUpperCase()] ?? null
+}
+
 /**
- * What to call a service: a plain name for common codes ("Colonoscopy"); else the start of the plan's long description
- * ("Anesthesia for upper gastrointestinal endoscopic procedures"); else the short name with its abbreviations spelled out;
- * else, for a revenue code, its label ("Ambulatory surgery charge").
+ * A service's name beside its code ("CPT 45378 · Colonoscopy"): our own name, else the one the API sends (CMS's RBCS name
+ * for a CPT code, CMS's or the plan's for a HCPCS Level II code, our label for a revenue code).
+ */
+export function codeName(code: string, name: string | null | undefined): string | null {
+  return ownName(code) ?? (name || null)
+}
+
+/**
+ * What to call a service: our own plain name ("Colonoscopy"); for a CPT or CDT code without one, CMS's RBCS name and the
+ * code ("Lower GI endoscopy (45399)"), never the plan's text; for a HCPCS Level II code, the start of its long name, else
+ * its short name with the abbreviations spelled out; for a revenue code, its label ("Ambulatory surgery charge").
  */
 export function serviceTitle(code: string, name: string | null | undefined, description?: string | null, revenueLabel?: string | null): string {
-  const plain = COMMON_NAMES[code.toUpperCase()]
+  const plain = ownName(code)
   if (plain) return plain
+  if (isLicensedCode(code)) return name ? `${sentenceCase(name)} (${code})` : `Code ${code}`
   const fromDescription = description ? descriptionTitle(description) : null
   if (fromDescription) return fromDescription
   if (name) return expandShortName(name)
@@ -275,23 +240,6 @@ export function serviceTitle(code: string, name: string | null | undefined, desc
   return `Code ${code}`
 }
 
-/** Extra words people type for common services. */
-const ALIASES: Record<string, string> = {
-  botox: 'J0585',
-  'knee mri': '73721',
-  'hip mri': '73721',
-  'ankle mri': '73721',
-  'brain mri': '70553',
-  'head ct': '70450',
-  mammogram: '77067',
-  'er visit': '99284',
-  'emergency room': '99284',
-  checkup: '99396',
-  physical: '99396',
-  'physical therapy': '97110',
-  therapy: '90837',
-  'blood test': '80053',
-}
 
 /**
  * Codes whose plain name or alias has every word typed, best first (an exact name, then a name that starts with the
@@ -302,8 +250,8 @@ export function plainNameMatches(text: string): { code: string; name: string }[]
   if (typed.length < 3) return []
   const words = typed.split(/\s+/)
   const entries = [
-    ...Object.entries(COMMON_NAMES).map(([code, name]) => ({ code, name, keys: name.toLowerCase() })),
-    ...Object.entries(ALIASES).map(([alias, code]) => ({ code, name: COMMON_NAMES[code] ?? alias, keys: alias })),
+    ...Object.entries(CODE_NAMES).map(([code, name]) => ({ code, name, keys: name.toLowerCase() })),
+    ...Object.entries(ALIASES).map(([alias, code]) => ({ code, name: CODE_NAMES[code] ?? alias, keys: alias })),
   ]
   const scored = entries
     .filter((entry) => words.every((word) => entry.keys.split(/[\s,/]+/).some((key) => key.startsWith(word))))

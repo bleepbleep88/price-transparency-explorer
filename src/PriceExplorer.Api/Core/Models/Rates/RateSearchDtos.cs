@@ -38,10 +38,13 @@ public sealed record RateSearchEcho(
 
 public sealed record SnapshotRef(int SnapshotId, DateOnly? IndexDate, bool IsLatest);
 
-/// <param name="Name">A short name: the plan's own, else CMS's HCPCS name (cut at a word near 100 characters).</param>
-/// <param name="Description">The plan's description, or CMS's full HCPCS name when the short one was cut.</param>
-/// <param name="DescriptionSource">"payer_file" when the plan's file describes the code, "cms_hcpcs" when the name comes
-/// from CMS's HCPCS Level II list instead, otherwise "none".</param>
+/// <param name="Name">A short name. For a HCPCS Level II code: the plan's own, else CMS's HCPCS name (cut at a word near
+/// 100 characters). For a CPT or CDT code: CMS's RBCS name ("Lower GI endoscopy"), never the AMA's or ADA's text, which we
+/// have no license for (Core/Domain/PublishedText.cs); the app shows its own plain name instead where it has one.</param>
+/// <param name="Description">For a HCPCS Level II code: the plan's description, or CMS's full HCPCS name when the short one
+/// was cut. Null for a CPT or CDT code.</param>
+/// <param name="DescriptionSource">"payer_file" when the plan's file names a HCPCS Level II code, "cms_hcpcs" when the name
+/// comes from CMS's HCPCS Level II list instead, "rbcs" when it's CMS's RBCS name, otherwise "none".</param>
 /// <param name="Category">How the code is priced: its kind of service and the unit a rate pays for.</param>
 /// <param name="Classification">What the code is: CMS's RBCS category, subcategory and family, or the code-range category.</param>
 /// <param name="DoseUnit">For drugs: the amount one HCPCS unit holds, read from the code's name ("10 mg" for J2704). Null

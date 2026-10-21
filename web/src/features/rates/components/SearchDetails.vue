@@ -6,6 +6,7 @@ import type { RateTrendResult } from '@/features/history/api/types'
 import { trendFor } from '@/features/history/lib/trend'
 import { shortDate } from '@/lib/format'
 import { LIKE_FOR_LIKE } from '@/lib/plainNumbers'
+import { codeName, ownName } from '@/lib/plainNames'
 import type { DirectorySource, RateGroup, RateSearchResult } from '../api/types'
 import { groupName, pinsProvider, qualityLines } from '../lib/lenses'
 import { pricingNotes } from '../lib/pricing'
@@ -41,8 +42,9 @@ const groupTrend = computed(() => (props.group ? trendFor(props.trend, props.gro
       <div v-if="code">
         <dt>Code</dt>
         <dd data-testid="detail-code">
-          {{ code.codeType }} {{ code.code }}<template v-if="code.name"> · {{ code.name }}</template>
+          {{ code.codeType }} {{ code.code }}<template v-if="codeName(code.code, code.name)"> · {{ codeName(code.code, code.name) }}</template>
           <template v-if="code.descriptionSource === 'cms_hcpcs'"> (name from CMS's HCPCS list)</template>
+          <template v-else-if="code.descriptionSource === 'rbcs' && !ownName(code.code)"> (CMS's category name)</template>
         </dd>
       </div>
       <div v-if="category">

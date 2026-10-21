@@ -299,7 +299,7 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
     }
 
     private Task<ChangesResult> ChangesAsync(GetChangesQuery query) =>
-        new GetChangesHandler(_connections, new ReferenceCatalog()).Handle(query, TestContext.Current.CancellationToken);
+        new GetChangesHandler(_connections, new ReferenceCatalog(), new CodeReference()).Handle(query, TestContext.Current.CancellationToken);
 
     private async Task PairAsync(string groupKey, string provider, decimal from, decimal to, string? name = null)
     {

@@ -1,4 +1,5 @@
 import json, sys, copy
+from fixture_names import scrub
 src_ex, src_es, src_index, out = sys.argv[1:5]
 
 def slice_file(path, picks, extra_ref_predicates, max_blocks=4):
@@ -58,6 +59,8 @@ for i, s in enumerate(index["reporting_structure"]):
     s["in_network_files"] = [{"description": "in-network file", "location": f"https://fixtures.test/2026-08-31_fidelis-{name}_in-network.json"}]
     s["allowed_amount_file"] = {"description": "allowed-amounts file", "location": f"https://fixtures.test/2026-08-31_fidelis-{name}_allowed-amounts.json"}
 
+# No CPT, CDT or revenue-code item text in the fixtures: see fixture_names.py.
+scrub(ex, "in_network"); scrub(es, "in_network")
 for name, doc in (("2026-08-31_fidelis_index.json", index), ("2026-08-31_fidelis-ex_in-network.json", ex), ("2026-08-31_fidelis-es_in-network.json", es)):
     with open(f"{out}/{name}", "w", encoding="utf-8", newline="\n") as f:
         json.dump(doc, f, indent=2)

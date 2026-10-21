@@ -160,8 +160,9 @@ public sealed class SuggestCodesHandler(DuckDbConnectionFactory connections, Cod
         {
             var pricing = ServiceCategories.Classify(row.CodeType, row.Code);
             var classification = codeReference.Classify(row.CodeType, row.Code);
-            var (name, description) = row.Name is not null || row.Description is not null || row.CmsName is null
-                ? (row.Name, row.Description)
+            // A CPT or CDT code is named from CMS's RBCS, never the AMA's or ADA's text (PublishedText).
+            var (name, description) = PublishedText.IsLicensed(row.Code) ? (codeReference.RbcsName(row.CodeType, row.Code), null)
+                : row.Name is not null || row.Description is not null || row.CmsName is null ? (row.Name, row.Description)
                 : (CodeNames.Short(row.CmsName), CodeNames.Short(row.CmsName) == row.CmsName ? null : row.CmsName);
             return new CodeSuggestion(
                 row.CodeType, row.Code, name, description,

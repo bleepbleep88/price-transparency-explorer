@@ -88,7 +88,12 @@ const comparisons = computed(() => {
     },
     {
       label: 'Searched as',
-      published: s.codeSource === 'additional_information' ? `"${s.additionalInformation}" in additional_information` : `${s.codeType} ${s.code}`,
+      published:
+        s.codeSource === 'additional_information'
+          ? s.additionalInformation
+            ? `"${s.additionalInformation}" in additional_information`
+            : 'a note in additional_information'
+          : `${s.codeType} ${s.code}`,
       cleaned: `${s.codeType} ${s.code}`,
     },
     { label: 'Price', published: String(s.rate), cleaned: money(s.rate) },
@@ -206,7 +211,7 @@ const comparisons = computed(() => {
             Listed {{ data.occurrences === 1 ? 'once' : plural(data.occurrences, 'time') }}<template v-if="data.itemLabelCount > 1">,
               under {{ plural(data.itemLabelCount, 'item name') }}</template>. Counted once.
           </p>
-          <p v-if="data.codeSource === 'additional_information'" class="muted">
+          <p v-if="data.codeSource === 'additional_information' && data.itemLabelSamples.length" class="muted">
             Item names here don't match the procedure:
             {{ data.itemLabelSamples.join('; ') }}{{ data.itemLabelCount > data.itemLabelSamples.length ? '…' : '' }}
           </p>

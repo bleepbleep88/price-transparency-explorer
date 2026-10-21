@@ -132,7 +132,7 @@ internal static class HistoryFiles
               { "npi": [{{provider.Npi}}], "tin": { "type": "ein", "value": "{{provider.Ein}}", "business_name": "{{provider.Name}}" } } ] }
             """);
         var items = rates.Select(rate => Item(
-            "CPT", rate.Code, rate.Code == "45378" ? "COLONOSCOPY" : "OFFICE VISIT", $"[{ids[rate.Provider]}]",
+            "CPT", rate.Code, rate.Code == "45378" ? "Item 1" : "Item 2", $"[{ids[rate.Provider]}]",
             Price(rate: rate.Amount, serviceCode: $"[\"{rate.Pos}\"]", billingClass: rate.BillingClass)));
         return File(references, items);
     }

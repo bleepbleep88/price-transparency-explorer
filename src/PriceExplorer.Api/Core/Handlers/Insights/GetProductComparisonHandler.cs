@@ -16,7 +16,7 @@ namespace PriceExplorer.Api.Core.Handlers.Insights;
 /// Pairs each provider's saved value in a comparison group under one product with its value in the same group under
 /// another (provider_values), and sums up the ratio product ÷ versus: overall, by band, by category, pair by pair.
 /// </summary>
-internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog)
+internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog, CodeReference codeReference)
     : IRequestHandler<GetProductComparisonQuery, ProductComparison>
 {
     public async Task<ProductComparison> Handle(GetProductComparisonQuery request, CancellationToken cancellationToken)
@@ -238,7 +238,7 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
             row.BusinessName,
             row.CodeType,
             row.Code,
-            InsightSupport.NameOf(names, catalog, row.CodeType, row.Code),
+            InsightSupport.NameOf(names, catalog, codeReference, row.CodeType, row.Code),
             pair.Category.Key,
             pair.Category.Label,
             row.FeeType,

@@ -9,6 +9,8 @@ import statistics
 import sys
 from decimal import Decimal
 
+from fixture_names import scrub
+
 src_ex, src_es, out = sys.argv[1:4]
 
 
@@ -78,6 +80,9 @@ es = slice_file(src_es, [
     {"type": "CPT", "code": "812"},
 ])
 
+# No CPT, CDT or revenue-code item text in the fixtures: see fixture_names.py.
+scrub(ex, "out_of_network")
+scrub(es, "out_of_network")
 for name, doc in (("2026-08-31_fidelis-ex_allowed-amounts.json", ex), ("2026-08-31_fidelis-es_allowed-amounts.json", es)):
     with open(f"{out}/{name}", "w", encoding="utf-8", newline="\n") as f:
         json.dump(doc, f, indent=2)

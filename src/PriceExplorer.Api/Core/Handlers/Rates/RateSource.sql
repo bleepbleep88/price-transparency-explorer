@@ -6,7 +6,8 @@ SELECT
     r.code_type               AS CodeType,
     r.code                    AS Code,
     r.code_source             AS CodeSource,
-    r.additional_information  AS AdditionalInformation,
+    -- Only a bare code: a free-text note could carry a CPT description (Core/Domain/PublishedText.cs).
+    CASE WHEN regexp_matches(r.additional_information, '^[0-9A-Za-z]{3,5}$') THEN r.additional_information END AS AdditionalInformation,
     r.negotiation_arrangement AS NegotiationArrangement,
     r.negotiated_type         AS NegotiatedType,
     r.rate                    AS Rate,
@@ -16,7 +17,9 @@ SELECT
     r.modifiers               AS Modifiers,
     r.occurrences             AS Occurrences,
     r.item_label_count        AS ItemLabelCount,
-    r.item_labels             AS ItemLabels,
+    -- Item names only for a HCPCS Level II code; a CPT, CDT or revenue-code item's names are never shown.
+    CASE WHEN regexp_matches(r.billing_code, '^[A-CE-V][0-9]{4}$') AND regexp_matches(r.code, '^[A-CE-V][0-9]{4}$')
+         THEN r.item_labels END AS ItemLabels,
     r.item_index              AS ItemIndex,
     r.rate_index              AS RateIndex,
     r.price_index             AS PriceIndex,

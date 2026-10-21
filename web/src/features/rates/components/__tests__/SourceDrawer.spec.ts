@@ -69,7 +69,7 @@ function makeSource(rateId: number): RateSource {
     modifiers: [{ code: '95', label: 'Telehealth (audio and video)' }],
     occurrences: 1,
     itemLabelCount: 1,
-    itemLabelSamples: ['PSYTX W PT 45 MINUTES'],
+    itemLabelSamples: [],
     providerGroups: [providerGroup(wholeTaxId)],
     providerGroupCount: wholeTaxId ? 333 : 571,
   }

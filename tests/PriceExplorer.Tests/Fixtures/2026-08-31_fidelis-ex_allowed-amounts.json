@@ -5,11 +5,11 @@
   "last_updated_on": "2026-08-31",
   "out_of_network": [
     {
-      "name": "EMERGENCY DEPT VISIT",
+      "name": "Item 1",
       "billing_code_type": "RC",
       "billing_code_type_version": "2022",
       "billing_code": "450",
-      "description": "EMERGENCY DEPARTMENT VISIT FOR THE EVALUATION AND MANAGEMENT OF A PATIENT, WHICH REQUIRES THESE 3 KE",
+      "description": "Item 1 description",
       "allowed_amounts": [
         {
           "tin": {
@@ -188,11 +188,11 @@
       ]
     },
     {
-      "name": "TREAT SHOULDER DISLOCATION",
+      "name": "Item 2",
       "billing_code_type": "RC",
       "billing_code_type_version": "2022",
       "billing_code": "450",
-      "description": "CLOSED TREATMENT OF SHOULDER DISLOCATION, WITH MANIPULATION; WITHOUT ANESTHESIA",
+      "description": "Item 2 description",
       "allowed_amounts": [
         {
           "tin": {
@@ -371,11 +371,11 @@
       ]
     },
     {
-      "name": "CT ABD & PELV W/CONTRAST",
+      "name": "Item 3",
       "billing_code_type": "CPT",
       "billing_code_type_version": "2022",
       "billing_code": "74177",
-      "description": "COMPUTED TOMOGRAPHY, ABDOMEN AND PELVIS; WITH CONTRAST MATERIAL(S)",
+      "description": "Item 3 description",
       "allowed_amounts": [
         {
           "tin": {
@@ -439,11 +439,11 @@
       ]
     },
     {
-      "name": "ANES LWR INTST SCR COLSC",
+      "name": "Item 4",
       "billing_code_type": "CPT",
       "billing_code_type_version": "2022",
       "billing_code": "812",
-      "description": "ANESTHESIA FOR LOWER INTESTINAL ENDOSCOPIC PROCEDURES, ENDOSCOPE INTRODUCED DISTAL TO DUODENUM; SCRE",
+      "description": "Item 4 description",
       "allowed_amounts": [
         {
           "tin": {

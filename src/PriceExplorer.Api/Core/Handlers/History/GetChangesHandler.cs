@@ -19,7 +19,7 @@ namespace PriceExplorer.Api.Core.Handlers.History;
 /// both snapshots' saved statistics are built and current there are no counts or rows, only a message: values still
 /// being saved would read as every rate new or gone, and values being updated as changes nobody made.
 /// </summary>
-internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog)
+internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, ReferenceCatalog catalog, CodeReference codeReference)
     : IRequestHandler<GetChangesQuery, ChangesResult>
 {
     public const string DefaultSort = "largest";
@@ -106,7 +106,8 @@ internal sealed class GetChangesHandler(DuckDbConnectionFactory connections, Ref
             counts,
             new RateChangesPage(total, request.Page, request.PageSize, rows.Select(row => new RateChange(
                 row.Kind, row.GroupKey, row.ProductKey, row.ProductLabel, row.CodeType, row.Code,
-                names.GetValueOrDefault((row.CodeType, row.Code)),
+                // A CPT or CDT code is named from CMS's RBCS, never the AMA's or ADA's text (PublishedText).
+                PublishedText.IsLicensed(row.Code) ? codeReference.RbcsName(row.CodeType, row.Code) : names.GetValueOrDefault((row.CodeType, row.Code)),
                 row.FeeType, RateSearchAssembler.FeeTypeLabelOf(row.FeeType),
                 row.SettingKey, catalog.Setting(row.SettingKey)?.Label ?? row.SettingKey,
                 row.Modifiers.Length == 0
