@@ -54,11 +54,12 @@ const headers = [
   <section v-if="line && ladder.data.value" class="levels" data-testid="level-ladder">
     <h2 class="section-title">Price by level</h2>
     <p class="muted" data-testid="level-line-label">{{ lineTitle(line) }}</p>
-    <p v-if="note" class="muted" data-testid="level-note">{{ note }}</p>
 
     <LevelLadderChart :steps="steps" :current="code!.code" />
 
     <DetailsPanel testid="level-details">
+      <!-- In Details: on the main view both bills can read the same ("Doctor · in the office"); only modifiers differ. -->
+      <p v-if="note" data-testid="level-note">{{ note }}</p>
       <v-select
         v-if="lines.length > 1"
         :model-value="line.key"
@@ -70,7 +71,7 @@ const headers = [
         @update:model-value="(key: string) => (picked = key)"
       />
       <p>{{ lineLabel(line) }}</p>
-      <v-table density="compact" data-testid="level-table">
+      <v-table density="compact" class="level-table" data-testid="level-table">
         <thead>
           <tr>
             <th v-for="header in headers" :key="header.key" :class="header.align === 'end' ? 'text-end' : undefined">{{ header.title }}</th>
@@ -78,9 +79,12 @@ const headers = [
         </thead>
         <tbody>
           <tr v-for="step in steps" :key="step.code" data-testid="level-step" :class="{ current: step.code === code!.code }">
-            <td>{{ levelLabel(step) }} · {{ step.code }}</td>
-            <td class="text-end">{{ step.typical == null ? '—' : dollars(step.typical) }}</td>
-            <td class="text-end">{{ step.mostText ?? '—' }}</td>
+            <td>
+              <span class="text-no-wrap">{{ levelLabel(step) }}</span>
+              <span class="code">{{ step.code }}</span>
+            </td>
+            <td class="text-end text-no-wrap">{{ step.typical == null ? '—' : dollars(step.typical) }}</td>
+            <td class="text-end text-no-wrap">{{ step.mostText ?? '—' }}</td>
             <td class="text-end">{{ wholeNumber(step.providers) }}</td>
           </tr>
         </tbody>
@@ -111,5 +115,20 @@ const headers = [
 
 .current td {
   font-weight: 600;
+}
+
+.code {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: rgba(var(--v-theme-on-background), var(--v-medium-emphasis-opacity));
+}
+
+/* Four columns fit a phone without sideways scroll once the cell padding is halved. */
+@media (max-width: 600px) {
+  .level-table :deep(th),
+  .level-table :deep(td) {
+    padding: 0 8px !important;
+  }
 }
 </style>

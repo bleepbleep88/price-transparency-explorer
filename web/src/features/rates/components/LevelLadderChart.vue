@@ -17,6 +17,14 @@ use([BarChart, GridComponent, TooltipComponent, SVGRenderer])
 const props = defineProps<{ steps: LadderStep[]; current: string }>()
 const theme = useTheme()
 
+// A see-through bar colour. Bar opacity would fade the price label too.
+function faded(hex: string, alpha: number): string {
+  const digits = hex.replace('#', '')
+  const full = digits.length === 3 ? [...digits].map((digit) => digit + digit).join('') : digits.slice(0, 6)
+  const [red, green, blue] = [0, 2, 4].map((start) => parseInt(full.slice(start, start + 2), 16))
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
 const option = computed(() => {
   const colors = theme.current.value.colors
   const ink = colors['on-surface']
@@ -50,7 +58,8 @@ const option = computed(() => {
         barWidth: '48%',
         data: props.steps.map((step) => ({
           value: step.typical ?? '-',
-          itemStyle: { color: colors.primary, opacity: step.code === props.current ? 1 : 0.35, borderRadius: [4, 4, 0, 0] },
+          itemStyle: { color: step.code === props.current ? colors.primary : faded(String(colors.primary), 0.35), borderRadius: [4, 4, 0, 0] },
+          label: { fontWeight: step.code === props.current ? 'bold' : 'normal' },
         })),
         label: { show: true, position: 'top', color: ink, formatter: ({ value }: { value: number }) => dollars(value) },
       },

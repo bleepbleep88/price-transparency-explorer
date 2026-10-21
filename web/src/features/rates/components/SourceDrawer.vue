@@ -162,7 +162,7 @@ const comparisons = computed(() => {
 
         <section class="d-flex flex-column ga-2">
           <h3 class="section-title">As published</h3>
-          <v-table density="compact">
+          <v-table density="compact" class="published">
             <thead>
               <tr>
                 <th></th>
@@ -200,7 +200,7 @@ const comparisons = computed(() => {
             <p>Also a whole-tax-ID contract (no NPIs).</p>
             <v-btn variant="text" size="small" class="px-0" @click="showRate(wholeTaxIdRateId)">Show it</v-btn>
           </div>
-          <v-list density="compact" class="py-0">
+          <v-list density="compact" class="py-0 groups">
             <v-list-item
               v-for="group in data.providerGroups"
               :key="`${group.providerGroupId}-${group.groupIndex}`"
@@ -234,6 +234,35 @@ const comparisons = computed(() => {
 .muted {
   font-size: 0.875rem;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+/* Long published values wrap inside their cells, so the drawer never scrolls sideways on a phone. */
+.published :deep(table) {
+  table-layout: fixed;
+}
+
+.published :deep(th),
+.published :deep(td) {
+  overflow-wrap: anywhere;
+}
+
+.published :deep(th:first-child) {
+  width: 28%;
+}
+
+@media (max-width: 600px) {
+  .published :deep(th),
+  .published :deep(td) {
+    padding: 0 8px !important;
+  }
+}
+
+/* Names and IDs wrap rather than cut off: every group ID stays readable. */
+.groups :deep(.v-list-item-title),
+.groups :deep(.v-list-item-subtitle) {
+  white-space: normal;
+  -webkit-line-clamp: unset;
+  overflow-wrap: anywhere;
 }
 
 .match {

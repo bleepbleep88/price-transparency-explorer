@@ -62,7 +62,8 @@ export interface LadderChoice {
 /**
  * The lines the search allows and the one to show first: the picked card's when it compares two levels or more, else
  * the fullest ladder (the API lists lines with the most levels priced first) with a typical price at the searched level,
- * else the first. When the picked card's line can't be compared, the note says so in a few words.
+ * else the first. When the picked card's line can't be compared, the closest line stands in (same plan, then fee type,
+ * then setting) and the note says so in a few words.
  */
 export function chooseLine(ladder: LevelLadder | null | undefined, code: string, filters: LadderFilters = {}): LadderChoice {
   const lines = comparableLines(ladder).filter(
@@ -78,7 +79,15 @@ export function chooseLine(ladder: LevelLadder | null | undefined, code: string,
   if (!pickedLine) return { lines, line: fallback, note: null }
   if (lines.includes(pickedLine)) return { lines, line: pickedLine, note: null }
   if (!fallback) return { lines, line: null, note: null }
-  return { lines, line: fallback, note: 'Your pick has too few levels. Showing another.' }
+
+  const likeness = (line: LevelLine) =>
+    (line.productKey === pickedLine.productKey ? 4 : 0) + (line.feeType === pickedLine.feeType ? 2 : 0) + (line.settingKey === pickedLine.settingKey ? 1 : 0)
+  // Most alike first; among equals, one priced at the searched level, then the API's order (fullest first).
+  const closest = lines.reduce((best, line) => {
+    const [a, b] = [likeness(line), likeness(best)]
+    return a > b || (a === b && pricedAt(line) && !pricedAt(best)) ? line : best
+  }, lines[0]!)
+  return { lines, line: closest, note: 'Too few levels for this bill. Showing a similar one.' }
 }
 
 /** One step per level of the family, lowest first. */

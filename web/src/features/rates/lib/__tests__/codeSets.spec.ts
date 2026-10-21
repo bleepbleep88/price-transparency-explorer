@@ -249,10 +249,17 @@ describe('level ladder', () => {
     expect(chooseLine(wide, '99213', { feeType: 'facility' }).line!.key).toBe('facility')
   })
 
-  it("says so when the picked card's line can't be compared", () => {
+  it("stands in the closest line when the picked card's can't be compared, and says so", () => {
     const picked = chooseLine(ladder, '99213', { group: 'essential-plan|CPT|99213|professional|lonely|25|negotiated' })
     expect(picked.line!.key).toBe('office')
-    expect(picked.note).toBe('Your pick has too few levels. Showing another.')
+    expect(picked.note).toBe('Too few levels for this bill. Showing a similar one.')
+
+    // A lone Ambetter video visit: the Ambetter video line stands in, not the fuller Essential Plan office line.
+    const ambetterLonely = line('ambetter-lonely', [step('99213', 3, 50, 90, 'ambetter-lonely')], { productKey: 'ambetter', settingKey: 'telehealth-home' })
+    const ambetterVideo = line('ambetter-video', telehealth.levels, { productKey: 'ambetter', settingKey: 'telehealth-home' })
+    const ambetterOffice = line('ambetter-office', office.levels, { productKey: 'ambetter' })
+    const wide: LevelLadder = { ...ladder, lines: [office, ambetterOffice, ambetterVideo, ambetterLonely] }
+    expect(chooseLine(wide, '99213', { group: 'essential-plan|CPT|99213|professional|ambetter-lonely|25|negotiated' }).line!.key).toBe('ambetter-video')
   })
 
   it('names a line plainly up front, and in full (modifiers, rate type) in the picker', () => {

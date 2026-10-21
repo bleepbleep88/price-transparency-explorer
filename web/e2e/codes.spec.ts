@@ -2,11 +2,11 @@ import { expect, test } from '@playwright/test'
 
 // Categories, visit levels and drug doses, against the real API and data. See playwright.config.ts for E2E_BASE_URL.
 
-test("a code shows CMS's category and how it's priced", async ({ page }) => {
+test("a code's Details show CMS's category and how it's priced", async ({ page }) => {
   await page.goto('/?code=45378')
 
-  await expect(page.getByTestId('category-chip')).toHaveText('Procedures · Digestive/Gastrointestinal')
-  await page.getByTestId('pricing-notes').getByRole('button', { name: "How it's priced" }).click()
+  await page.getByTestId('search-details-toggle').click()
+  await expect(page.getByTestId('category-chip')).toHaveText('Procedures · Digestive/Gastrointestinal · Lower GI Endoscopy - Other')
   await expect(page.getByTestId('pricing-note-facility-rates')).toContainText('filed under a revenue code')
 })
 
@@ -21,7 +21,7 @@ test('an office visit shows every level side by side, numbers in Details', async
 
   await ladder.getByTestId('level-details-toggle').click()
   await expect(ladder.getByTestId('level-step')).toHaveCount(5)
-  await expect(ladder.getByTestId('level-step').nth(2)).toContainText('Level 3 · 99213')
+  await expect(ladder.getByTestId('level-step').nth(2)).toContainText(/Level 3\s*99213/)
   await expect(ladder.getByTestId('level-caption')).toHaveText("How often each level is billed isn't in the files.")
 
   // Another plan and bill: the title follows.

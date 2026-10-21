@@ -38,10 +38,14 @@ function rateText(rate: number, rateHigh: number): string {
 
 <template>
   <v-dialog v-model="open" max-width="520" scrollable>
-    <v-card :title="row ? providerName(row.businessName) : 'Clinicians'" :subtitle="row ? `Tax ID ${row.einDisplay}` : undefined" data-testid="npi-dialog">
-      <template #append>
+    <v-card data-testid="npi-dialog">
+      <div class="d-flex align-start pa-4 pb-0">
+        <div class="flex-grow-1">
+          <h2 class="dialog-title">{{ row ? providerName(row.businessName) : 'Clinicians' }}</h2>
+          <p v-if="row" class="muted">Tax ID {{ row.einDisplay }}</p>
+        </div>
         <v-btn :icon="mdiClose" variant="text" aria-label="Close" @click="open = false" />
-      </template>
+      </div>
       <v-card-text class="d-flex flex-column ga-2">
         <v-skeleton-loader v-if="npis.isPending.value" type="list-item@4" />
         <v-alert v-else-if="errorMessage" type="error" variant="tonal">{{ errorMessage }}</v-alert>
@@ -67,6 +71,17 @@ function rateText(rate: number, rateHigh: number): string {
 </template>
 
 <style scoped>
+.dialog-title {
+  font-family: var(--v-font-body);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.muted {
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
 .list-title {
   font-family: var(--v-font-body);
   font-size: 1rem;
