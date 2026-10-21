@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { flushPromises, type VueWrapper } from '@vue/test-utils'
+import type { VueWrapper } from '@vue/test-utils'
 import type { HistorySnapshot, RateChange } from '../../api/types'
 import { change } from '../../lib/__tests__/fixtures'
 import ChangesTable from '../ChangesTable.vue'
@@ -10,8 +10,8 @@ const september: HistorySnapshot = { snapshotId: 1, indexDate: '2026-09-28', isL
 
 let wrapper: VueWrapper | undefined
 
-async function mountTable(items: RateChange[], sort = 'largest') {
-  const mounted = await mountWith(ChangesTable, { rows: { total: items.length, page: 1, pageSize: 25, items }, sort, from: august, to: september })
+async function mountList(items: RateChange[], total = items.length) {
+  const mounted = await mountWith(ChangesTable, { rows: { total, page: 1, pageSize: 10, items }, from: august, to: september })
   wrapper = mounted.wrapper
   return mounted
 }
@@ -22,51 +22,71 @@ afterEach(() => {
 })
 
 describe('ChangesTable', () => {
-  it("shows each change with both files' rates, in dollars and percent, under the files' dates", async () => {
-    await mountTable([change(), change({ providerKey: 'u1a2b3c4d5e6f', ein: null, einDisplay: '••-•••4567', einMasked: true, change: -50, changePct: -10, from: 500, to: 450 })])
-
-    const headers = wrapper!.findAll('th').map((th) => th.text())
-    expect(headers).toEqual(expect.arrayContaining(['Aug 31, 2026', 'Sep 28, 2026', 'Change']))
-    const rows = wrapper!.findAll('tbody tr')
-    expect(rows[0]!.text()).toContain('CPT 45378')
-    expect(rows[0]!.text()).toContain('DIAGNOSTIC COLONOSCOPY')
-    expect(rows[0]!.text()).toContain('Facility fee · Ambulatory surgery center')
-    expect(headers).toContain('Fee, setting and plan')
-    expect(rows[0]!.text()).toContain('EIN 22-1111111')
-    expect(rows[0]!.get('[data-testid="change-text"]').text()).toBe('Up $60 (10%)')
-    expect(rows[0]!.get('[data-testid="change-text"]').classes()).toContain('text-high')
-    expect(rows[1]!.get('[data-testid="change-text"]').classes()).toContain('text-low')
-    expect(rows[1]!.text()).toContain('Unverified tax ID')
-  })
-
-  it('marks new and dropped rates the other file only lists differently, and rates with several values', async () => {
-    await mountTable([
-      change({ kind: 'dropped', to: null, change: null, changePct: null, listedElsewhere: true }),
-      change({ fromRates: 2, toRates: 3 }),
+  it('lists each change as name, service and old to new price, with no codes or tax IDs', async () => {
+    await mountList([
+      change({ businessName: 'NHPE, LLC dba New Hyde Park Endoscopy' }),
+      change({ providerKey: 'u1', einDisplay: '••-•••4567', einMasked: true, change: -50, changePct: -10, from: 500, to: 450 }),
+      change({ providerKey: 'p3', feeType: 'professional', settingKey: 'office', code: '99213', codeName: 'OFFICE/OUTPATIENT VISIT EST', from: 100.21, to: 100.4 }),
     ])
 
-    const rows = wrapper!.findAll('tbody tr')
-    expect(rows[0]!.get('[data-testid="change-text"]').text()).toBe('Gone')
-    expect(rows[0]!.find('[data-testid="listed-elsewhere"]').exists()).toBe(true)
-    expect(rows[1]!.text()).toContain('(2 rates)')
-    expect(rows[1]!.text()).toContain('(3 rates)')
-    expect(rows[1]!.text()).toContain('Several rates')
+    const rows = wrapper!.findAll('[data-testid="change-row"]')
+    expect(rows[0]!.text()).toContain('New Hyde Park Endoscopy')
+    expect(rows[0]!.get('[data-testid="change-service"]').text()).toBe('Colonoscopy · Surgery center')
+    expect(rows[0]!.get('[data-testid="change-text"]').text()).toBe('$600 → $660')
+    expect(rows[0]!.get('[data-testid="change-text"]').classes()).toContain('text-high')
+    expect(rows[1]!.get('[data-testid="change-text"]').classes()).toContain('text-low')
+    // Whole dollars would read "$100 → $100".
+    expect(rows[2]!.get('[data-testid="change-text"]').text()).toBe('$100.21 → $100.40')
+    expect(rows[2]!.get('[data-testid="change-service"]').text()).toBe('Office visit, level 3 · Doctor in the office')
+    expect(wrapper!.text()).not.toMatch(/CPT|45378|EIN|tax ID|22-1111111|modifier/)
   })
 
-  it("links each row to the provider's rows in search, in the file that has them", async () => {
-    await mountTable([change(), change({ kind: 'dropped', to: null, change: null, changePct: null })])
+  it('opens a row to show the plan, code, tax ID, several rates, and where else it is listed', async () => {
+    await mountList([
+      change({ kind: 'dropped', to: null, change: null, changePct: null, listedElsewhere: true }),
+      change({ providerKey: 'p2', fromRates: 2, toRates: 3 }),
+    ])
 
-    const links = wrapper!.findAll('[data-testid="change-search"]').map((link) => link.attributes('href'))
-    expect(links[0]).toBe('/?code=45378&codeType=CPT&ein=221111111&group=ambetter|CPT|45378|facility|asc||negotiated')
-    expect(links[1]).toBe('/?code=45378&codeType=CPT&ein=221111111&group=ambetter|CPT|45378|facility|asc||negotiated&snapshot=2')
+    const rows = wrapper!.findAll('[data-testid="change-row"]')
+    expect(rows[0]!.get('[data-testid="change-text"]').text()).toBe('Gone · $600')
+    expect(wrapper!.find('[data-testid="change-details"]').exists()).toBe(false)
+
+    await rows[0]!.get('button').trigger('click')
+    const details = rows[0]!.get('[data-testid="change-details"]')
+    expect(details.text()).toContain('Ambetter from Fidelis Care · Facility fee · Ambulatory surgery center')
+    expect(details.text()).toContain('CPT 45378 · DIAGNOSTIC COLONOSCOPY')
+    expect(details.text()).toContain('tax ID 22-1111111')
+    expect(details.get('[data-testid="listed-elsewhere"]').text()).toBe('Also in the Sep 28, 2026 file, with other modifiers or setting.')
+    expect(rows[0]!.get('button').attributes('aria-expanded')).toBe('true')
+
+    await rows[1]!.get('button').trigger('click')
+    expect(rows[1]!.get('[data-testid="several-rates"]').text()).toContain('Several rates: 2 then 3.')
+    expect(rows[0]!.find('[data-testid="change-details"]').exists()).toBe(false)
   })
 
-  it('sorts by the change when its header is clicked, and back to the biggest moves', async () => {
-    await mountTable([change()])
+  it("links an opened row to the provider's rows in search, in the file that has them", async () => {
+    await mountList([change(), change({ providerKey: 'other', kind: 'dropped', to: null, change: null, changePct: null })])
+    const rows = wrapper!.findAll('[data-testid="change-row"]')
 
-    await wrapper!.findAll('th').find((th) => th.text() === 'Change')!.find('.v-data-table-header__content').trigger('click')
-    await flushPromises()
+    await rows[0]!.get('button').trigger('click')
+    expect(rows[0]!.get('[data-testid="change-search"]').attributes('href')).toBe(
+      '/?code=45378&codeType=CPT&ein=221111111&group=ambetter|CPT|45378|facility|asc||negotiated',
+    )
+    await rows[1]!.get('button').trigger('click')
+    expect(rows[1]!.get('[data-testid="change-search"]').attributes('href')).toBe(
+      '/?code=45378&codeType=CPT&ein=other&group=ambetter|CPT|45378|facility|asc||negotiated&snapshot=2',
+    )
+  })
 
-    expect(wrapper!.emitted('updateOptions')?.[0]).toEqual([{ page: 1, pageSize: 25, sort: 'changePct' }])
+  it('pages through the rest, and says when nothing matches', async () => {
+    await mountList([change()], 35)
+    expect(wrapper!.find('[data-testid="changes-pages"]').exists()).toBe(true)
+    await wrapper!.get('[data-testid="changes-pages"]').findAll('button').find((button) => button.text() === '2')!.trigger('click')
+    expect(wrapper!.emitted('page')).toEqual([[2]])
+    wrapper!.unmount()
+
+    await mountList([])
+    expect(wrapper!.get('[data-testid="changes-none"]').text()).toBe('No changes match.')
+    expect(wrapper!.find('[data-testid="changes-pages"]').exists()).toBe(false)
   })
 })

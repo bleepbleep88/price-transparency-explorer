@@ -122,12 +122,10 @@ afterEach(() => {
 })
 
 describe('LensHistoryLine', () => {
-  it("gives providers their own rate over time and a way to the card's trend", async () => {
+  it("gives providers their own rate's history in a few words, and a way to the trend", async () => {
     await mountLine('providers', result([group(ASC, 200), group(OFFICE, 114, [PM])], '061036715'), { ein: '061036715' })
 
-    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain(
-      'Your rate was $100.36 (Jul 27), $100.36 (Aug 31) and $117.77 (Sep 28): up $17.41 (17%) since Jul 27.',
-    )
+    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('Your rate: up $17.41 since Aug')
     await wrapper!.get('[data-testid="show-trend"]').trigger('click')
     expect(wrapper!.emitted('showTrend')).toEqual([[OFFICE]])
   })
@@ -138,12 +136,10 @@ describe('LensHistoryLine', () => {
     expect(wrapper!.find('[data-testid="lens-history"]').exists()).toBe(false)
   })
 
-  it("gives employers the typical price over time where the most providers are", async () => {
+  it('gives employers the history of the bill with the most places', async () => {
     await mountLine('employers', result([group(OFFICE, 114), group(ASC, 200)]))
 
-    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain(
-      'On the card with the most providers: the typical price went from $70 (Jul 27) to $77 (Sep 28): up $7 (10%).',
-    )
+    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('Doctor: up $7 since Jul')
     await wrapper!.get('[data-testid="show-trend"]').trigger('click')
     expect(wrapper!.emitted('showTrend')).toEqual([[ASC]])
   })
@@ -158,7 +154,7 @@ describe('LensHistoryLine', () => {
 
     expect(changes).toHaveBeenCalledWith(expect.objectContaining({ code: '99213', snapshot: undefined, pageSize: 1 }), expect.anything())
     const line = wrapper!.get('[data-testid="lens-history"]')
-    expect(line.text()).toContain('Since the Aug 31 file, for 99213: 56 rates went up, 57 went down, 683 are new and 618 are gone.')
+    expect(line.text()).toContain('Since Aug 31: 56 up · 57 down · 683 new · 618 gone')
     // The searched code's own changes, revenue-code facility charges included, as the line counts them.
     expect(line.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?code=99213&includeFacilityCharges=true')
     expect(changes).toHaveBeenCalledWith(expect.objectContaining({ includeFacilityCharges: true }), expect.anything())
@@ -169,8 +165,8 @@ describe('LensHistoryLine', () => {
 
     await mountLine('plans', result([group(OFFICE, 114)]))
 
-    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('The changes since the Aug 31 file show once loading finishes.')
-    expect(wrapper!.text()).not.toMatch(/went up|are new|are gone/)
+    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('Changes show once loading finishes.')
+    expect(wrapper!.text()).not.toMatch(/ up | new | gone/)
   })
 
   it('compares an older snapshot with the file before it, and the oldest with nothing', async () => {
@@ -181,7 +177,7 @@ describe('LensHistoryLine', () => {
 
     await mountLine('plans', result([group(OFFICE, 114)]), { snapshot: '2' })
     expect(changes).toHaveBeenCalledWith(expect.objectContaining({ snapshot: 2 }), expect.anything())
-    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('No rate for 99213 changed since the Jul 27 file.')
+    expect(wrapper!.get('[data-testid="lens-history"]').text()).toContain('Since Jul 27: no changes')
     expect(wrapper!.get('[data-testid="see-changes"]').attributes('href')).toBe('/changes?snapshot=2&code=99213&includeFacilityCharges=true')
     wrapper!.unmount()
 

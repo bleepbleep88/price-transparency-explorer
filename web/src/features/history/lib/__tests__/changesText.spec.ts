@@ -4,8 +4,11 @@ import {
   changeAmounts,
   changesSinceText,
   changeText,
+  countsLine,
   countsSummary,
   listedElsewhereSummary,
+  priceMove,
+  upDown,
   waitingText,
 } from '../changesText'
 import { change } from './fixtures'
@@ -25,6 +28,28 @@ const counts: ChangeCounts = {
 const none: ChangeCounts = { changed: 0, increased: 0, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 12, facilityCharges: 0 }
 
 describe('changes in words', () => {
+  it("gives a row's prices in a few characters: old to new, new or gone", () => {
+    expect(priceMove(change({ from: 42, to: 193.19 }))).toBe('$42 → $193')
+    expect(priceMove(change({ from: 3.36, to: 10.7 }))).toBe('$3.36 → $10.70')
+    expect(priceMove(change({ from: 100.21, to: 100.4 }))).toBe('$100.21 → $100.40')
+    expect(priceMove(change({ kind: 'new', from: null, to: 750 }))).toBe('New · $750')
+    expect(priceMove(change({ kind: 'dropped', from: 450, to: null }))).toBe('Gone · $450')
+  })
+
+  it('counts the kinds in one short line for a lens', () => {
+    expect(countsLine(counts)).toBe('1,975 up · 1,957 down · 14,632 new · 16,776 gone')
+    expect(countsLine({ ...none, new: 3 })).toBe('3 new')
+    expect(countsLine(none)).toBe('no changes')
+  })
+
+  it('says up or down by the amounts as shown', () => {
+    expect(upDown(51.45, 53.2, 'typical')).toBe('Up $1.75')
+    expect(upDown(113.01, 113.59, 'typical')).toBe('Up $1')
+    expect(upDown(113.4, 113.01, 'typical')).toBeNull()
+    expect(upDown(100.36, 117.77)).toBe('Up $17.41')
+    expect(upDown(71.38, 61.65)).toBe('Down $9.73')
+  })
+
   it('says why there are no changes yet, naming the files', () => {
     const side = (snapshotId: number, indexDate: string, statisticsBuiltAt: string | null, statisticsCurrent: boolean) => ({
       snapshotId,

@@ -24,7 +24,7 @@ afterEach(() => {
   wrapper = undefined
 })
 
-const yours = (rate: number) => ({ providerKey: '061036715', displayName: 'PM Pediatrics', rate })
+const yours = (rate: number) => ({ providerKey: '061036715', displayName: 'PM Pediatrics, PLLC', rate })
 const threeFiles = trend([
   point(3, '2026-07-27', { median: 113.01, provider: yours(100.36) }),
   point(2, '2026-08-31', { median: 113.59, provider: yours(100.36) }),
@@ -32,40 +32,34 @@ const threeFiles = trend([
 ])
 
 describe('TrendLine', () => {
-  it('draws the group across the files and says the typical price in words', async () => {
+  it('draws the months and gives the typical price by month in a few words', async () => {
     const line = await mountLine(threeFiles)
 
     expect(line.find('[data-testid="trend-chart-stub"]').exists()).toBe(true)
-    expect(line.get('[data-testid="trend-typical"]').text()).toBe(
-      'The typical price was $113 (Jul 27), $114 (Aug 31) and $114 (Sep 28): up $1 (under 1%) since Jul 27.',
-    )
-    expect(line.text().toLowerCase()).not.toMatch(/median|percentile|quartile/)
+    expect(line.get('[data-testid="trend-typical"]').text()).toBe('Typical: Jul $113 · Aug $114 · Sep $114')
+    expect(line.text().toLowerCase()).not.toMatch(/median|percentile|quartile|card|snapshot/)
     expect(line.find('[data-testid="trend-provider"]').exists()).toBe(false)
   })
 
-  it("follows the searched provider's rate by name when an NPI or EIN picked one out", async () => {
+  it("follows the searched provider's rate by its plain name when an NPI or EIN picked one out", async () => {
     const line = await mountLine(threeFiles, true)
 
-    // A card is read by every audience, so it isn't "your rate".
-    expect(line.get('[data-testid="trend-provider"]').text()).toBe(
-      "PM Pediatrics' rate was $100.36 (Jul 27), $100.36 (Aug 31) and $117.77 (Sep 28): up $17.41 (17%) since Jul 27.",
-    )
+    expect(line.get('[data-testid="trend-provider"]').text()).toBe('PM Pediatrics: Jul $100.36 · Aug $100.36 · Sep $117.77')
   })
 
-  it('leads with the providers in both files when they all kept their rates, and never calls it a price change', async () => {
+  it('says who stayed and who left when only who is listed moved the price', async () => {
     const line = await mountLine(
       trend([
-        point(2, '2026-08-31', { median: 573.48 }),
+        point(2, '2026-08-31', { median: 51.45 }),
         point(1, '2026-09-28', {
-          median: 610,
-          sincePrevious: { sinceSnapshotId: 2, stayed: 40, raised: 0, lowered: 0, reweighted: 0, left: 87, joined: 39 },
+          median: 113.59,
+          sincePrevious: { sinceSnapshotId: 2, stayed: 37, raised: 0, lowered: 0, reweighted: 0, left: 87, joined: 39 },
         }),
       ]),
     )
 
-    expect(line.get('[data-testid="trend-typical"]').text()).toBe(
-      'Of the 40 providers listed in both files, all kept the same rate. 87 left and 39 joined, so the typical price on this card moved from $573 (Aug 31) to $610 (Sep 28).',
-    )
+    expect(line.get('[data-testid="trend-who"]').text()).toBe('Aug–Sep: 37 kept their rate, 87 left, 39 joined')
+    expect(line.text()).not.toMatch(/went up|times as much/)
   })
 
   it('shows nothing for a group too small for a typical price when no provider is followed', async () => {
@@ -74,10 +68,10 @@ describe('TrendLine', () => {
     expect((await mountLine(small)).html()).not.toContain('trend-line')
   })
 
-  it('says when no other loaded file has the group', async () => {
+  it('says when no other month has the prices', async () => {
     const line = await mountLine(trend([point(1, '2026-09-28')]))
 
-    expect(line.get('[data-testid="trend-only-here"]').text()).toBe('No other loaded file has prices for this card.')
+    expect(line.get('[data-testid="trend-only-here"]').text()).toBe('No other month has these prices.')
   })
 
   it('leaves an incomplete file out and says so', async () => {
@@ -85,7 +79,7 @@ describe('TrendLine', () => {
       trend([point(3, '2026-07-27', { partial: true, median: 610 }), point(2, '2026-08-31', { median: 610 }), point(1, '2026-09-28', { median: 620 })]),
     )
 
-    expect(line.get('[data-testid="trend-typical"]').text()).toBe('The typical price went from $610 (Aug 31) to $620 (Sep 28): up $10 (2%).')
-    expect(line.text()).toContain("The Jul 27 file looks incomplete, so it's left out.")
+    expect(line.get('[data-testid="trend-typical"]').text()).toBe('Typical: Aug $610 · Sep $620')
+    expect(line.text()).toContain('Jul file incomplete, left out')
   })
 })

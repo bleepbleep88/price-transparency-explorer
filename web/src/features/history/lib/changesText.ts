@@ -97,6 +97,29 @@ export function waitingText(result: Pick<ChangesResult, 'from' | 'to'>): string 
   return `Changes show once loading finishes: the numbers for ${outOfDate.join(' and ')} are being updated.`
 }
 
+/** The main view's waiting line; Details names the files (waitingText). */
+export const WAITING_SHORT = 'Changes show once loading finishes.'
+
+/** A row's prices in a few characters (decision 90): "$42 → $193", "New · $750", "Gone · $450". */
+export function priceMove(row: Pick<RateChange, 'kind' | 'from' | 'to'>): string {
+  if (row.kind === 'new') return `New · ${dollars(row.to ?? 0)}`
+  if (row.kind === 'dropped') return `Gone · ${dollars(row.from ?? 0)}`
+  const [from, to] = [row.from ?? 0, row.to ?? 0]
+  // Whole dollars from $100 would hide a move of cents ("$100 → $100"): then both to the cent.
+  return dollars(from) === dollars(to) ? `${money(from)} → ${money(to)}` : `${dollars(from)} → ${dollars(to)}`
+}
+
+/** A lens's line of counts: "56 up · 57 down · 683 new · 618 gone"; "no changes" when there are none. */
+export function countsLine(counts: ChangeCounts): string {
+  const parts = [
+    counts.increased ? `${wholeNumber(counts.increased)} up` : '',
+    counts.decreased ? `${wholeNumber(counts.decreased)} down` : '',
+    counts.new ? `${wholeNumber(counts.new)} new` : '',
+    counts.dropped ? `${wholeNumber(counts.dropped)} gone` : '',
+  ].filter(Boolean)
+  return parts.length ? parts.join(' · ') : 'no changes'
+}
+
 /** The changes page's summary of everything the filters cover. */
 export function countsSummary(counts: ChangeCounts, from: string, to: string): string {
   const text = countsText(counts)
