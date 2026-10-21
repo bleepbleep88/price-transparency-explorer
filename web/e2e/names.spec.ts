@@ -23,6 +23,10 @@ test("each place under a network's name shows its own practice, and the drawer k
   await rows.filter({ hasText: 'Eighth Avenue Anesthesia' }).click()
   const drawer = page.getByTestId('source-drawer')
   await expect(drawer.getByTestId('source-listed-as')).toHaveText('Listed by the plan as Chinese American IPA Assoc/CAIPA')
+
+  // Its scorecard has the same name.
+  await page.goto('/providers/464213772')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Eighth Avenue Anesthesia')
 })
 
 test("a file that names tax IDs after other providers shows each practice's own name", async ({ page }) => {
@@ -35,4 +39,36 @@ test("a file that names tax IDs after other providers shows each practice's own 
   // The same practices as on the Ambetter tab, under the same names.
   expect(names).toContain('Eighth Avenue Anesthesia')
   expect(names.join(' | ')).not.toMatch(/MMC Faculty Practice|Bellevue Hospital Center|Jacobi Medical Center/)
+})
+
+test("ENT & Allergy's tax ID (13-4000192) has its own name on every page, though the Sep 28 Essential file calls it others", async ({ page }) => {
+  // Places: the Essential Plan file lists it as "Memorial Sloan Kettering Cancer Center at Basking Ridge" here.
+  await page.goto('/?code=30903&ein=134000192&plan=essential-plan')
+  const row = page.getByTestId('place-row').first()
+  await expect(row.locator('.name')).toHaveText('ENT & Allergy Associates')
+  await row.click()
+  await expect(page.getByTestId('source-listed-as')).toHaveText('Listed by the plan as Memorial Sloan Kettering Cancer Center at Basking Ridge')
+
+  await page.goto('/providers/134000192')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('ENT & Allergy Associates')
+
+  await page.goto('/insights/compare?code=31237')
+  await expect(page.locator('main')).toContainText('ENT & Allergy Associates')
+
+  // Aug 31 to Sep 28: the same name on both sides of the change.
+  await page.goto('/changes?code=30903')
+  await expect(page.locator('main')).toContainText('ENT & Allergy Associates')
+  await expect(page.locator('main')).not.toContainText('Memorial Sloan Kettering')
+})
+
+test("the sources page says the Sep 28 Essential file's names don't match, in Details", async ({ page }) => {
+  await page.goto('/sources')
+  const september = page.getByTestId('source-snapshot').filter({ hasText: 'Sep 28, 2026' })
+  await expect(september.getByTestId('source-names')).toBeHidden()
+  await september.getByTestId('details-toggle').click()
+  await expect(september.getByTestId('source-names')).toHaveText(
+    'Provider names in this file match the other files for only 9% of the same tax IDs (about 98% between the other files). ' +
+      "Names shown come from the same tax ID in Ambetter's Sep 28 file, else Essential Plan's Aug 31 file.",
+  )
+  await expect(september.getByTestId('source-names')).toHaveCount(1)
 })

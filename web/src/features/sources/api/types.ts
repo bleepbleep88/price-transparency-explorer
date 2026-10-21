@@ -69,6 +69,23 @@ export interface SourceFile {
   counts: SourceFileCounts | null
   rejects: SourceReject[]
   timing: SourceFileTiming
+  /** Set when the file's provider names can't be trusted, and lists show names from other files instead. */
+  providerNames: SourceFileNames | null
+}
+
+/** A rate file whose provider names disagree with the other files for the same tax IDs. */
+export interface SourceFileNames {
+  /** Of the tax IDs it shares with another file, the most that file names the same way, in percent. */
+  agreementPct: number
+  /** The same for the other files (their median), in percent; null with no other to compare. */
+  typicalAgreementPct: number | null
+  /** The files the names shown instead come from, the most names first (at most two). */
+  namesFrom: SourceFileRef[]
+}
+
+export interface SourceFileRef {
+  productLabel: string
+  indexDate: string | null
 }
 
 export interface SourceSnapshot {

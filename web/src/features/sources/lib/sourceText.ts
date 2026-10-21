@@ -1,4 +1,5 @@
-import { plural, shortDate, wholeNumber } from '@/lib/format'
+import { monthDay, plural, shortDate, wholeNumber } from '@/lib/format'
+import { planName } from '@/features/rates/lib/answer'
 import { providerName } from '@/lib/plainNames'
 import type { SourceFile, SourceKind, SourceSnapshot } from '../api/types'
 
@@ -180,6 +181,23 @@ export function snapshotProblem(snapshot: SourceSnapshot): string | null {
 }
 
 /** "List of files Aug 31, 2026 · file says Sep 2, 2026 · server Sep 4, 2026" */
+/**
+ * For Details: a rate file whose provider names don't match the other files for the same tax IDs, and where the names
+ * shown come from instead. Null for a file whose names are used as published.
+ */
+export function namesLine(file: SourceFile): string | null {
+  const names = file.providerNames
+  if (!names) return null
+  const typical = names.typicalAgreementPct != null ? ` (about ${names.typicalAgreementPct}% between the other files)` : ''
+  const from = names.namesFrom.map((ref) => `${planName(ref.productLabel)}'s ${monthDay(ref.indexDate)} file`)
+  return (
+    `Provider names in this file match the other files for only ${names.agreementPct}% of the same tax IDs${typical}. ` +
+    (from.length
+      ? `Names shown come from the same tax ID in ${from.join(', else ')}.`
+      : 'Names shown come from the national provider registry where it names the practice.')
+  )
+}
+
 export function datesLine(file: SourceFile): string {
   const { indexDate, fileLastUpdatedOn, httpLastModified } = file.dates
   return `List of files ${shortDate(indexDate)} · file says ${shortDate(fileLastUpdatedOn)} · server ${shortDate(httpLastModified)}`

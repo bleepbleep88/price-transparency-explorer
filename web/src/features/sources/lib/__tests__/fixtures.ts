@@ -38,6 +38,7 @@ export function sourceFile(overrides: Partial<SourceFile> = {}, counts: Partial<
     },
     rejects: [],
     timing: { downloadMs: 18, parseMs: 736, loadedAt: '2026-10-20T09:40:03.739284+00:00' },
+    providerNames: null,
     ...overrides,
   }
 }
