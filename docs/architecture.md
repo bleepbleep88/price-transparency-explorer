@@ -221,7 +221,7 @@ A rate's `item_index`, `rate_index` and `price_index` rebuild its JSON path: `$.
 
 ## 6. Search design
 
-A **comparison group** is product × code × fee type × setting × modifiers × rate type. Each provider (tax ID) counts once per group, at the NPI-weighted median of its rates ([README: Comparing fairly](../README.md#comparing-fairly)).
+A **comparison group** is product × code × fee type × setting × modifiers × rate type. Each provider (tax ID) counts once per group, at the NPI-weighted median of its rates ([Details: Comparing fairly](details.md#comparing-fairly)).
 
 ### 6a. One search, end to end
 
@@ -394,7 +394,7 @@ Under Docker Compose the API is at `http://localhost:8080` (through the web cont
 | `GET /api/v1/changes` · `/out-of-network` · `/sources` · `/snapshots` | History, allowed amounts, files |
 | `GET /api/v1/status` · `/status/stream` · `/health/live` · `/health/ready` | Loading progress and health |
 
-Full parameters are in the [README API table](../README.md#api) and the OpenAPI document.
+Full parameters are in the [API endpoints table](details.md#api-endpoints) and the OpenAPI document.
 
 Examples, each run against a local API with the three months loaded (results are for the newest, 2026-09-28):
 
@@ -501,10 +501,10 @@ A real response, trimmed (the facility filter above, `pageSize=1`):
 
 | Decision | Where it's argued |
 |---|---|
-| C#/.NET with MediatR queries, not Go; DuckDB embedded; load everything at startup | [Assumptions and tradeoffs](../README.md#assumptions-and-tradeoffs) |
-| What the files contain and how each quirk is handled (RC codes, duplicates, masked EINs, mislabelled names) | [What the data looks like](../README.md#what-the-data-looks-like-measured-on-the-2026-08-31-files) |
-| Like-for-like comparison groups, one value per provider | [Comparing fairly](../README.md#comparing-fairly) |
-| Plain numbers and one answer per page | [Plain numbers, simple pages](../README.md#plain-numbers-simple-pages) |
-| Changes and trends never call a listing change a price change | [Price history](../README.md#price-history) |
-| Scope limits: outpatient only, one payer, no login, a negotiated rate isn't a patient's cost | [Assumptions and tradeoffs](../README.md#assumptions-and-tradeoffs) |
-| What's next | [What I'd add next](../README.md#what-id-add-next) |
+| C#/.NET with MediatR queries, not Go; DuckDB embedded; load everything at startup | [Tradeoffs](../README.md#tradeoffs) |
+| What the files contain and how each quirk is handled (RC codes, duplicates, masked EINs, mislabelled names) | [Data problems found](../README.md#data-problems-found), [in detail](details.md#what-the-data-looks-like-measured-on-the-2026-08-31-files) |
+| Like-for-like comparison groups, one value per provider | [Comparing fairly](details.md#comparing-fairly) |
+| Plain numbers and one answer per page | [Plain numbers, simple pages](details.md#plain-numbers-simple-pages) |
+| Changes and trends never call a listing change a price change | [Price history](details.md#price-history) |
+| Scope limits: outpatient only, one payer, no login, a negotiated rate isn't a patient's cost | [Tradeoffs](../README.md#tradeoffs) |
+| What's next | [What I'd add next](details.md#what-id-add-next) |
