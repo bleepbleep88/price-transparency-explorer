@@ -4,6 +4,7 @@ import {
   OUT_OF_NETWORK_NOTES,
   PER_UNIT_NOTE,
   amountsListed,
+  amountsRange,
   amountsSentence,
   amountsText,
   billedLine,
@@ -13,6 +14,8 @@ import {
   leadGroup,
   listText,
   noBilledLine,
+  outOfNetworkLine,
+  outOfNetworkWhich,
   plansLensLine,
   providersLensLine,
   severalCodes,
@@ -62,14 +65,13 @@ describe('out-of-network readings', () => {
     expect(noBilledLine(oonGroup({ billed: null, billedToAllowed: null }))).toBe('Too few billed charges published to compare.')
   })
 
-  it('says only what the files support about the amounts', () => {
-    expect(OUT_OF_NETWORK_NOTES).toContain(
-      "Each different amount is listed once, with no claim count. The files don't say whether an amount covers one visit or several, so compare these with in-network prices carefully.",
-    )
+  it('says only what the files support about the amounts, in short notes', () => {
+    expect(OUT_OF_NETWORK_NOTES).toContain("The files don't say whether an amount covers one visit or several.")
     for (const note of [...OUT_OF_NETWORK_NOTES, PER_UNIT_NOTE]) {
       expect(note).not.toMatch(/look like|totals|so most|whole service/i)
       expect(note).not.toMatch(NOT_SAID)
     }
+    for (const note of OUT_OF_NETWORK_NOTES) expect(note.split(' ').length).toBeLessThanOrEqual(14)
   })
 
   it('says in one line per product when its file was only partly read or could not be loaded', () => {
@@ -141,5 +143,28 @@ describe('out-of-network readings', () => {
     for (const line of [plansLensLine([LISTED_CT_READ]), providersLensLine([noCharges])]) expect(line).not.toMatch(NOT_SAID)
     expect(plansLensLine([])).toBeNull()
     expect(providersLensLine([])).toBeNull()
+  })
+
+  it('gives the panel one line for the bill with the most providers, never a code', () => {
+    expect(outOfNetworkLine([LISTED_CT_READ, oonGroup()])).toBe('Providers usually billed about 4.8 times what the plan allowed.')
+    expect(outOfNetworkLine([oonGroup({ billedToAllowed: 1.97 })])).toBe('Providers usually billed about 97% more than what the plan allowed.')
+    // No billed charges to compare: what the plan allowed, as a range.
+    expect(outOfNetworkLine([oonGroup({ billed: null, billedToAllowed: null })])).toBe('The plan allowed $60.12\u00a0–\u00a0$187,539.')
+    // Under 5 providers: how few, and the amounts themselves.
+    expect(outOfNetworkLine([LISTED_CT_READ])).toBe('Only 1 place: the plan allowed $218 · $545 · $763 · $8,374.')
+    expect(outOfNetworkLine([])).toBeNull()
+  })
+
+  it('lists up to 4 amounts and gives a range past that', () => {
+    expect(amountsRange(LISTED_CT_READ.allowed)).toBe('$218 · $545 · $763 · $8,374')
+    expect(amountsRange({ count: 6, min: 23.38, median: null, max: 20767, listed: [23.38, 299, 513, 598, 1025, 20767] })).toBe('$23.38\u00a0–\u00a0$20,767')
+    expect(amountsRange({ count: 6, min: 300, median: 300, max: 300, listed: [] })).toBe('$300')
+  })
+
+  it('says which bill the line is for only when the panel holds several, in plain words', () => {
+    expect(outOfNetworkWhich([oonGroup()])).toBeNull()
+    expect(outOfNetworkWhich([oonGroup(), LISTED_CT_READ])).toBe('Essential Plan · Facility fee')
+    const doctor = oonGroup({ key: 'b', feeType: 'professional', providers: 9, modifiers: [{ code: 'LT', label: 'Left side (modifier LT)' }] })
+    expect(outOfNetworkWhich([oonGroup(), doctor])).toBe("Doctor's fee · left")
   })
 })

@@ -1,22 +1,21 @@
-import { plural, wholeNumber } from '@/lib/format'
-import { dollars, feeLabel, fewProvidersLine, MIN_PROVIDERS_FOR_RANGE, rangeLine, typicalPrice, type PriceSummary } from '@/lib/plainNumbers'
+import { billLine, billName, placesCount } from '@/lib/plainNames'
+import { dollars, MIN_PROVIDERS_FOR_RANGE, typicalPrice, type PriceSummary } from '@/lib/plainNumbers'
 import type { LevelLadder, LevelLine, LevelStep } from '../api/types'
-import { modifierText } from './lenses'
 
-// The level ladder: one visit family's levels side by side for one plan, fee, setting and modifier set, so levels are
-// only compared like for like. Plain words only: a typical price per level, and "most providers" from 10 providers.
+// The level ladder: one visit family's levels side by side for one plan, bill and setting, so levels are only
+// compared like for like. A typical price per level (5+ places), and "most places" from 10.
 
-/** One level on the chosen line; a level with no prices there still gets a step, with 0 providers. */
+/** One level on the chosen line; a level with no prices there still gets a step, with 0 places. */
 export interface LadderStep {
   code: string
   level: number
   providers: number
   typical: number | null
-  /** "Most providers get between" (10+ providers only): the chart's band. */
+  /** "Most places" (10+ only). */
   most: { low: number; high: number } | null
-  /** "Most providers get between $80 and $159." (10+), "Prices run from $61 to $244." (5 to 9), else null. */
-  range: string | null
-  /** "Typical price: $114. Most providers get between $80 and $150.", or why there's no price. */
+  /** "$80 – $159" (10+ places), else null. */
+  mostText: string | null
+  /** A few words for the chart's tooltip: "Typical $114 · 105 places", "Only 3 places", "No prices". */
   text: string
 }
 
@@ -24,19 +23,24 @@ function summaryOf(step: LevelStep): PriceSummary {
   return { ...step.stats, providers: step.providerCount }
 }
 
-/** Lines with a typical price (5+ providers) at two levels or more: the only ones a ladder can compare. */
+/** Lines with a typical price (5+ places) at two levels or more: the only ones a ladder can compare. */
 export function comparableLines(ladder: LevelLadder | null | undefined): LevelLine[] {
   return (ladder?.lines ?? []).filter((line) => line.levels.filter((step) => typicalPrice(summaryOf(step)) != null).length >= 2)
 }
 
+/** The main view's name for a line: plan and bill, no modifiers: "Essential Plan · Doctor · in the office". */
+export function lineTitle(line: LevelLine): string {
+  const { name, where } = billName(line)
+  return [line.productLabel, name, where].filter(Boolean).join(' · ')
+}
+
 /**
- * "Essential Plan · Doctor's fee · Doctor's office · Separate service, same day (modifier 25)", with the rate type when
- * it isn't a plain negotiated rate ("· rate type: fee schedule"), so two lines never read the same.
+ * The picker's name for a line, so no two read the same: plan, bill, modifiers in words, and the rate type when it
+ * isn't a plain negotiated rate. "Essential Plan · Doctor · in the office · separate visit, same day".
  */
 export function lineLabel(line: LevelLine): string {
-  const modifiers = line.modifiers.length ? ` · ${modifierText(line.modifiers)}` : ''
-  const rateType = line.negotiatedType === 'negotiated' ? '' : ` · rate type: ${line.negotiatedType}`
-  return `${line.productLabel} · ${feeLabel(line.feeType)} · ${line.settingLabel}${modifiers}${rateType}`
+  const rateType = line.negotiatedType === 'negotiated' ? '' : ` · ${line.negotiatedType} rate`
+  return `${line.productLabel} · ${billLine(line)}${rateType}`
 }
 
 /** What the search narrows to: the ladder shows only lines for the same plan, setting and fee type, and the picked card's. */
@@ -55,14 +59,11 @@ export interface LadderChoice {
   note: string | null
 }
 
-function typicalLevels(line: LevelLine): number {
-  return line.levels.filter((step) => typicalPrice(summaryOf(step)) != null).length
-}
-
 /**
  * The lines the search allows and the one to show first: the picked card's when it compares two levels or more, else
  * the fullest ladder (the API lists lines with the most levels priced first) with a typical price at the searched level,
- * else the first. When the picked card's line can't be compared, the note says so and names the line shown.
+ * else the first. When the picked card's line can't be compared, the closest line stands in (same plan, then fee type,
+ * then setting) and the note says so in a few words.
  */
 export function chooseLine(ladder: LevelLadder | null | undefined, code: string, filters: LadderFilters = {}): LadderChoice {
   const lines = comparableLines(ladder).filter(
@@ -78,40 +79,34 @@ export function chooseLine(ladder: LevelLadder | null | undefined, code: string,
   if (!pickedLine) return { lines, line: fallback, note: null }
   if (lines.includes(pickedLine)) return { lines, line: pickedLine, note: null }
   if (!fallback) return { lines, line: null, note: null }
-  const priced = typicalLevels(pickedLine)
-  const why = priced === 1 ? 'has a typical price at only one level' : 'has too few providers for a typical price at any level'
-  return { lines, line: fallback, note: `The card you picked ${why}; showing ${lineLabel(fallback)}.` }
+
+  const likeness = (line: LevelLine) =>
+    (line.productKey === pickedLine.productKey ? 4 : 0) + (line.feeType === pickedLine.feeType ? 2 : 0) + (line.settingKey === pickedLine.settingKey ? 1 : 0)
+  // Most alike first; among equals, one priced at the searched level, then the API's order (fullest first).
+  const closest = lines.reduce((best, line) => {
+    const [a, b] = [likeness(line), likeness(best)]
+    return a > b || (a === b && pricedAt(line) && !pricedAt(best)) ? line : best
+  }, lines[0]!)
+  return { lines, line: closest, note: 'Too few levels for this bill. Showing a similar one.' }
 }
 
-/** One step per level of the family, lowest first, in plain words. */
+/** One step per level of the family, lowest first. */
 export function ladderSteps(ladder: LevelLadder, line: LevelLine): LadderStep[] {
   return ladder.codes.map(({ code, level }) => {
     const step = line.levels.find((candidate) => candidate.code === code)
-    if (!step) return { code, level, providers: 0, typical: null, most: null, range: null, text: 'No prices for this level here.' }
-    const summary = summaryOf(step)
-    const typical = typicalPrice(summary)
+    if (!step) return { code, level, providers: 0, typical: null, most: null, mostText: null, text: 'No prices' }
+    const typical = typicalPrice(summaryOf(step))
     if (typical == null) {
-      return { code, level, providers: step.providerCount, typical: null, most: null, range: null, text: fewProvidersLine(step.providerCount) }
+      return { code, level, providers: step.providerCount, typical: null, most: null, mostText: null, text: `Only ${placesCount(step.providerCount)}` }
     }
-    const most =
-      step.providerCount >= MIN_PROVIDERS_FOR_RANGE && step.stats.p10 != null && step.stats.p90 != null
-        ? { low: step.stats.p10, high: step.stats.p90 }
-        : null
-    const range = rangeLine(summary)
-    return { code, level, providers: step.providerCount, typical, most, range, text: `Typical price: ${dollars(typical)}. ${range ?? ''}`.trim() }
+    const { p10, p90 } = step.stats
+    const most = step.providerCount >= MIN_PROVIDERS_FOR_RANGE && p10 != null && p90 != null ? { low: p10, high: p90 } : null
+    const mostText = most ? (dollars(most.low) === dollars(most.high) ? dollars(most.low) : `${dollars(most.low)} – ${dollars(most.high)}`) : null
+    return { code, level, providers: step.providerCount, typical, most, mostText, text: `Typical ${dollars(typical)} · ${placesCount(step.providerCount)}` }
   })
 }
 
-/** "Level 3 (99213)" */
-export function levelLabel(step: { level: number; code: string }): string {
-  return `Level ${step.level} (${step.code})`
-}
-
-/** "Each level's typical price comes from 44 to 151 providers." over the steps with a typical price. */
-export function ladderCaption(steps: readonly LadderStep[]): string {
-  const counts = steps.filter((step) => step.typical != null).map((step) => step.providers)
-  const [low, high] = [Math.min(...counts), Math.max(...counts)]
-  return low === high
-    ? `Each level's typical price comes from ${plural(low, 'provider')}.`
-    : `Each level's typical price comes from ${wholeNumber(low)} to ${wholeNumber(high)} providers.`
+/** "Level 3". The code goes in Details. */
+export function levelLabel(step: { level: number }): string {
+  return `Level ${step.level}`
 }

@@ -279,5 +279,4 @@ export function feeLabel(feeType: string): string {
 export const LIKE_FOR_LIKE = 'Same service, same setting, same plan'
 
 /** Said once per page, in the footer. */
-export const ALWAYS_TRUE =
-  "These are negotiated rates from the plan's files, not what a person pays. The files don't say how often a service happens."
+export const ALWAYS_TRUE = 'What the plan pays. Not what a patient pays.'

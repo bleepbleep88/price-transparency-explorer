@@ -17,6 +17,8 @@ function mountForm(query: Record<string, string>) {
 describe('SearchForm', () => {
   it('keeps unsearched edits when only the lens or the case count changes', async () => {
     const wrapper = mountForm({ code: '99213' })
+    // The NPI sits under Filters.
+    await wrapper.get('[data-testid="filters-toggle"]').trigger('click')
     const npi = wrapper.get('[data-testid="npi-input"] input')
     await npi.setValue('1801474036')
 

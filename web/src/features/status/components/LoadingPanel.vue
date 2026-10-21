@@ -1,24 +1,41 @@
 <script setup lang="ts">
-import { mdiCloudDownloadOutline } from '@mdi/js'
+import { computed } from 'vue'
 import { useDataStatus } from '../useDataStatus'
 
+// One line and a bar while the plan's files load; the page fills in by itself when they're ready.
 const { status, progress } = useDataStatus()
+
+const line = computed(() => {
+  if (status.value?.phase === 'buildingStatistics') return 'Preparing comparisons'
+  const percent = progress.value == null ? '' : ` ${Math.round(progress.value * 100)}%`
+  return `Loading prices${percent}`
+})
 </script>
 
 <template>
-  <v-card class="pa-2" data-testid="loading-panel">
-    <v-card-item :prepend-icon="mdiCloudDownloadOutline" title="Rate data is still loading">
-      <v-card-subtitle class="text-wrap">Results will appear here on their own as soon as loading finishes.</v-card-subtitle>
-    </v-card-item>
-    <v-card-text class="d-flex flex-column ga-2">
-      <p class="text-body-medium" aria-live="polite">{{ status?.message ?? 'Waiting for the server…' }}</p>
-      <v-progress-linear
-        :model-value="progress == null ? undefined : progress * 100"
-        :indeterminate="progress == null"
-        color="info"
-        rounded
-        height="8"
-      />
-    </v-card-text>
-  </v-card>
+  <section class="loading" data-testid="loading-panel">
+    <p class="loading-line">{{ line }}</p>
+    <v-progress-linear
+      :model-value="progress == null ? undefined : progress * 100"
+      :indeterminate="progress == null"
+      color="primary"
+      rounded
+      height="6"
+      aria-label="Loading progress"
+    />
+  </section>
 </template>
+
+<style scoped>
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 0;
+}
+
+.loading-line {
+  font-size: 1rem;
+  font-weight: 600;
+}
+</style>

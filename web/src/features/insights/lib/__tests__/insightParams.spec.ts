@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compareApiQuery, gapApiQuery, mergeInsightQuery, parseCompareQuery, parseGapQuery, pickProducts } from '../insightParams'
+import { compareApiQuery, gapApiQuery, mergeInsightQuery, parseCompareQuery, parseGapQuery, parseScorecardQuery, pickProducts } from '../insightParams'
 
 describe('parseGapQuery', () => {
   it('reads the filters and falls back to defaults for anything malformed', () => {
@@ -39,6 +39,19 @@ describe('parseCompareQuery', () => {
     expect(parseCompareQuery({ sort: 'cheapest' }).sort).toBe('difference')
     expect(compareApiQuery(parseCompareQuery({ code: '99213' }))).toMatchObject({ code: '99213', sort: 'difference' })
   })
+
+  it('shows the biggest differences ten at a time unless the address says otherwise', () => {
+    expect(parseCompareQuery({}).pageSize).toBe(10)
+    expect(parseCompareQuery({ pageSize: '25' }).pageSize).toBe(25)
+  })
+})
+
+describe('parseScorecardQuery', () => {
+  it('keeps the name the reader came from, cut to a sane length', () => {
+    expect(parseScorecardQuery({ as: ' The Trustees of Columbia ' }).as).toBe('The Trustees of Columbia')
+    expect(parseScorecardQuery({ as: 'x'.repeat(500) }).as).toHaveLength(200)
+    expect(parseScorecardQuery({}).as).toBeUndefined()
+  })
 })
 
 describe('mergeInsightQuery', () => {
@@ -50,6 +63,11 @@ describe('mergeInsightQuery', () => {
   it('keeps a page the patch sets', () => {
     expect(mergeInsightQuery({ code: '99213' }, { page: 2 }, 'gap')).toEqual({ code: '99213', page: '2' })
     expect(mergeInsightQuery({ page: '2' }, { page: 1, pageSize: 50 }, 'difference')).toEqual({ pageSize: '50' })
+  })
+
+  it("drops the page size only when it's the page's own default", () => {
+    expect(mergeInsightQuery({}, { pageSize: 10 }, 'difference', 10)).toEqual({})
+    expect(mergeInsightQuery({}, { pageSize: 25 }, 'difference', 10)).toEqual({ pageSize: '25' })
   })
 })
 

@@ -4,7 +4,7 @@ import { createVuetify } from 'vuetify'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import StartHere from '../StartHere.vue'
 
-async function mountCards(query: Record<string, string> = {}) {
+async function mountExamples(query: Record<string, string> = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/', name: 'search', component: { template: '<div />' } }],
@@ -17,34 +17,24 @@ async function mountCards(query: Record<string, string> = {}) {
 }
 
 describe('StartHere', () => {
-  it('has one card per audience, each saying what the explorer answers for them', async () => {
-    const wrapper = await mountCards()
-    for (const key of ['providers', 'plans', 'employers', 'innovators', 'life-sciences']) {
-      expect(wrapper.find(`[data-testid="start-${key}"]`).exists()).toBe(true)
-    }
-    expect(wrapper.get('[data-testid="start-employers"]').text()).toContain('What a service typically costs')
+  it('offers a few common services by plain name, each a search link', async () => {
+    const wrapper = await mountExamples()
+    const colonoscopy = wrapper.get('[data-testid="example-45378"]')
+    expect(colonoscopy.text()).toBe('Colonoscopy')
+    expect(colonoscopy.attributes('href')).toBe('/?code=45378')
+    expect(wrapper.findAll('[data-testid^="example-"]').map((chip) => chip.text())).toEqual([
+      'Colonoscopy',
+      'Office visit',
+      'ER visit',
+      'Cataract surgery',
+      'Botox',
+    ])
+    // Plain names only: no codes on the chips.
+    expect(wrapper.text()).not.toMatch(/\d{4,}/)
   })
 
-  it('makes every example a link that sets the lens (and the NPI for the providers example)', async () => {
-    const wrapper = await mountCards()
-    const providers = wrapper.get('[data-testid="start-providers-99213"]')
-    expect(providers.element.tagName).toBe('A')
-    expect(providers.attributes('href')).toBe('/?code=99213&lens=providers&npi=1801474036')
-    expect(providers.attributes('role')).toBe('link')
-    expect(providers.element.parentElement?.getAttribute('role')).toBe('listitem')
-    expect(wrapper.get('[data-testid="start-employers-45378"]').attributes('href')).toBe('/?code=45378&lens=employers')
-  })
-
-  it('keeps the snapshot picked in the app bar', async () => {
-    const wrapper = await mountCards({ snapshot: '2' })
-    expect(wrapper.get('[data-testid="start-employers-45378"]').attributes('href')).toBe('/?code=45378&lens=employers&snapshot=2')
-  })
-
-  it('links innovators to the API reference', async () => {
-    const hrefs = (await mountCards())
-      .get('[data-testid="start-innovators"]')
-      .findAll('a')
-      .map((link) => link.attributes('href'))
-    expect(hrefs).toEqual(expect.arrayContaining(['/scalar/v1', '/openapi/v1.json']))
+  it('keeps the month picked in the app bar', async () => {
+    const wrapper = await mountExamples({ snapshot: '2' })
+    expect(wrapper.get('[data-testid="example-J0585"]').attributes('href')).toBe('/?code=J0585&snapshot=2')
   })
 })

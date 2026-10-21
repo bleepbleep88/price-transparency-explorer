@@ -43,6 +43,8 @@ export const useDataStatus = createSharedComposable(() => {
   onScopeDispose(() => source?.close())
 
   const dataAvailable = computed(() => status.value?.dataAvailable ?? false)
+  /** The first fetch failed and the stream hasn't spoken: the server can't be reached. */
+  const unreachable = computed(() => pushed.value == null && initial.isError.value)
 
   /** Overall progress 0–1 across all files, or null when not loading. */
   const progress = computed(() => {
@@ -51,5 +53,5 @@ export const useDataStatus = createSharedComposable(() => {
     return Math.min(1, (current.filesDone + (current.currentFileProgress ?? 0)) / current.filesTotal)
   })
 
-  return { status, connected, dataAvailable, progress }
+  return { status, connected, dataAvailable, unreachable, progress }
 })

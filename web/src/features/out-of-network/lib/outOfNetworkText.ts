@@ -1,5 +1,6 @@
 import { plural } from '@/lib/format'
 import { ABOUT_THE_SAME, MIN_PROVIDERS_FOR_TYPICAL, TIMES_FROM, aboutTimes, dollars, feeLabel, fewProvidersLine } from '@/lib/plainNumbers'
+import { modifierWords, placesCount } from '@/lib/plainNames'
 import { modifierText } from '@/features/rates/lib/lenses'
 import type { SearchParams } from '@/features/rates/lib/searchParams'
 import type { AmountSummary, OutOfNetworkFile, OutOfNetworkGroup, OutOfNetworkResult } from '../api/types'
@@ -11,11 +12,12 @@ import type { AmountSummary, OutOfNetworkFile, OutOfNetworkGroup, OutOfNetworkRe
 // Dollars, "times", fee names and the 5 and 5% rules come from lib/plainNumbers.ts, like the rest of the app.
 
 export const OUT_OF_NETWORK_NOTES: readonly string[] = [
-  'Plans list a provider and service only with 20 or more claims in a 90-day window. Most codes here have none.',
-  "Each different amount is listed once, with no claim count. The files don't say whether an amount covers one visit or several, so compare these with in-network prices carefully.",
+  'Listed only with 20 or more claims in a 90-day window.',
+  'Each different amount is listed once, with no claim count.',
+  "The files don't say whether an amount covers one visit or several.",
 ]
 
-export const PER_UNIT_NOTE = "In-network rates for this code are per unit; the files don't say how many units an out-of-network amount covers."
+export const PER_UNIT_NOTE = "In-network prices for this code are per unit; these files don't say how many units an amount covers."
 
 /** "20 different amounts listed" (never "payments": the files have no claim counts). */
 export function amountsListed(count: number): string {
@@ -136,4 +138,42 @@ export function providersLensLine(groups: readonly OutOfNetworkGroup[]): string 
   return lead.allowed.median == null
     ? `Providers outside the network were allowed ${listText(lead.allowed.listed)} (${where}, ${plural(lead.providers, 'provider')}).`
     : `For providers outside the network, the amounts the plan allowed ${amountsText(lead.allowed)} (${where}, ${amountsListed(lead.payments)}).`
+}
+
+/** Up to this many amounts are listed one by one on the main view; more read as a range. */
+const LISTED_ON_MAIN_VIEW = 4
+
+/** "$184 – $20,511", "$300", or the few listed amounts: "$218 · $545 · $763". */
+export function amountsRange(summary: AmountSummary): string {
+  if (summary.median == null && summary.listed.length && summary.listed.length <= LISTED_ON_MAIN_VIEW) {
+    return summary.listed.map(dollars).join(' · ')
+  }
+  const [low, high] = [dollars(summary.min), dollars(summary.max)]
+  // No-break spaces keep a range on one line.
+  return low === high ? low : `${low}\u00a0–\u00a0${high}`
+}
+
+/**
+ * The panel's one line, for the group with the most providers: "Providers usually billed about 4.8 times what the plan
+ * allowed." Without billed charges to compare, what the plan allowed: "The plan allowed $184 – $20,511." Under 5
+ * providers, the amounts and how few: "Only 1 place: the plan allowed $218 · $545 · $763 · $8,374." Null without groups.
+ */
+export function outOfNetworkLine(groups: readonly OutOfNetworkGroup[]): string | null {
+  const lead = leadGroup(groups)
+  if (!lead) return null
+  const versus = billedVersusAllowed(lead)
+  if (versus != null) return `Providers usually billed ${versus} what the plan allowed.`
+  if (lead.providers < MIN_PROVIDERS_FOR_TYPICAL) return `Only ${placesCount(lead.providers)}: the plan allowed ${amountsRange(lead.allowed)}.`
+  return `The plan allowed ${amountsRange(lead.allowed)}.`
+}
+
+/**
+ * Which bill the one line speaks for, when the panel holds more than one: "Facility fee", "Essential Plan · Doctor's fee",
+ * "Doctor's fee · left side". No codes. Null with a single group.
+ */
+export function outOfNetworkWhich(groups: readonly OutOfNetworkGroup[]): string | null {
+  const lead = leadGroup(groups)
+  if (!lead || groups.length < 2) return null
+  const severalPlans = new Set(groups.map((group) => group.productKey)).size > 1
+  return [severalPlans ? lead.productLabel : null, feeLabel(lead.feeType), modifierWords(lead.modifiers)].filter(Boolean).join(' · ')
 }

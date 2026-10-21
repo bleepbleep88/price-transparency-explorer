@@ -1,7 +1,9 @@
 import { plural, shortDate, wholeNumber } from '@/lib/format'
-import type { SourceFile, SourceKind } from '../api/types'
+import { providerName } from '@/lib/plainNames'
+import type { SourceFile, SourceKind, SourceSnapshot } from '../api/types'
 
-// Plain readings of /api/v1/sources. Counts of zero are left out.
+// Plain readings of /api/v1/sources. The main view gets months, plans, links and one total; the rest is for Details.
+// Counts of zero are left out.
 
 export function kindLabel(kind: SourceKind): string {
   if (kind === 'in_network') return 'In-network rates'
@@ -83,22 +85,102 @@ export function fileSize(bytes: number | null | undefined): string {
   return bytes < 1_048_576 ? `${wholeNumber(Math.max(1, Math.round(bytes / 1024)))} KB` : `${wholeNumber(Math.round(bytes / 1_048_576))} MB`
 }
 
-export const STATUS_COLORS: Readonly<Record<string, string>> = {
-  loaded: 'success',
-  ready: 'success',
-  partial: 'warning',
-  loading: 'info',
-  pending: 'default',
-  failed: 'error',
+/** How every file is cleaned, short, for the bottom of the page. */
+export const CLEANING_RULES: readonly string[] = [
+  'Each file is read as a stream and saved in one step.',
+  'Exact copies are counted once.',
+  'Codes get back dropped leading zeros (490 → 0490).',
+  'Revenue-code facility rates take the procedure code in their notes.',
+  'Tax IDs with a prefix the IRS never issues are masked.',
+  'NPIs that fail the check digit are kept and flagged.',
+  'Bad values are set aside and counted, never stopping a file.',
+]
+
+/** One plan in one month, with its two files: prices (in-network) and out of network (allowed amounts). */
+export interface PlanFiles {
+  productKey: string
+  productLabel: string
+  prices: SourceFile | null
+  outOfNetwork: SourceFile | null
 }
 
-/** How every file is cleaned, for the top of the page. */
-export const CLEANING_RULES: readonly string[] = [
-  'Every file is read as a stream, and each is saved in one step, so a search never sees half a file.',
-  'Exact copies are removed; each rate keeps a count of its copies.',
-  'Codes get back the leading zeros the file dropped (490 → 0490); the code as published is kept.',
-  'Facility rates filed under a revenue code take the procedure code named in their notes.',
-  'Tax IDs with a prefix the IRS never issues are masked: they may be Social Security numbers.',
-  'NPIs that fail the check digit are kept and flagged.',
-  'A bad value never stops a file. It is set aside and counted below, with the reason and the first example.',
-]
+/** A month's files grouped by plan, in the order the plans first appear. */
+export function planFiles(snapshot: SourceSnapshot): PlanFiles[] {
+  const plans = new Map<string, PlanFiles>()
+  for (const file of snapshot.files) {
+    const plan = plans.get(file.productKey) ?? { productKey: file.productKey, productLabel: file.productLabel, prices: null, outOfNetwork: null }
+    if (file.kind === 'allowed_amount') plan.outOfNetwork = file
+    else plan.prices = file
+    plans.set(file.productKey, plan)
+  }
+  return [...plans.values()]
+}
+
+/** Prices in a month's rate files, and how many are left once exact copies count once. Null until one is loaded. */
+export function priceTotals(snapshot: SourceSnapshot): { published: number; unique: number } | null {
+  const loaded = snapshot.files.filter((file) => file.kind === 'in_network' && file.counts?.published != null && file.counts.unique != null)
+  if (!loaded.length) return null
+  return loaded.reduce(
+    (sum, file) => ({ published: sum.published + file.counts!.published!, unique: sum.unique + file.counts!.unique! }),
+    { published: 0, unique: 0 },
+  )
+}
+
+/** What the big figure's second number is, said next to it. */
+export const AFTER_COPIES = 'after removing copies'
+
+/** "573,393 prices → 17,140 after removing copies" */
+export function totalsText(totals: { published: number; unique: number }): string {
+  return `${plural(totals.published, 'price')} → ${wholeNumber(totals.unique)} ${AFTER_COPIES}`
+}
+
+/** A file link with its size, since it downloads the whole file: "Prices · 91 MB". Just the name when the size is unknown. */
+export function fileLinkText(name: string, file: SourceFile): string {
+  return file.contentLength == null ? name : `${name} · ${fileSize(file.contentLength)}`
+}
+
+/** The month whose numbers lead the page: the one shown by default, else the newest. */
+export function leadSnapshot(snapshots: readonly SourceSnapshot[]): SourceSnapshot | null {
+  return snapshots.find((snapshot) => snapshot.isLatest) ?? snapshots[0] ?? null
+}
+
+/** "3 months of public files from Centene Management Company" */
+export function sourcesSubtitle(snapshots: readonly SourceSnapshot[]): string | null {
+  if (!snapshots.length) return null
+  const publisher = snapshots.find((snapshot) => snapshot.reportingEntityName)?.reportingEntityName
+  const months = plural(snapshots.length, 'month')
+  return publisher ? `${months} of public files from ${providerName(publisher)}` : `${months} of public files`
+}
+
+/** A file's trouble in two or three words, for the main view. Null when it loaded in full. */
+export function fileProblem(file: SourceFile): string | null {
+  if (file.status === 'failed') return "Couldn't be loaded"
+  if (file.status === 'partial') return 'Only partly read'
+  if (!file.counts) return 'Not loaded yet'
+  return null
+}
+
+/** "Prices file: only partly read", one line per file of the plan that didn't load in full. */
+export function planProblems(plan: PlanFiles): string[] {
+  const files: [string, SourceFile | null][] = [
+    ['Prices', plan.prices],
+    ['Out of network', plan.outOfNetwork],
+  ]
+  return files.flatMap(([label, file]) => {
+    const problem = file ? fileProblem(file) : null
+    return problem ? [`${label} file: ${problem.charAt(0).toLowerCase()}${problem.slice(1)}`] : []
+  })
+}
+
+/** A month's trouble in a few words. Null when it was read. */
+export function snapshotProblem(snapshot: SourceSnapshot): string | null {
+  if (snapshot.status === 'failed') return "This month's list of files couldn't be read"
+  if (snapshot.status === 'partial') return 'Some files were only partly read'
+  return null
+}
+
+/** "List of files Aug 31, 2026 · file says Sep 2, 2026 · server Sep 4, 2026" */
+export function datesLine(file: SourceFile): string {
+  const { indexDate, fileLastUpdatedOn, httpLastModified } = file.dates
+  return `List of files ${shortDate(indexDate)} · file says ${shortDate(fileLastUpdatedOn)} · server ${shortDate(httpLastModified)}`
+}

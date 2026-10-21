@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { mdiMagnify } from '@mdi/js'
 import { plural } from '@/lib/format'
+import { providerName } from '@/lib/plainNames'
+import PageHeader from '@/components/simple/PageHeader.vue'
 import type { ProviderSuggestion } from '@/features/rates/api/types'
 import { useProviderSuggestions } from '@/features/rates/composables/useRateQueries'
 import { parseLookupQuery } from '@/features/insights/lib/insightParams'
@@ -14,52 +16,50 @@ const router = useRouter()
 const search = ref('')
 watch(() => parseLookupQuery(route.query).q, (value) => (search.value = value ?? ''), { immediate: true })
 const suggestions = useProviderSuggestions(search, undefined)
-const items = computed<ProviderSuggestion[]>(() => suggestions.data.value ?? [])
+const items = computed(() => (suggestions.data.value ?? []).map((item) => ({ ...item, title: providerName(item.businessName) })))
+
+// Picking a provider also sets the field's text to its name; that update must not replace the way to its scorecard.
+let leaving = false
 
 function onSearch(value: string | null) {
   search.value = value ?? ''
   const q = search.value.trim()
-  if (q !== (parseLookupQuery(route.query).q ?? '')) void router.replace({ name: 'providers', query: q ? { q } : {} })
+  if (!leaving && q !== (parseLookupQuery(route.query).q ?? '')) void router.replace({ name: 'providers', query: q ? { q } : {} })
 }
 
 function open(item: ProviderSuggestion | null) {
-  if (item) void router.push({ name: 'scorecard', params: { key: item.providerKey } })
+  if (!item) return
+  leaving = true
+  void router.push({ name: 'scorecard', params: { key: item.providerKey } })
 }
 </script>
 
 <template>
-  <v-container class="py-6" max-width="880">
-    <h1 class="text-headline-medium mb-1">Provider scorecards</h1>
-    <p class="text-body-medium text-medium-emphasis mb-4">
-      One provider (tax ID) across every service it has a rate for: where each price sits among other providers for the
-      same service, and how its prices compare overall.
-    </p>
+  <v-container class="py-10 d-flex flex-column ga-6" max-width="960">
+    <PageHeader title="Providers" subtitle="How one place's prices compare." />
 
     <v-autocomplete
       :search="search"
       :items="items"
-      item-title="businessName"
+      item-title="title"
       item-value="providerKey"
       return-object
-      label="Provider name or EIN"
-      placeholder="e.g. Northwell, or 11-3471596"
+      label="Provider"
+      placeholder="Name, e.g. Northwell"
       persistent-placeholder
       :prepend-inner-icon="mdiMagnify"
       :loading="suggestions.isFetching.value"
       no-filter
       hide-no-data
+      hide-details
       autocomplete="off"
       data-testid="provider-lookup"
       @update:search="onSearch"
       @update:model-value="open"
     >
       <template #item="{ props: itemProps, item }">
-        <v-list-item v-bind="itemProps" :subtitle="`EIN ${item.taxIdDisplay} · ${plural(item.rates, 'rate')}`" />
+        <v-list-item v-bind="itemProps" :subtitle="plural(item.rates, 'price')" />
       </template>
     </v-autocomplete>
-
-    <p class="text-body-small text-medium-emphasis mt-3">
-      From a search, add an NPI or EIN, pick the Providers lens, and follow "See this provider's scorecard".
-    </p>
   </v-container>
 </template>

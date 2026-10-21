@@ -1,31 +1,33 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useDisplay } from 'vuetify'
-import { wholeNumber } from '@/lib/format'
+import { dollars } from '@/lib/plainNumbers'
+import DetailsPanel from '@/components/simple/DetailsPanel.vue'
 import type { RateSearchResult } from '../api/types'
-import { doseMath, dosePricing, doseUnits, doseUnitWord, MAX_DOSE_UNITS } from '../lib/dose'
+import { doseLine, dosePricing, doseRange, doseUnits, doseUnitWord, MAX_DOSE_UNITS, unitDefinition } from '../lib/dose'
 import { isDrugCode } from '../lib/lenses'
 import { parseDose } from '../lib/searchParams'
 
-const props = defineProps<{ result: RateSearchResult; dose?: number }>()
+// A dose box and one answer: "45 mg = 5 units → $4.75". Which price it uses, and why, sits in Details. The price is
+// the plan tab's (`plan`), from the tile the reader is looking at (`group`) when that tile can price a dose.
+const props = defineProps<{ result: RateSearchResult; dose?: number; plan?: string | null; group?: string | null }>()
 const emit = defineEmits<{ dose: [dose: number | null] }>()
-const { smAndDown } = useDisplay()
 
 const code = computed(() => props.result.code)
 const unit = computed(() => (isDrugCode(code.value) ? code.value?.doseUnit : null) ?? null)
-const pricing = computed(() => dosePricing(props.result))
+const pricing = computed(() => dosePricing(props.result, { plan: props.plan, group: props.group }))
 const options = computed(() => pricing.value.options)
 
-// The card whose price the math uses: the reader's pick, else the first (no modifiers, most providers).
+// The card whose price the math uses: the reader's pick in Details, else the first (the tile, else no modifiers and the
+// most providers). Another code, plan or tile drops the pick.
 const picked = ref<string | null>(null)
 watch(
-  () => code.value?.code,
+  () => [code.value?.code, props.plan, props.group],
   () => (picked.value = null),
 )
 const option = computed(() => options.value.find((candidate) => candidate.groupKey === picked.value) ?? options.value[0] ?? null)
 const optionItems = computed(() => options.value.map((candidate) => ({ title: candidate.label, value: candidate.groupKey })))
 
-// The dose lives in the URL (?dose=), so a shared link shows the same math.
+// The dose lives in the URL (?dose=), so a shared link shows the same answer.
 const doseInput = ref(props.dose != null ? String(props.dose) : '')
 watch(
   () => props.dose,
@@ -34,21 +36,19 @@ watch(
   },
 )
 
-const tooManyUnits = computed(() => {
-  const dose = parseDose(doseInput.value)
-  return dose != null && unit.value != null && doseUnits(dose, unit.value).units > MAX_DOSE_UNITS
-})
 const doseError = computed(() => {
   if (!doseInput.value.trim()) return ''
-  if (parseDose(doseInput.value) == null) return 'Enter a dose as a plain number, like 45 or 2.5.'
-  return tooManyUnits.value ? `That's more than ${wholeNumber(MAX_DOSE_UNITS)} units: enter a smaller dose.` : ''
-})
-const math = computed(() => {
   const dose = parseDose(doseInput.value)
-  return dose != null && unit.value && option.value ? doseMath(dose, unit.value, option.value.typical, option.value.most) : null
+  if (dose == null) return 'Enter a number, like 45.'
+  return unit.value && doseUnits(dose, unit.value).units > MAX_DOSE_UNITS ? 'Too big: over 100,000 units.' : ''
 })
+const answer = computed(() => {
+  const dose = parseDose(doseInput.value)
+  return dose != null && unit.value && option.value ? doseLine(dose, unit.value, option.value.typical) : null
+})
+const range = computed(() => (answer.value && option.value ? doseRange(answer.value.units, option.value.most) : null))
 
-// A dose the box rejects leaves the URL too, so a shared link never shows math the reader didn't see.
+// A dose the box rejects leaves the URL too, so a shared link never shows an answer the reader didn't see.
 function onDoseInput(text: string) {
   doseInput.value = text
   emit('dose', doseError.value ? null : parseDose(text))
@@ -56,67 +56,85 @@ function onDoseInput(text: string) {
 </script>
 
 <template>
-  <v-card v-if="unit && (option || pricing.reason)" data-testid="dose-calculator">
-    <v-card-item>
-      <v-card-title class="text-wrap">What a dose comes to at the plan's rates</v-card-title>
-      <v-card-subtitle class="text-wrap">One unit of {{ code!.code }} is {{ unit.text }}, as the code's name says.</v-card-subtitle>
-    </v-card-item>
-    <v-card-text class="d-flex flex-column ga-3">
-      <p v-if="!option" class="text-body-medium" data-testid="dose-reason">{{ pricing.reason }}</p>
-      <template v-else>
-        <div class="d-flex flex-wrap ga-3">
-          <v-text-field
-            :model-value="doseInput"
-            :label="`Dose (${doseUnitWord(unit)})`"
-            :suffix="doseUnitWord(unit)"
-            inputmode="decimal"
-            autocomplete="off"
-            :error-messages="doseError"
-            density="compact"
-            class="dose-input"
-            data-testid="dose-input"
-            @update:model-value="onDoseInput"
-          />
-          <div v-if="options.length > 1" class="flex-grow-1 dose-card">
-            <v-select
-              :model-value="option.groupKey"
-              :items="optionItems"
-              label="Price from"
-              density="compact"
-              hide-details
-              data-testid="dose-card"
-              @update:model-value="(key: string) => (picked = key)"
-            />
-            <!-- On a phone the select cuts the label short; the part that tells cards apart comes last. -->
-            <p v-if="smAndDown" class="text-body-small mt-1" data-testid="dose-card-label">{{ option.label }}</p>
-          </div>
-          <p v-else class="text-body-medium align-self-center">Price from: {{ option.label }}</p>
-        </div>
+  <section v-if="unit && (option || pricing.reason)" class="dose" data-testid="dose-calculator">
+    <h2 class="section-title">Price per dose</h2>
+    <p v-if="!option" class="muted" data-testid="dose-reason">{{ pricing.reason }}</p>
+    <template v-else>
+      <div class="dose-row">
+        <v-text-field
+          :model-value="doseInput"
+          label="Dose"
+          :suffix="doseUnitWord(unit)"
+          inputmode="decimal"
+          autocomplete="off"
+          :error-messages="doseError"
+          density="compact"
+          hide-details="auto"
+          class="dose-input"
+          data-testid="dose-input"
+          @update:model-value="onDoseInput"
+        />
+        <p aria-live="polite" class="dose-answer" data-testid="dose-answer">
+          <template v-if="answer">{{ answer.text }}</template>
+          <span v-else-if="!doseError" class="muted">{{ unitDefinition(unit) ?? 'Enter a dose' }}</span>
+        </p>
+      </div>
+      <p v-if="answer && unitDefinition(unit)" class="muted" data-testid="dose-unit">{{ unitDefinition(unit) }}</p>
 
-        <div aria-live="polite" class="d-flex flex-column ga-1" data-testid="dose-math-region">
-          <template v-if="math">
-            <div class="d-flex flex-column ga-1" data-testid="dose-math">
-              <p v-for="line in math.lines" :key="line" class="text-body-medium">{{ line }}</p>
-            </div>
-          </template>
-          <p v-else-if="!doseError" class="text-body-medium text-medium-emphasis">Enter a dose to see how many units it is and what it comes to.</p>
-        </div>
-      </template>
-
-      <p class="text-body-small text-medium-emphasis" data-testid="dose-notes">
-        This is the drug alone: giving it, the injection or infusion, is billed under its own code. When part of a
-        single-dose vial is thrown away, the discarded amount can be billed on its own line with modifier JW.
-      </p>
-    </v-card-text>
-  </v-card>
+      <DetailsPanel label="Details: dose" testid="dose-details">
+        <v-select
+          v-if="options.length > 1"
+          :model-value="option.groupKey"
+          :items="optionItems"
+          label="Price from"
+          density="compact"
+          hide-details
+          data-testid="dose-card"
+          @update:model-value="(key: string) => (picked = key)"
+        />
+        <p data-testid="dose-card-label">Price from: {{ option.label }}</p>
+        <p>Typical price: {{ dollars(option.typical) }} a unit</p>
+        <p v-if="range">{{ range }}</p>
+        <p>The drug only. Giving it is billed separately.</p>
+        <p>Thrown-away drug is billed on its own line (modifier JW).</p>
+      </DetailsPanel>
+    </template>
+  </section>
 </template>
 
 <style scoped>
-.dose-input {
-  max-width: 220px;
+.dose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 960px;
 }
 
-.dose-card {
-  min-width: 0;
+.section-title {
+  font-family: var(--v-font-body);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.dose-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.dose-input {
+  flex: 0 0 160px;
+}
+
+.dose-answer {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.muted {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: rgba(var(--v-theme-on-background), var(--v-medium-emphasis-opacity));
 }
 </style>

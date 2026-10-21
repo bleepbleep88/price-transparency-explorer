@@ -1,4 +1,4 @@
-import { money, plural, shortDate, wholeDollars, wholeNumber } from '@/lib/format'
+import { money, shortDate, wholeDollars, wholeNumber } from '@/lib/format'
 import { aboutTimes, capitalize, dollars, shownDollars, TIMES_FROM } from '@/lib/plainNumbers'
 import type { ChangeCounts, ChangesResult, RateChange } from '../api/types'
 
@@ -49,6 +49,13 @@ export function changeAmounts(from: number, to: number, shown: Shown = 'rate'): 
   }
 }
 
+/** "Up $12", "Down $4.50": the difference between two amounts as shown, without the share; null when they look the same. */
+export function upDown(from: number, to: number, shown: Shown = 'rate'): string | null {
+  const { value } = SHOWN[shown]
+  const difference = Math.round((value(to) - value(from)) * 100) / 100
+  return difference === 0 ? null : `${difference > 0 ? 'Up' : 'Down'} ${differenceText(difference)}`
+}
+
 /** Whether two amounts look the same as shown. */
 export function sameAsShown(a: number, b: number, shown: Shown = 'rate'): boolean {
   return SHOWN[shown].value(a) === SHOWN[shown].value(b)
@@ -59,23 +66,6 @@ export function changeText(row: RateChange): string {
   if (row.kind === 'new') return 'New'
   if (row.kind === 'dropped') return 'Gone'
   return capitalize(changeAmounts(row.from ?? 0, row.to ?? 0).change)
-}
-
-/** "1,975 rates went up, 1,957 went down, 14,632 are new and 16,776 are gone", or null when nothing differs. */
-function countsText(counts: ChangeCounts): string | null {
-  const parts: string[] = []
-  const subject = (count: number) => (parts.length ? wholeNumber(count) : plural(count, 'rate'))
-  if (counts.increased) parts.push(`${subject(counts.increased)} went up`)
-  if (counts.decreased) parts.push(`${subject(counts.decreased)} went down`)
-  if (counts.new) parts.push(`${subject(counts.new)} ${counts.new === 1 ? 'is' : 'are'} new`)
-  if (counts.dropped) parts.push(`${subject(counts.dropped)} ${counts.dropped === 1 ? 'is' : 'are'} gone`)
-  return parts.length ? joinAnd(parts) : null
-}
-
-/** The plans lens: "Since the Aug 31 file, for 99213: 56 rates went up, 57 went down, 683 are new and 618 are gone." */
-export function changesSinceText(counts: ChangeCounts, since: string, code: string): string {
-  const text = countsText(counts)
-  return text ? `Since the ${since} file, for ${code}: ${text}.` : `No rate for ${code} changed since the ${since} file.`
 }
 
 /**
@@ -90,11 +80,16 @@ export function waitingText(result: Pick<ChangesResult, 'from' | 'to'>): string 
   return `Changes show once loading finishes: the numbers for ${outOfDate.join(' and ')} are being updated.`
 }
 
-/** The changes page's summary of everything the filters cover. */
-export function countsSummary(counts: ChangeCounts, from: string, to: string): string {
-  const text = countsText(counts)
-  const same = counts.unchanged ? ` ${plural(counts.unchanged, 'rate')} stayed the same.` : ''
-  return text ? `Between ${from} and ${to}: ${text}.${same}` : `Nothing changed between ${from} and ${to}.${same}`
+/** The main view's waiting line; Details names the files (waitingText). */
+export const WAITING_SHORT = 'Changes show once loading finishes.'
+
+/** A row's prices in a few characters (decision 90): "$42 → $193", "New · $750", "Gone · $450". */
+export function priceMove(row: Pick<RateChange, 'kind' | 'from' | 'to'>): string {
+  if (row.kind === 'new') return `New · ${dollars(row.to ?? 0)}`
+  if (row.kind === 'dropped') return `Gone · ${dollars(row.from ?? 0)}`
+  const [from, to] = [row.from ?? 0, row.to ?? 0]
+  // Whole dollars from $100 would hide a move of cents ("$100 → $100"): then both to the cent.
+  return dollars(from) === dollars(to) ? `${money(from)} → ${money(to)}` : `${dollars(from)} → ${dollars(to)}`
 }
 
 /** How many new and gone rates are only listed differently; null when none are. */

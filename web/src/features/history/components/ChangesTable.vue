@@ -1,50 +1,55 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useDisplay } from 'vuetify'
-import { mdiMagnify } from '@mdi/js'
-import { money, shortDate } from '@/lib/format'
+import { computed, ref } from 'vue'
+import { shortDate } from '@/lib/format'
 import { feeLabel } from '@/lib/plainNumbers'
+import { billLine, providerName } from '@/lib/plainNames'
+import { planName } from '@/features/rates/lib/answer'
+import { serviceLabel } from '@/features/insights/lib/plainWords'
 import { modifierText } from '@/features/rates/lib/lenses'
 import type { HistorySnapshot, RateChange, RateChangesPage } from '../api/types'
-import { changeText } from '../lib/changesText'
-import { DEFAULT_CHANGE_SORT, type ChangeSort } from '../lib/changesParams'
+import { changeText, priceMove } from '../lib/changesText'
 
+// The biggest changes as a short list (decision 90): name, service, "$old → $new". A row opens its details on click:
+// plan, code, tax ID, how many rates, and a link to the provider's rows.
 const props = defineProps<{
   rows: RateChangesPage
-  sort: ChangeSort
   from: HistorySnapshot
   to: HistorySnapshot
   loading?: boolean
 }>()
-const emit = defineEmits<{ updateOptions: [options: { page: number; pageSize: number; sort: ChangeSort }] }>()
-
-const { smAndDown } = useDisplay()
-
-// The two rate columns are named by their files' dates.
-const headers = computed(() => [
-  { title: 'Code', key: 'code', sortable: true },
-  { title: 'Fee, setting and plan', key: 'group', sortable: false },
-  { title: 'Provider', key: 'provider', sortable: true },
-  { title: shortDate(props.from.indexDate), key: 'from', sortable: false, align: 'end' as const },
-  { title: shortDate(props.to.indexDate), key: 'to', sortable: false, align: 'end' as const },
-  { title: 'Change', key: 'changePct', sortable: true, align: 'end' as const },
-  { title: '', key: 'actions', sortable: false, align: 'end' as const },
-])
+const emit = defineEmits<{ page: [page: number] }>()
 
 const items = computed(() => props.rows.items.map((row) => ({ ...row, id: `${row.groupKey}::${row.providerKey}` })))
+const pages = computed(() => Math.max(1, Math.ceil(props.rows.total / props.rows.pageSize)))
+const open = ref<string | null>(null)
 
-// No column sort means the default: the biggest moves first.
-const sortBy = computed(() =>
-  props.sort === DEFAULT_CHANGE_SORT
-    ? []
-    : [{ key: props.sort.replace(/^-/, ''), order: props.sort.startsWith('-') ? ('desc' as const) : ('asc' as const) }],
-)
+function toggle(id: string) {
+  open.value = open.value === id ? null : id
+}
 
-function onOptions(options: { page: number; itemsPerPage: number; sortBy: { key: string; order?: boolean | 'asc' | 'desc' }[] }) {
-  const first = options.sortBy[0]
-  const sort = (first ? `${first.order === 'desc' ? '-' : ''}${first.key}` : DEFAULT_CHANGE_SORT) as ChangeSort
-  if (options.page === props.rows.page && options.itemsPerPage === props.rows.pageSize && sort === props.sort) return
-  emit('updateOptions', { page: sort === props.sort ? options.page : 1, pageSize: options.itemsPerPage, sort })
+/**
+ * The service, about 10 words a row with the name and prices (decision 90): "Therapy session, 45 minutes". When another
+ * row on the page has the same provider and service, what tells them apart is added: the bill ("Doctor · in the office",
+ * "Surgery center") and/or the plan. A row's details always name both.
+ */
+const serviceLines = computed(() => {
+  const rows = props.rows.items
+  const keyOf = (row: RateChange) => `${providerName(row.businessName)}|${serviceLabel(row)}`
+  return rows.map((row) => {
+    const service = serviceLabel(row)
+    const twins = rows.filter((other) => keyOf(other) === keyOf(row))
+    if (twins.length < 2) return service
+    const bills = new Set(twins.map((twin) => billLine(twin)))
+    const plans = new Set(twins.map((twin) => twin.productLabel))
+    const tell = [bills.size > 1 ? billLine(row) : '', plans.size > 1 ? planName(row.productLabel) : '']
+    return [service, ...tell.filter(Boolean)].join(' · ')
+  })
+})
+
+/** Up in red, down in green (decision 90's colours); new and gone in ink. */
+function tone(row: RateChange): string | undefined {
+  if (row.kind !== 'changed' || row.change == null) return undefined
+  return row.change > 0 ? 'text-high' : 'text-low'
 }
 
 /** The provider's rows in that group, in the file that has them (the older one for a dropped rate). */
@@ -65,107 +70,125 @@ function searchLink(row: RateChange) {
 function otherFile(row: RateChange): string {
   return shortDate((row.kind === 'new' ? props.from : props.to).indexDate)
 }
-
-function direction(row: RateChange): string | undefined {
-  if (row.kind !== 'changed' || row.change == null) return undefined
-  return row.change > 0 ? 'text-high' : 'text-low'
-}
 </script>
 
 <template>
-  <v-data-table-server
-    :headers="headers"
-    :items="items"
-    item-value="id"
-    :items-length="rows.total"
-    :page="rows.page"
-    :items-per-page="rows.pageSize"
-    :items-per-page-options="[25, 50, 100]"
-    :sort-by="sortBy"
-    :loading="loading"
-    :mobile="smAndDown"
-    density="compact"
-    hover
-    data-testid="changes-table"
-    @update:options="onOptions"
-  >
-    <template #[`item.code`]="{ item }">
-      <div class="py-1" data-testid="change-row">
-        <span class="font-weight-medium text-no-wrap">{{ item.codeType }} {{ item.code }}</span>
-        <div v-if="item.codeName" class="text-body-small text-medium-emphasis">{{ item.codeName }}</div>
-      </div>
-    </template>
-
-    <template #[`item.group`]="{ item }">
-      <div class="py-1">
-        <div class="text-body-medium">
-          {{ feeLabel(item.feeType) }} · {{ item.settingLabel }}<template v-if="item.modifiers.length"> · {{ modifierText(item.modifiers) }}</template>
-        </div>
-        <div class="text-body-small text-medium-emphasis">{{ item.productLabel }}</div>
-      </div>
-    </template>
-
-    <template #[`item.provider`]="{ item }">
-      <div class="py-1">
-        <span class="font-weight-medium">{{ item.businessName }}</span>
-        <div class="d-flex flex-wrap align-center ga-1 text-body-small text-medium-emphasis">
-          <span>EIN {{ item.einDisplay }}</span>
-          <v-chip v-if="item.einMasked" size="x-small" color="warning" variant="tonal">Unverified tax ID</v-chip>
-        </div>
-      </div>
-    </template>
-
-    <template #[`item.from`]="{ item }">
-      <span class="text-no-wrap">{{ money(item.from) }}</span>
-      <div v-if="(item.fromRates ?? 0) > 1" class="text-body-small text-medium-emphasis text-no-wrap">({{ item.fromRates }} rates)</div>
-    </template>
-
-    <template #[`item.to`]="{ item }">
-      <span class="text-no-wrap font-weight-medium">{{ money(item.to) }}</span>
-      <div v-if="(item.toRates ?? 0) > 1" class="text-body-small text-medium-emphasis text-no-wrap">({{ item.toRates }} rates)</div>
-    </template>
-
-    <template #[`item.changePct`]="{ item }">
-      <div class="d-flex flex-column align-end ga-1 py-1">
-        <span class="text-no-wrap font-weight-medium" :class="direction(item)" data-testid="change-text">{{ changeText(item) }}</span>
-        <v-tooltip
-          v-if="item.listedElsewhere"
-          :text="`The ${otherFile(item)} file lists this provider for the same service with other modifiers or in another setting.`"
-          max-width="320"
-          location="top"
+  <div class="d-flex flex-column ga-2" :style="{ opacity: loading ? 0.6 : 1 }" data-testid="changes-table">
+    <p v-if="!items.length" class="text-medium-emphasis" data-testid="changes-none">No changes match.</p>
+    <ol v-else class="change-list">
+      <li v-for="(item, index) in items" :key="item.id" data-testid="change-row">
+        <button
+          type="button"
+          class="change-row"
+          :aria-expanded="open === item.id"
+          :aria-controls="`change-${item.id}`"
+          @click="toggle(item.id)"
         >
-          <template #activator="{ props: tip }">
-            <v-chip v-bind="tip" size="x-small" variant="outlined" data-testid="listed-elsewhere">Listed differently</v-chip>
-          </template>
-        </v-tooltip>
-        <v-tooltip
-          v-else-if="item.kind === 'changed' && ((item.fromRates ?? 0) > 1 || (item.toRates ?? 0) > 1)"
-          text="The provider has several rates here. The one shown is its clinicians' typical rate, so it also moves when a rate is added or removed, not only when a price changes."
-          max-width="340"
-          location="top"
-        >
-          <template #activator="{ props: tip }">
-            <v-chip v-bind="tip" size="x-small" variant="outlined">Several rates</v-chip>
-          </template>
-        </v-tooltip>
-      </div>
-    </template>
-
-    <template #[`item.actions`]="{ item }">
-      <v-btn
-        :to="searchLink(item)"
-        :prepend-icon="mdiMagnify"
-        variant="text"
-        size="small"
-        :aria-label="`Search ${item.codeType} ${item.code} for ${item.businessName}`"
-        data-testid="change-search"
-      >
-        Search
-      </v-btn>
-    </template>
-
-    <template #no-data>
-      <p class="text-body-medium text-medium-emphasis py-4">No changes match. Try clearing a filter.</p>
-    </template>
-  </v-data-table-server>
+          <span class="who">
+            <span class="name">{{ providerName(item.businessName) }}</span>
+            <span class="service" data-testid="change-service">{{ serviceLines[index] }}</span>
+          </span>
+          <span class="move" :class="tone(item)" data-testid="change-text">{{ priceMove(item) }}</span>
+        </button>
+        <div v-if="open === item.id" :id="`change-${item.id}`" class="change-details" data-testid="change-details">
+          <span data-testid="change-bill">{{ billLine(item) }}</span>
+          <span>{{ changeText(item) }}</span>
+          <span>
+            {{ item.productLabel }} · {{ feeLabel(item.feeType) }} · {{ item.settingLabel
+            }}<template v-if="item.modifiers.length"> · {{ modifierText(item.modifiers) }}</template>
+          </span>
+          <span>{{ item.codeType }} {{ item.code }}<template v-if="item.codeName"> · {{ item.codeName }}</template></span>
+          <span>{{ item.businessName }} · tax ID {{ item.einDisplay }}<template v-if="item.einMasked"> (not verified)</template></span>
+          <span v-if="(item.fromRates ?? 0) > 1 || (item.toRates ?? 0) > 1" data-testid="several-rates">
+            Several rates: {{ item.fromRates ?? 0 }} then {{ item.toRates ?? 0 }}. The one shown is its clinicians' typical rate.
+          </span>
+          <span v-if="item.listedElsewhere" data-testid="listed-elsewhere">
+            Also in the {{ otherFile(item) }} file, with other modifiers or setting.
+          </span>
+          <router-link :to="searchLink(item)" class="search-link" data-testid="change-search">See these rates</router-link>
+        </div>
+      </li>
+    </ol>
+    <v-pagination
+      v-if="pages > 1"
+      :model-value="rows.page"
+      :length="pages"
+      :total-visible="5"
+      density="comfortable"
+      rounded
+      aria-label="Pages of changes"
+      data-testid="changes-pages"
+      @update:model-value="(page) => emit('page', page)"
+    />
+  </div>
 </template>
+
+<style scoped>
+.change-list {
+  list-style: none;
+  padding: 0;
+}
+
+.change-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  width: 100%;
+  padding: 8px 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  cursor: pointer;
+}
+
+.change-row:hover .name {
+  text-decoration: underline;
+}
+
+.change-row:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.service {
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-background), var(--v-medium-emphasis-opacity));
+  overflow-wrap: anywhere;
+}
+
+.move {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.change-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0 16px;
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-background), var(--v-medium-emphasis-opacity));
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.search-link {
+  align-self: flex-start;
+  font-weight: 600;
+  color: rgb(var(--v-theme-primary));
+}
+</style>

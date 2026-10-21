@@ -55,7 +55,14 @@ describe('the scorecard filter', () => {
     expect(filterScorecardGroups(rows, 'AMBETTER')).toEqual([er])
     expect(filterScorecardGroups(rows, 'hospital outpatient')).toEqual([office, operatingRoom])
     expect(filterScorecardGroups(rows, 'facility fee')).toEqual(rows)
-    expect(filterScorecardGroups(rows, 'no procedure named')).toEqual([operatingRoom])
+    expect(filterScorecardGroups(rows, 'facility-only')).toEqual([operatingRoom])
+  })
+
+  it('finds rows by the plain names the page shows', () => {
+    // 99213 reads "Office visit, level 3"; the ER bill reads "Emergency room"; Ambetter's plan reads "Ambetter".
+    expect(filterScorecardGroups(rows, 'level 3')).toEqual([office])
+    expect(filterScorecardGroups(rows, 'emergency room')).toEqual([er])
+    expect(filterScorecardGroups(rows, 'facility charge')).toEqual([operatingRoom])
   })
 
   it('needs every word, in any order', () => {

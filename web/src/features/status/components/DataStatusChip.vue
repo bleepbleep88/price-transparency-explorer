@@ -1,39 +1,43 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { mdiAlertCircleOutline, mdiChartBoxOutline, mdiCheckCircleOutline, mdiCloudDownloadOutline, mdiLanConnect } from '@mdi/js'
 import { useDataStatus } from '../useDataStatus'
 
-const { status, progress } = useDataStatus()
+// Seen only while data loads or when something failed; hidden once the data is ready. The live region always stays, so
+// the parent's class (spacing) goes on the chip.
+defineOptions({ inheritAttrs: false })
+const { status, progress, unreachable } = useDataStatus()
 
-const view = computed(() => {
+const view = computed<{ text: string; failed: boolean } | null>(() => {
   const current = status.value
-  // spoken: what the live region announces; no percentages, so screen readers hear phase changes, not every tick.
-  if (!current) return { color: 'default', icon: mdiLanConnect, text: 'Connecting…', spoken: 'Connecting' }
+  if (!current) return unreachable.value ? { text: "Can't reach the server", failed: true } : null
   if (current.phase === 'ready') {
-    return current.issues.length > 0
-      ? { color: 'warning', icon: mdiAlertCircleOutline, text: 'Data ready, with notes', spoken: 'Data ready, with notes' }
-      : { color: 'success', icon: mdiCheckCircleOutline, text: 'Data ready', spoken: 'Data ready' }
+    return current.issues.some((issue) => issue.severity === 'error') ? { text: 'Some data failed', failed: true } : null
   }
-  if (current.phase === 'failed') {
-    return { color: 'error', icon: mdiAlertCircleOutline, text: 'Data failed to load', spoken: 'Data failed to load' }
-  }
-  // Every file is saved and searchable; the server is saving the numbers behind each card.
-  if (current.phase === 'buildingStatistics') {
-    return { color: 'info', icon: mdiChartBoxOutline, text: 'Preparing comparisons', spoken: 'Preparing comparisons' }
-  }
+  if (current.phase === 'failed') return { text: 'Data failed to load', failed: true }
+  // Every file is saved and searchable; the server is saving the numbers behind each answer.
+  if (current.phase === 'buildingStatistics') return { text: 'Preparing comparisons', failed: false }
   const percent = progress.value == null ? '' : ` ${Math.round(progress.value * 100)}%`
-  return { color: 'info', icon: mdiCloudDownloadOutline, text: `Loading data${percent}`, spoken: 'Loading data' }
+  return { text: `Loading data${percent}`, failed: false }
+})
+
+// What the live region announces: phase changes only, never every percent.
+const spoken = computed(() => {
+  const current = status.value
+  if (!current) return unreachable.value ? "Can't reach the server" : ''
+  if (current.phase === 'ready') return view.value?.text ?? 'Data ready'
+  if (current.phase === 'failed' || current.phase === 'buildingStatistics') return view.value?.text ?? ''
+  return 'Loading data'
 })
 </script>
 
 <template>
-  <v-menu location="bottom end" :close-on-content-click="false">
+  <span class="d-sr-only" role="status">{{ spoken }}</span>
+  <v-menu v-if="view" location="bottom end" :close-on-content-click="false">
     <template #activator="{ props }">
       <v-chip
-        v-bind="props"
-        :color="view.color"
-        :prepend-icon="view.icon"
-        variant="tonal"
+        v-bind="{ ...props, ...$attrs }"
+        :color="view.failed ? 'error' : undefined"
+        variant="outlined"
         size="small"
         role="button"
         :aria-label="`Data status: ${view.text}`"
@@ -41,31 +45,28 @@ const view = computed(() => {
       >
         {{ view.text }}
       </v-chip>
-      <span class="d-sr-only" role="status">{{ view.spoken }}</span>
     </template>
 
     <v-card max-width="440" title="Data status">
       <v-card-text class="d-flex flex-column ga-2">
-        <p class="text-body-medium">{{ status?.message ?? 'Waiting for the server…' }}</p>
-        <v-progress-linear v-if="progress != null" :model-value="progress * 100" color="info" rounded height="6" />
-        <p v-if="status && status.filesTotal > 0" class="text-body-small text-medium-emphasis">
-          {{ status.filesDone }} of {{ status.filesTotal }} rate files processed
-        </p>
-        <template v-if="status?.issues.length">
-          <v-divider />
-          <p class="text-body-small font-weight-medium">Notes from loading</p>
-          <v-alert
-            v-for="(issue, index) in status.issues"
-            :key="index"
-            :type="issue.severity === 'error' ? 'error' : 'warning'"
-            variant="tonal"
-            density="compact"
-            class="text-body-small"
-          >
-            {{ issue.message }}
-          </v-alert>
-        </template>
+        <p>{{ status?.message ?? 'The server did not answer.' }}</p>
+        <v-progress-linear v-if="progress != null" :model-value="progress * 100" color="primary" rounded height="6" />
+        <p v-if="status && status.filesTotal > 0" class="text-medium-emphasis">{{ status.filesDone }} of {{ status.filesTotal }} files done</p>
+        <ul v-if="status?.issues.length" class="issues">
+          <li v-for="(issue, index) in status.issues" :key="index" :class="{ failed: issue.severity === 'error' }">{{ issue.message }}</li>
+        </ul>
       </v-card-text>
     </v-card>
   </v-menu>
 </template>
+
+<style scoped>
+.issues {
+  padding-left: 16px;
+  font-size: 0.875rem;
+}
+
+.failed {
+  color: rgb(var(--v-theme-error));
+}
+</style>

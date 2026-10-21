@@ -6,8 +6,9 @@ import { LineChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
 import { SVGRenderer } from 'echarts/renderers'
 import VChart from 'vue-echarts'
-import { money, plural, shortDate } from '@/lib/format'
+import { money, shortDate } from '@/lib/format'
 import { dollars } from '@/lib/plainNumbers'
+import { placesCount, providerName } from '@/lib/plainNames'
 import type { GroupTrend } from '../api/types'
 import { followedProvider, stepNote, trendSeries } from '../lib/trend'
 
@@ -18,10 +19,10 @@ use([LineChart, GridComponent, LegendComponent, TooltipComponent, SVGRenderer])
 const props = defineProps<{ trend: GroupTrend; selectedId: number | null; showProvider: boolean }>()
 const theme = useTheme()
 
-const TYPICAL = 'Typical price'
-// Read under every audience, so not "your": the legend names the provider, as the card's line does.
-const followed = computed(() => followedProvider(props.trend, props.selectedId) ?? 'This provider')
-const MOST = 'Most providers'
+const TYPICAL = 'Typical'
+// Read under every audience, so not "your": the legend names the provider.
+const followed = computed(() => providerName(followedProvider(props.trend, props.selectedId) ?? 'This provider'))
+const MOST = 'Most'
 
 function rgba(hex: string, alpha: number): string {
   const value = Number.parseInt(hex.replace('#', '').slice(0, 6), 16)
@@ -34,19 +35,24 @@ function hex(name: string, fallback: string): string {
   return typeof value === 'string' ? value : fallback
 }
 
+/** Names come from the plan's files, and the tooltip is HTML. */
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`)
+}
+
 function tooltip(index: number): string {
   const point = props.trend.points[index]
   if (!point) return ''
   const lines = [`<strong>${shortDate(point.indexDate)}</strong>`]
-  if (point.partial) lines.push('This file looks incomplete')
-  // Typical prices and ranges as the cards show them; a provider's rate to the cent, as its chip does.
-  lines.push(point.median != null ? `${TYPICAL}: ${dollars(point.median)}` : 'Too few providers for a typical price')
-  if (point.p10 != null && point.p90 != null) lines.push(`${MOST} get ${dollars(point.p10)} to ${dollars(point.p90)}`)
-  lines.push(plural(point.providerCount, 'provider'))
+  if (point.partial) lines.push('File incomplete')
+  // Typical prices and ranges as the tiles show them; a provider's rate to the cent.
+  lines.push(point.median != null ? `${TYPICAL} ${dollars(point.median)}` : 'Too few places')
+  if (point.p10 != null && point.p90 != null) lines.push(`${MOST} ${dollars(point.p10)} – ${dollars(point.p90)}`)
+  lines.push(placesCount(point.providerCount))
   // Who stayed and who came or went, so a move that's only a change in who is listed doesn't read as a price change.
   const note = stepNote(props.trend, point.snapshotId)
-  if (note) lines.push(`<span style="white-space: normal">${note}</span>`)
-  if (props.showProvider && point.provider) lines.push(`${point.provider.displayName}: ${money(point.provider.rate)}`)
+  if (note) lines.push(`<span style="white-space: normal">${escapeHtml(note)}</span>`)
+  if (props.showProvider && point.provider) lines.push(`${escapeHtml(providerName(point.provider.displayName))} ${money(point.provider.rate)}`)
   return lines.join('<br>')
 }
 

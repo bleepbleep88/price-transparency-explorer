@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ALWAYS_TRUE } from '@/lib/plainNumbers'
-import { mdiAccountSearchOutline, mdiChartBar, mdiCompareHorizontal, mdiDatabaseOutline, mdiHistory, mdiMagnify, mdiMenu, mdiThemeLightDark } from '@mdi/js'
+import { mdiMenu, mdiThemeLightDark } from '@mdi/js'
 import { useRoute } from 'vue-router'
-import { useDisplay, useTheme } from 'vuetify'
+import { useTheme } from 'vuetify'
 import DataStatusChip from '@/features/status/components/DataStatusChip.vue'
 import { useDataStatus } from '@/features/status/useDataStatus'
 import SnapshotPicker from '@/features/history/components/SnapshotPicker.vue'
@@ -11,23 +11,19 @@ import { useSnapshotChoice } from '@/features/history/composables/useSnapshotCho
 
 const theme = useTheme()
 const route = useRoute()
-// Six pages, the snapshot picker and the status chip: below the extra-large breakpoint the page buttons drop their icons
-// and some padding, so the brand isn't cut off.
-const { xlAndUp } = useDisplay()
 
 // Start the live status stream once for the whole app.
 useDataStatus()
 
-// Each item is current on its own pages: a scorecard (/providers/:key) belongs to Provider scorecards. Every page shows
-// the snapshot picked in the app bar, so links between pages keep it.
+// Each item is current on its own pages: a scorecard (/providers/:key) belongs to Providers. Every page shows the month
+// picked in the app bar, so links between pages keep it.
 const { carried } = useSnapshotChoice()
 const navItems = computed(() => [
-  { title: 'Search', to: { name: 'search', query: carried.value }, icon: mdiMagnify, names: ['search'] },
-  { title: 'Changes', to: { name: 'changes', query: carried.value }, icon: mdiHistory, names: ['changes'] },
-  { title: 'Price differences', to: { name: 'gaps', query: carried.value }, icon: mdiChartBar, names: ['gaps'] },
-  { title: 'Plan comparison', to: { name: 'compare', query: carried.value }, icon: mdiCompareHorizontal, names: ['compare'] },
-  { title: 'Provider scorecards', to: { name: 'providers', query: carried.value }, icon: mdiAccountSearchOutline, names: ['providers', 'scorecard'] },
-  { title: 'Sources', to: { name: 'sources', query: carried.value }, icon: mdiDatabaseOutline, names: ['sources'] },
+  { title: 'Search', to: { name: 'search', query: carried.value }, names: ['search'] },
+  { title: 'Price gaps', to: { name: 'gaps', query: carried.value }, names: ['gaps'] },
+  { title: 'Compare plans', to: { name: 'compare', query: carried.value }, names: ['compare'] },
+  { title: 'Providers', to: { name: 'providers', query: carried.value }, names: ['providers', 'scorecard'] },
+  { title: 'Changes', to: { name: 'changes', query: carried.value }, names: ['changes'] },
 ])
 const isCurrent = (item: { names: string[] }) => item.names.includes(String(route.name))
 </script>
@@ -36,19 +32,18 @@ const isCurrent = (item: { names: string[] }) => item.names.includes(String(rout
   <v-app>
     <v-app-bar flat border="b" density="comfortable">
       <v-app-bar-title>
-        <router-link :to="{ name: 'search', query: carried }" class="brand">Price Transparency Explorer</router-link>
+        <router-link :to="{ name: 'search', query: carried }" class="brand">Price Explorer</router-link>
       </v-app-bar-title>
 
-      <nav aria-label="Main" class="d-none d-lg-flex ga-1">
+      <nav aria-label="Main" class="d-none d-md-flex ga-1">
         <v-btn
           v-for="item in navItems"
           :key="item.title"
           :to="item.to"
-          :prepend-icon="xlAndUp ? item.icon : undefined"
-          :class="{ 'px-2': !xlAndUp }"
           :active="isCurrent(item)"
           :aria-current="isCurrent(item) ? 'page' : undefined"
           variant="text"
+          class="px-3"
           :data-testid="`nav-${item.to.name}`"
         >
           {{ item.title }}
@@ -56,20 +51,19 @@ const isCurrent = (item: { names: string[] }) => item.names.includes(String(rout
       </nav>
 
       <template #append>
-        <!-- Sources lists every file, so there's nothing to pick there. -->
+        <!-- Sources lists every file, so there's no month to pick there. -->
         <SnapshotPicker v-if="route.name !== 'sources'" />
         <DataStatusChip class="me-2" />
-        <!-- Below the large breakpoint the pages sit in a menu, so the app bar fits a phone. -->
+        <!-- On a phone the pages sit in a menu. -->
         <v-menu location="bottom end">
           <template #activator="{ props: menu }">
-            <v-btn v-bind="menu" :icon="mdiMenu" variant="text" class="d-lg-none" aria-label="Pages" data-testid="nav-menu" />
+            <v-btn v-bind="menu" :icon="mdiMenu" variant="text" class="d-md-none" aria-label="Pages" data-testid="nav-menu" />
           </template>
           <v-list density="compact" aria-label="Pages" nav>
             <v-list-item
               v-for="item in navItems"
               :key="item.title"
               :to="item.to"
-              :prepend-icon="item.icon"
               :title="item.title"
               :active="isCurrent(item)"
               :aria-current="isCurrent(item) ? 'page' : undefined"
@@ -89,9 +83,10 @@ const isCurrent = (item: { names: string[] }) => item.names.includes(String(rout
       <router-view />
     </v-main>
 
-    <v-footer color="background" border="t" class="text-body-small text-medium-emphasis justify-center text-center px-4">
-      {{ ALWAYS_TRUE }} CPT® is a registered trademark of the American Medical Association; descriptions are shown as
-      published by the payer.
+    <v-footer color="background" border="t" class="app-footer">
+      <span data-testid="always-true">{{ ALWAYS_TRUE }}</span>
+      <router-link :to="{ name: 'sources', query: carried }" data-testid="nav-sources">Where the data comes from</router-link>
+      <span class="cpt">CPT® is a trademark of the American Medical Association.</span>
     </v-footer>
   </v-app>
 </template>
@@ -101,5 +96,34 @@ const isCurrent = (item: { names: string[] }) => item.names.includes(String(rout
   color: inherit;
   text-decoration: none;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+/* On a phone the brand keeps its full name: the title doesn't shrink below it. */
+:deep(.v-app-bar-title) {
+  flex: 0 0 auto;
+  min-width: max-content;
+  margin-inline-end: 16px;
+}
+
+.app-footer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-content: center;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 24px;
+  padding: 16px max(16px, env(safe-area-inset-left, 0px));
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-background), var(--v-medium-emphasis-opacity));
+}
+
+.app-footer a {
+  color: rgb(var(--v-theme-primary));
+}
+
+.cpt {
+  font-size: 0.875rem;
 }
 </style>

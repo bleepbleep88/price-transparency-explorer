@@ -9,7 +9,18 @@ export const CHANGE_KINDS = ['changed', 'increased', 'decreased', 'new', 'droppe
 export const CHANGE_SORTS = ['largest', '-changePct', 'changePct', 'code', '-code', 'provider', '-provider'] as const
 export type ChangeSort = (typeof CHANGE_SORTS)[number]
 export const DEFAULT_CHANGE_SORT: ChangeSort = 'largest'
-export const DEFAULT_CHANGES_PAGE_SIZE = 25
+/** The order picker's words. */
+export const CHANGE_SORT_LABELS: Record<ChangeSort, string> = {
+  largest: 'Biggest change',
+  '-changePct': 'Biggest rise',
+  changePct: 'Biggest drop',
+  code: 'Code, low to high',
+  '-code': 'Code, high to low',
+  provider: 'Name, A to Z',
+  '-provider': 'Name, Z to A',
+}
+/** A short list (decision 90); the pager shows the rest. */
+export const DEFAULT_CHANGES_PAGE_SIZE = 10
 export const MAX_CHANGE_PCT = 1_000
 
 export interface ChangesParams {

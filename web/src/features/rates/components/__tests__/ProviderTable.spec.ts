@@ -101,7 +101,7 @@ describe('ProviderTable', () => {
     expect(headers.join(' ')).not.toMatch(/median|percentile|position/i)
 
     const compared = wrapper.findAll('[data-testid="row-compared"]').map((cell) => [
-      cell.find('[data-testid="band-chip"]').exists() ? cell.get('[data-testid="band-chip"]').text() : cell.text(),
+      cell.find('[data-testid="band-label"]').exists() ? cell.get('[data-testid="band-label"]').text() : cell.text(),
       cell.find('[data-testid="row-difference"]').exists() ? cell.get('[data-testid="row-difference"]').text() : null,
     ])
     expect(compared).toEqual([
@@ -116,9 +116,16 @@ describe('ProviderTable', () => {
     expect(wrapper.text()).not.toMatch(/percentile|median|quartile|×/i)
   })
 
-  it("names the fee in plain words: doctor's fee or facility fee", () => {
-    const text = mountTable().text()
-    expect(text).toContain('Facility fee · Ambulatory surgery center')
-    expect(text).toContain("Doctor's fee · Doctor's office")
+  it('shows each place by name with its price, and no tax IDs, codes or NPI counts', () => {
+    const wrapper = mountTable()
+    expect(wrapper.findAll('[data-testid="provider-row"]').map((row) => row.text())).toEqual([
+      'Low Cost ASC',
+      'Typical ASC',
+      'Middle ASC',
+      'Pricey ASC',
+      'Small Practice',
+    ])
+    expect(wrapper.findAll('th').map((th) => th.text()).filter(Boolean)).toEqual(['Place', 'Price', 'Compared with typical'])
+    expect(wrapper.text()).not.toMatch(/EIN|11-3466729|modifier|NPI/)
   })
 })

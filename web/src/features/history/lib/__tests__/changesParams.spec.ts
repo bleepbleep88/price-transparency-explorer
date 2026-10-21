@@ -41,7 +41,7 @@ describe('changes URL state', () => {
       includeFacilityCharges: false,
       sort: 'largest',
       page: 1,
-      pageSize: 25,
+      pageSize: 10,
     })
   })
 
@@ -55,7 +55,7 @@ describe('changes URL state', () => {
       snapshot: '2',
       listedElsewhere: 'false',
     })
-    expect(mergeChangesQuery({ listedElsewhere: 'false', kind: 'new' }, { hideListedElsewhere: false, kind: undefined, pageSize: 25 })).toEqual({
+    expect(mergeChangesQuery({ listedElsewhere: 'false', kind: 'new' }, { hideListedElsewhere: false, kind: undefined, pageSize: 10 })).toEqual({
       kind: 'new',
     })
     expect(mergeChangesQuery({ code: '0450' }, { includeFacilityCharges: true })).toEqual({ code: '0450', includeFacilityCharges: 'true' })
@@ -75,7 +75,7 @@ describe('changes URL state', () => {
       includeFacilityCharges: undefined,
       sort: undefined,
       page: 1,
-      pageSize: 25,
+      pageSize: 10,
     })
   })
 })

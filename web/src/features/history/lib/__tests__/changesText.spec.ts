@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { ChangeCounts } from '../../api/types'
 import {
   changeAmounts,
-  changesSinceText,
   changeText,
-  countsSummary,
   listedElsewhereSummary,
+  priceMove,
+  upDown,
   waitingText,
 } from '../changesText'
 import { change } from './fixtures'
@@ -25,6 +25,22 @@ const counts: ChangeCounts = {
 const none: ChangeCounts = { changed: 0, increased: 0, decreased: 0, new: 0, newListedElsewhere: 0, dropped: 0, droppedListedElsewhere: 0, unchanged: 12, facilityCharges: 0 }
 
 describe('changes in words', () => {
+  it("gives a row's prices in a few characters: old to new, new or gone", () => {
+    expect(priceMove(change({ from: 42, to: 193.19 }))).toBe('$42 → $193')
+    expect(priceMove(change({ from: 3.36, to: 10.7 }))).toBe('$3.36 → $10.70')
+    expect(priceMove(change({ from: 100.21, to: 100.4 }))).toBe('$100.21 → $100.40')
+    expect(priceMove(change({ kind: 'new', from: null, to: 750 }))).toBe('New · $750')
+    expect(priceMove(change({ kind: 'dropped', from: 450, to: null }))).toBe('Gone · $450')
+  })
+
+  it('says up or down by the amounts as shown', () => {
+    expect(upDown(51.45, 53.2, 'typical')).toBe('Up $1.75')
+    expect(upDown(113.01, 113.59, 'typical')).toBe('Up $1')
+    expect(upDown(113.4, 113.01, 'typical')).toBeNull()
+    expect(upDown(100.36, 117.77)).toBe('Up $17.41')
+    expect(upDown(71.38, 61.65)).toBe('Down $9.73')
+  })
+
   it('says why there are no changes yet, naming the files', () => {
     const side = (snapshotId: number, indexDate: string, statisticsBuiltAt: string | null, statisticsCurrent: boolean) => ({
       snapshotId,
@@ -41,17 +57,6 @@ describe('changes in words', () => {
     ).toBe('Changes show once loading finishes: the numbers for Aug 31, 2026 and Sep 28, 2026 are being updated.')
   })
 
-
-  it('sums up what the filters cover: up, down, new and gone', () => {
-    expect(countsSummary(counts, 'Aug 31, 2026', 'Sep 28, 2026')).toBe(
-      'Between Aug 31, 2026 and Sep 28, 2026: 1,975 rates went up, 1,957 went down, 14,632 are new and 16,776 are gone. 41,163 rates stayed the same.',
-    )
-    expect(countsSummary({ ...none, new: 1 }, 'Aug 31, 2026', 'Sep 28, 2026')).toBe(
-      'Between Aug 31, 2026 and Sep 28, 2026: 1 rate is new. 12 rates stayed the same.',
-    )
-    expect(countsSummary(none, 'Aug 31, 2026', 'Sep 28, 2026')).toBe('Nothing changed between Aug 31, 2026 and Sep 28, 2026. 12 rates stayed the same.')
-  })
-
   it('says how many new and gone rates are only listed differently', () => {
     expect(listedElsewhereSummary(counts)).toBe(
       '5,858 of the new and 5,856 of the gone rates are the same provider and service, listed with other modifiers or in another setting.',
@@ -60,14 +65,6 @@ describe('changes in words', () => {
       '5,856 of the gone rates are the same provider and service, listed with other modifiers or in another setting.',
     )
     expect(listedElsewhereSummary(none)).toBeNull()
-  })
-
-  it("gives the plans lens one line for the code's changes since the last file", () => {
-    expect(changesSinceText({ ...none, changed: 7, increased: 6, decreased: 1, new: 70, dropped: 14 }, 'Aug 31', '45378')).toBe(
-      'Since the Aug 31 file, for 45378: 6 rates went up, 1 went down, 70 are new and 14 are gone.',
-    )
-    expect(changesSinceText({ ...none, changed: 1, increased: 1 }, 'Aug 31', '45378')).toBe('Since the Aug 31 file, for 45378: 1 rate went up.')
-    expect(changesSinceText(none, 'Aug 31', '45378')).toBe('No rate for 45378 changed since the Aug 31 file.')
   })
 
   it('shows a change in dollars and percent, and big jumps as how many times as much', () => {

@@ -121,20 +121,20 @@ describe('SourceDrawer', () => {
   it("opens the row's whole-tax-ID contract for the same provider, and goes back", async () => {
     const w = await mountDrawer(WHOLE_TAX_ID_RATE)
     expect(source).toHaveBeenLastCalledWith(ROW_RATE, PROVIDER, expect.anything())
-    expect(w.get('[data-testid="whole-tax-id-contract"]').text()).toContain('This row also includes a whole-tax-ID contract (no NPIs listed).')
+    expect(w.get('[data-testid="whole-tax-id-contract"]').text()).toContain('Also a whole-tax-ID contract (no NPIs).')
     expect(w.find('[data-testid="whole-tax-id-shown"]').exists()).toBe(false)
 
-    await buttonNamed(w, 'Show that contract')!.trigger('click')
+    await buttonNamed(w, 'Show it')!.trigger('click')
     await flushPromises()
     expect(source).toHaveBeenLastCalledWith(WHOLE_TAX_ID_RATE, PROVIDER, expect.anything())
-    expect(w.text()).toContain('whole tax ID (no NPIs listed)')
+    expect(w.text()).toContain('whole tax ID, no NPIs')
     expect(w.get('[data-testid="source-json-path"]').text()).toBe('$.in_network[1236].negotiated_rates[0].negotiated_prices[0]')
     expect(w.find('[data-testid="whole-tax-id-contract"]').exists()).toBe(false)
-    expect(w.get('[data-testid="whole-tax-id-shown"]').text()).toContain("Showing the row's whole-tax-ID contract.")
+    expect(w.get('[data-testid="whole-tax-id-shown"]').text()).toContain("Showing the whole-tax-ID contract.")
     // The pressed button is gone; focus moves to the drawer's heading rather than being lost.
-    expect(document.activeElement?.textContent).toBe('Where this rate comes from')
+    expect(document.activeElement?.textContent).toBe('Source of this price')
 
-    await buttonNamed(w, "Back to the row's rate")!.trigger('click')
+    await buttonNamed(w, 'Back to this price')!.trigger('click')
     await flushPromises()
     expect(w.get('[data-testid="source-json-path"]').text()).toBe('$.in_network[1236].negotiated_rates[14].negotiated_prices[0]')
     expect(w.find('[data-testid="whole-tax-id-contract"]').exists()).toBe(true)
@@ -142,7 +142,7 @@ describe('SourceDrawer', () => {
 
   it("starts on the row's own rate each time it opens", async () => {
     const w = await mountDrawer(WHOLE_TAX_ID_RATE)
-    await buttonNamed(w, 'Show that contract')!.trigger('click')
+    await buttonNamed(w, 'Show it')!.trigger('click')
     await flushPromises()
     expect(w.find('[data-testid="whole-tax-id-shown"]').exists()).toBe(true)
 
@@ -158,6 +158,6 @@ describe('SourceDrawer', () => {
     const w = await mountDrawer(null)
     expect(w.find('[data-testid="source-json-path"]').exists()).toBe(true)
     expect(w.find('[data-testid="whole-tax-id-contract"]').exists()).toBe(false)
-    expect(buttonNamed(w, 'Show that contract')).toBeUndefined()
+    expect(buttonNamed(w, 'Show it')).toBeUndefined()
   })
 })

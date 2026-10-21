@@ -19,25 +19,25 @@ const router = createRouter({
       path: '/sources',
       name: 'sources',
       component: () => import('@/views/SourcesView.vue'),
-      meta: { title: 'Sources and data quality' },
+      meta: { title: 'Where the data comes from' },
     },
     {
       path: '/insights/gaps',
       name: 'gaps',
       component: () => import('@/views/GapLeaderboardView.vue'),
-      meta: { title: 'Where prices differ most' },
+      meta: { title: 'Price gaps' },
     },
     {
       path: '/insights/compare',
       name: 'compare',
       component: () => import('@/views/ProductComparisonView.vue'),
-      meta: { title: 'Plan comparison' },
+      meta: { title: 'Compare plans' },
     },
     {
       path: '/providers',
       name: 'providers',
       component: () => import('@/views/ProviderLookupView.vue'),
-      meta: { title: 'Provider scorecards' },
+      meta: { title: 'Providers' },
     },
     {
       path: '/providers/:key',
@@ -56,7 +56,7 @@ const router = createRouter({
 
 router.afterEach((to) => {
   const title = to.meta.title as string | undefined
-  document.title = title ? `${title} · Price Transparency Explorer` : 'Price Transparency Explorer'
+  document.title = title ? `${title} · Price Explorer` : 'Price Explorer'
 })
 
 export default router
