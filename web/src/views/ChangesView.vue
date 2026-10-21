@@ -19,6 +19,7 @@ import {
 } from '@/features/history/lib/changesParams'
 import { listedElsewhereSummary, WAITING_SHORT, waitingText } from '@/features/history/lib/changesText'
 import FacilityChargesSwitch from '@/features/insights/components/FacilityChargesSwitch.vue'
+import { planName } from '@/features/rates/lib/answer'
 import { olderSnapshots } from '@/features/history/lib/snapshots'
 import type { ChangeFilter } from '@/features/history/api/types'
 
@@ -66,7 +67,9 @@ function applyMinimum() {
 
 const fromItems = computed(() => older.value.map((snapshot) => ({ title: monthDay(snapshot.indexDate), value: snapshot.snapshotId })))
 const fromId = computed(() => result.value?.query.from ?? params.value.from ?? older.value[0]?.snapshotId ?? null)
-const productItems = computed(() => (current.value?.products ?? []).map((product) => ({ title: product.productLabel, value: product.productKey })))
+const productItems = computed(() =>
+  (current.value?.products ?? []).map((product) => ({ title: planName(product.productLabel), value: product.productKey })),
+)
 const sortItems = Object.entries(CHANGE_SORT_LABELS).map(([value, title]) => ({ value, title }))
 
 const subtitle = computed(() => {

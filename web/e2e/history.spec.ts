@@ -7,10 +7,10 @@ const STATISTICS_WORDS = /percentile|median|middle half|quartile|×|p90|p10|spre
 // Decision 90: no code types, modifiers, tax IDs or NPIs on the main view (Details may have them).
 const CODES_AND_IDS = /\bCPT\b|HCPCS|\bRC \d|\bEIN\b|tax ID|modifier|\bNPI/i
 
-/** The words on the first screen: text whose box starts above the fold, Details closed. */
+/** The words on the first screen, app bar included: text whose box starts above the fold, Details closed. */
 async function firstScreenWords(page: Page): Promise<number> {
   return page.evaluate(() => {
-    const walker = document.createTreeWalker(document.querySelector('main') ?? document.body, NodeFilter.SHOW_TEXT)
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
     let words = 0
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const element = node.parentElement
@@ -59,7 +59,7 @@ test('a price whose typical moved only because different providers are listed sa
 })
 
 test('the changes page leads with four big counts and the biggest changes as name, service and old to new price', async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.setViewportSize({ width: 1280, height: 900 })
   await page.goto('/changes')
   await expect(page.getByRole('heading', { name: 'Rate changes', level: 1 })).toBeVisible()
   await expect(page.getByText('Aug 31 to Sep 28, 2026')).toBeVisible()
