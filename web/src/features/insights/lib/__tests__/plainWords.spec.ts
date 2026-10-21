@@ -1,54 +1,41 @@
 import { describe, expect, it } from 'vitest'
-import { groupLine, pairWords, paysWords, position, rangeWords, unitSuffix } from '../plainWords'
+import { dollars } from '@/lib/plainNumbers'
+import { fewModifiers, groupLine, pairWords, paysWords, planName, rangeText, rowLine, spreadDollars, unitSuffix, versusTypical } from '../plainWords'
 
-// Decision 89 on the insights pages: no statistics jargon, "about the same" within 5%, "times" only from twice, and the
-// position and the dollars on one row never contradict each other.
+// Decisions 89 and 90 on the insights pages: no statistics words, "about" within 5%, "times" only from twice, and as
+// few words as can say it.
 
-describe('position', () => {
-  it('says "About typical" only within 5% of typical, and then alone', () => {
-    expect(position('typical', 103, 100)).toEqual({ label: 'About typical', difference: null })
+describe('versusTypical', () => {
+  it('says how far off in three or four words', () => {
+    expect(versusTypical(118, 100)).toBe('18% above typical')
+    expect(versusTypical(31.81, 251.81)).toBe('87% below typical')
+    expect(versusTypical(109.76, 51.45)).toBe('About 2.1 times typical')
+    expect(versusTypical(103, 100, 'typical')).toBe('About typical')
   })
 
-  it('gives a middle-band price far from typical its dollars and no "About typical"', () => {
-    // 84 of 124 providers get $51.45, so $109.76 is in the middle band, yet about twice the typical price.
-    expect(position('typical', 109.76, 51.45)).toEqual({ label: null, difference: 'about 2.1 times the typical price' })
-    expect(position('typical', 61.22, 40)).toEqual({ label: null, difference: '$21.22 more than typical (about 53% more)' })
+  it('gives a price placed lower or higher than most its dollars, even within 5%', () => {
+    expect(versusTypical(73.6, 74.55, 'low')).toBe('$0.95 below typical')
+    expect(versusTypical(88.12, 87.75, 'high')).toBe('$0.37 above typical')
   })
 
-  it('never puts "about the same" next to "Lower than most" or "Higher than most"', () => {
-    expect(position('high', 88.12, 87.75)).toEqual({ label: 'Higher than most', difference: '$0.37 more than typical' })
-    expect(position('low', 73.6, 74.55)).toEqual({ label: 'Lower than most', difference: '$0.95 less than typical' })
+  it('takes those dollars between the figures as shown, and says only "about" when rounding leaves none', () => {
+    // $1,404.32 against a typical $1,384 (within 5%, but placed higher than most).
+    expect(versusTypical(1404.32, 1384, 'high')).toBe('$20.32 above typical')
+    // $100.40 against a typical $100.45, which shows as $100: the difference would point the wrong way.
+    expect(versusTypical(100.4, 100.45, 'low')).toBe('About typical')
   })
 
-  it('says the share the lists are ranked by next to the dollars', () => {
-    // $31.81 against a typical price shown as $252: $220.19 less, to the cent, as the shared helper writes differences.
-    expect(position('low', 31.81, 251.81)).toEqual({ label: 'Lower than most', difference: '$220.19 less than typical (about 87% less)' })
-  })
-
-  it('takes the dollars between the rate as shown and the typical price as shown', () => {
-    // $1,404.32 against a typical $1,325 (1,324.60 unrounded) reads $79.32 more, not $79.72.
-    expect(position('high', 1404.32, 1324.6).difference).toBe('$79.32 more than typical (about 6% more)')
-  })
-
-  it('leaves the label alone when rounding the typical price leaves the difference the wrong way', () => {
-    // $100.40 against a typical $100.45, which shows as $100.
-    expect(position('low', 100.4, 100.45)).toEqual({ label: 'Lower than most', difference: null })
-  })
-
-  it('puts the unit after the dollars, and says nothing without a typical price', () => {
-    expect(position('low', 0.11, 0.15, ' per unit').difference).toBe('$0.04 per unit less than typical (about 27% less)')
-    expect(position(null, 170, null)).toEqual({ label: null, difference: null })
+  it('says nothing without a typical price', () => {
+    expect(versusTypical(170, null)).toBeNull()
   })
 })
 
 describe('what one plan pays against the other', () => {
   it('says "the same" for a pair only when the two rates are equal', () => {
     expect(pairWords({ same: true, productValue: 603.82, versusValue: 603.82, ratio: 1 })).toBe('the same')
-    expect(pairWords({ same: false, productValue: 2665.57, versusValue: 2677.58, ratio: 1 })).toBe('almost the same ($12.01 less)')
     expect(pairWords({ same: false, productValue: 395.22, versusValue: 393.81, ratio: 1 })).toBe('almost the same ($1.41 more)')
-    expect(pairWords({ same: false, productValue: 90, versusValue: 100, ratio: 0.9 })).toBe('about 10% less')
-    expect(pairWords({ same: false, productValue: 2665.574, versusValue: 2677.576, ratio: 1 })).toBe('almost the same ($12.01 less)')
     expect(pairWords({ same: false, productValue: 603.821, versusValue: 603.824, ratio: 1 })).toBe('almost the same')
+    expect(pairWords({ same: false, productValue: 90, versusValue: 100, ratio: 0.9 })).toBe('about 10% less')
   })
 
   it('reads a rounded summary point as "about the same" and a big one in times', () => {
@@ -60,23 +47,47 @@ describe('what one plan pays against the other', () => {
   })
 })
 
-describe('rangeWords', () => {
-  it('says "times" only from twice, dollars under that, and "about the same" within 5%', () => {
-    expect(rangeWords(2978.01, 11238.91)).toBe('the high end is about 3.8 times the low end')
-    // Shown as $1,277 to $1,422, so $145 more, though the unrounded gap is $144.25.
-    expect(rangeWords(1277.48, 1421.73)).toBe('the high end is $145 more than the low end')
-    expect(rangeWords(24.76, 25.11)).toBe('most providers get about the same price')
-    expect(rangeWords(167.09, 167.09)).toBe('most providers get the same price')
-    expect(rangeWords(100, 199)).not.toContain('times')
-  })
-
-  it('puts the unit after the dollars', () => {
-    expect(rangeWords(0.1, 0.18, ' per unit')).toBe('the high end is $0.08 per unit more than the low end')
+describe('ranges', () => {
+  it('writes a range with an en dash and its spread between the ends as shown', () => {
+    expect(rangeText(389.4, 625.2, dollars)).toBe('$389 – $625')
+    expect(rangeText(167.09, 167.4, dollars)).toBe('$167')
+    // Shown as $1,277 – $1,422, so $145 apart, though the unrounded ends are $144.25 apart.
+    expect(spreadDollars(1277.48, 1421.73)).toBe('$145')
+    expect(spreadDollars(0.1, 0.18)).toBe('$0.08')
   })
 })
 
-describe('labels', () => {
-  it("names the two bills as people do and the unit of a per-unit price", () => {
+describe('names on the main view', () => {
+  const office = { feeType: 'professional', settingKey: 'office', settingLabel: "Doctor's office", modifiers: [], productLabel: 'Essential Plan', perUnit: false }
+
+  it('calls a plan what people call it', () => {
+    expect(planName('Ambetter from Fidelis Care')).toBe('Ambetter')
+    expect(planName('Essential Plan')).toBe('Essential Plan')
+  })
+
+  it('says the bill, its modifiers in short, the plan and "per unit"', () => {
+    expect(rowLine(office)).toBe('Doctor · in the office · Essential Plan')
+    expect(rowLine({ ...office, feeType: 'facility', settingKey: 'asc', productLabel: 'Ambetter from Fidelis Care', perUnit: true })).toBe(
+      'Surgery center · Ambetter · per unit',
+    )
+  })
+
+  it('keeps at most two modifiers, without codes or brackets or repeats, and drops telehealth ones on a video visit', () => {
+    const modifier = (code: string, label: string) => ({ code, label })
+    expect(fewModifiers([modifier('LT', 'Left side (modifier LT)'), modifier('RT', 'Right side (modifier RT)')])).toBe('left side, right side')
+    expect(
+      fewModifiers([
+        modifier('25', 'Separate visit on the same day as a procedure (modifier 25)'),
+        modifier('95', 'Telehealth (audio and video) (modifier 95)'),
+        modifier('GT', 'Telehealth (interactive audio and video) (modifier GT)'),
+      ]),
+    ).toBe('separate visit on the same day as a procedure, telehealth')
+    expect(fewModifiers(['A', 'B', 'C'].map((code) => modifier(code, `Side ${code}`)))).toBe('side A, +2 more')
+    expect(fewModifiers([modifier('95', 'Telehealth (audio and video) (modifier 95)')], 'telehealth-home')).toBe('')
+    expect(fewModifiers([modifier('SS', 'Modifier SS')])).toBe('')
+  })
+
+  it('keeps the precise group line and the unit for Details', () => {
     expect(groupLine({ productLabel: 'Essential Plan', feeType: 'professional', settingLabel: "Doctor's office", modifiers: [] })).toBe(
       "Essential Plan · Doctor's fee · Doctor's office",
     )

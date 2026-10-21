@@ -25,19 +25,19 @@ const router = createRouter({
       path: '/insights/gaps',
       name: 'gaps',
       component: () => import('@/views/GapLeaderboardView.vue'),
-      meta: { title: 'Where prices differ most' },
+      meta: { title: 'Price gaps' },
     },
     {
       path: '/insights/compare',
       name: 'compare',
       component: () => import('@/views/ProductComparisonView.vue'),
-      meta: { title: 'Plan comparison' },
+      meta: { title: 'Compare plans' },
     },
     {
       path: '/providers',
       name: 'providers',
       component: () => import('@/views/ProviderLookupView.vue'),
-      meta: { title: 'Provider scorecards' },
+      meta: { title: 'Providers' },
     },
     {
       path: '/providers/:key',

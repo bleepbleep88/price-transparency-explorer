@@ -77,7 +77,7 @@ test('a card whose typical price moved only because different providers are list
 test('the changes page leaves out facility charges with no procedure named until the switch adds them', async ({ page }) => {
   await page.goto('/changes')
   const toggle = page.getByTestId('facility-charges')
-  await expect(toggle).toContainText(/Include facility charges with no procedure named \([\d,]+\)/)
+  await expect(toggle).toContainText(/Include facility-only charges \([\d,]+\)/)
   const before = await page.getByTestId('changes-summary').innerText()
 
   await toggle.locator('input').check()

@@ -1,42 +1,44 @@
 <script setup lang="ts">
-import { money } from '@/lib/format'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { lowerFirst } from '@/lib/plainNumbers'
+import PlaceList, { type PlaceItem } from '@/components/simple/PlaceList.vue'
 import type { ScorecardGroup } from '../api/types'
 import { searchLocation } from '../lib/insightLinks'
-import { serviceName } from '../lib/insightText'
-import { groupLine, position, unitSuffix } from '../lib/plainWords'
+import { rowLine, serviceLabel, versusTypical } from '../lib/plainWords'
 
-// A provider's services furthest above (or below) the typical price, each opening the search that shows it. The list is
-// ranked by share of the typical price, so each line says that share next to the dollars.
-defineProps<{ title: string; groups: ScorecardGroup[]; empty: string }>()
+// A provider's services furthest above (or below) the typical price: plain name, the bill and how far off, its price.
+// Each opens the search that shows it.
+const props = defineProps<{ title: string; groups: ScorecardGroup[]; tone: 'low' | 'high'; empty: string }>()
+const router = useRouter()
 
-function detail(group: ScorecardGroup): string {
-  const unit = unitSuffix(group)
-  const { difference } = position(group.band, group.value, group.median, unit)
-  return difference ? `${money(group.value)}${unit}: ${difference}` : `${money(group.value)}${unit}`
+const items = computed<PlaceItem[]>(() =>
+  props.groups.map((group) => ({
+    key: group.groupKey,
+    name: serviceLabel(group),
+    place: [rowLine(group), lowerFirst(versusTypical(group.value, group.median, group.band) ?? '')].filter(Boolean).join(' · '),
+    price: group.value,
+  })),
+)
+
+function open(key: string) {
+  const group = props.groups.find((g) => g.groupKey === key)
+  if (group) void router.push(searchLocation(group.search))
 }
 </script>
 
 <template>
-  <v-card class="h-100">
-    <v-card-item>
-      <v-card-title tag="h2">{{ title }}</v-card-title>
-    </v-card-item>
-    <v-card-text>
-      <p v-if="!groups.length" class="text-body-medium text-medium-emphasis">{{ empty }}</p>
-      <v-list v-else density="compact" class="py-0 bg-transparent">
-        <v-list-item
-          v-for="group in groups"
-          :key="group.groupKey"
-          :to="searchLocation(group.search)"
-          class="px-0"
-          data-testid="extreme-group"
-        >
-          <v-list-item-title class="text-body-medium font-weight-medium text-wrap">{{ serviceName(group) }}</v-list-item-title>
-          <!-- Plain text, not a list subtitle: subtitles are cut to one line, and the setting and plan need all of it. -->
-          <p class="text-body-small text-medium-emphasis">{{ groupLine(group) }} · {{ group.unit }}</p>
-          <p class="text-body-medium">{{ detail(group) }}</p>
-        </v-list-item>
-      </v-list>
-    </v-card-text>
-  </v-card>
+  <PlaceList v-if="items.length" :title="title" :items="items" :tone="tone" data-testid="scorecard-extremes" @open="open" />
+  <section v-else class="d-flex flex-column ga-2" data-testid="scorecard-extremes">
+    <h3 class="empty-title">{{ title }}</h3>
+    <p class="text-body-medium text-medium-emphasis">{{ empty }}</p>
+  </section>
 </template>
+
+<style scoped>
+.empty-title {
+  font-family: var(--v-font-body);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+</style>

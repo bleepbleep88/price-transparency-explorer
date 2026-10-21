@@ -1,24 +1,29 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { ScorecardGroup, StatisticsBasis } from '../../api/types'
+import AnswerTile from '../AnswerTile.vue'
+import FacilityChargesSwitch from '../FacilityChargesSwitch.vue'
 import ScorecardExtremes from '../ScorecardExtremes.vue'
 import StatisticsNote from '../StatisticsNote.vue'
 
 // The note asks the live data status whether a rebuild is running; here none is.
 vi.mock('@/features/status/useDataStatus', () => ({ useDataStatus: () => ({ status: ref({ phase: 'ready' }) }) }))
 
-function plugins() {
+function makeRouter() {
   const empty = { template: '<div />' }
-  const router = createRouter({
+  return createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'search', component: empty },
       { path: '/providers/:key', name: 'scorecard', component: empty },
     ],
   })
+}
+
+function plugins(router = makeRouter()) {
   return [createVuetify({ theme: { defaultTheme: 'light' } }), router]
 }
 
@@ -60,34 +65,34 @@ function scorecardGroup(overrides: Partial<ScorecardGroup> = {}): ScorecardGroup
 }
 
 describe('StatisticsNote', () => {
-  it('names the plan files and stays quiet while the figures are current', () => {
+  it('stays quiet while the figures are current', () => {
     const wrapper = mount(StatisticsNote, { props: { basis: basis() }, global: { plugins: plugins() } })
-    expect(wrapper.text()).toContain('Plan files of Aug 31, 2026 · figures saved Oct 20, 2026')
     expect(wrapper.find('[data-testid="statistics-stale"]').exists()).toBe(false)
+    expect(wrapper.text()).toBe('')
   })
 
-  it('warns while they are being built or rebuilt', () => {
-    const building = mount(StatisticsNote, { props: { basis: basis({ isCurrent: false, builtAt: null }) }, global: { plugins: plugins() } })
-    const rebuilding = mount(StatisticsNote, { props: { basis: basis({ isCurrent: false }) }, global: { plugins: plugins() } })
-    expect(building.get('[data-testid="statistics-stale"]').text()).toContain("haven't been saved yet")
-    expect(rebuilding.get('[data-testid="statistics-stale"]').text()).toContain('out of date')
+  it('warns in a short line while they are missing or out of date', () => {
+    const missing = mount(StatisticsNote, { props: { basis: basis({ isCurrent: false, builtAt: null }) }, global: { plugins: plugins() } })
+    const stale = mount(StatisticsNote, { props: { basis: basis({ isCurrent: false }) }, global: { plugins: plugins() } })
+    expect(missing.get('[data-testid="statistics-stale"]').text()).toBe('No figures yet. They come with the next load.')
+    expect(stale.get('[data-testid="statistics-stale"]').text()).toBe('Figures are out of date until the next load.')
   })
 })
 
 describe('ScorecardExtremes', () => {
-  it('lists each service with its price against typical, in plain words, linked to the search that shows it', () => {
+  it('lists each service by its plain name, the bill and how far off, and opens the search that shows it', async () => {
+    const router = makeRouter()
     const wrapper = mount(ScorecardExtremes, {
-      props: { title: 'Furthest above the median', groups: [scorecardGroup()], empty: 'None above.' },
-      global: { plugins: plugins() },
+      props: { title: 'Most above typical', groups: [scorecardGroup()], tone: 'high', empty: 'None well above typical.' },
+      global: { plugins: plugins(router) },
     })
-    const item = wrapper.get('[data-testid="extreme-group"]')
-    expect(item.text()).toContain('RC 0460')
-    expect(item.text()).toContain('Essential Plan · Facility fee · Hospital outpatient department')
-    expect(item.text()).toContain('$393.99: about 15 times the typical price')
-    expect(item.text()).not.toMatch(/median|percentile|×/)
-    const href = new URL(item.attributes('href')!, 'http://localhost')
-    expect(href.pathname).toBe('/')
-    expect(Object.fromEntries(href.searchParams)).toEqual({
+    const row = wrapper.get('[data-testid="place-row"]')
+    expect(row.text()).toContain('Hospital · Essential Plan · about 15 times typical')
+    expect(row.text()).toContain('$394')
+    expect(row.text()).not.toMatch(/median|percentile|×|RC|0460|modifier|EIN/)
+    await row.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.query).toEqual({
       code: '0460',
       codeType: 'RC',
       group: 'essential-plan|RC|0460|facility|hospital-outpatient||negotiated',
@@ -96,8 +101,29 @@ describe('ScorecardExtremes', () => {
   })
 
   it('says so when there is nothing to list', () => {
-    const wrapper = mount(ScorecardExtremes, { props: { title: 'Furthest below the median', groups: [], empty: 'None below.' }, global: { plugins: plugins() } })
-    expect(wrapper.text()).toContain('None below.')
-    expect(wrapper.find('[data-testid="extreme-group"]').exists()).toBe(false)
+    const wrapper = mount(ScorecardExtremes, {
+      props: { title: 'Most below typical', groups: [], tone: 'low', empty: 'None well below typical.' },
+      global: { plugins: plugins() },
+    })
+    expect(wrapper.text()).toContain('None well below typical.')
+    expect(wrapper.find('[data-testid="place-row"]').exists()).toBe(false)
+  })
+})
+
+describe('FacilityChargesSwitch', () => {
+  it('has a short label with what it adds, and cannot be turned on with nothing to add', () => {
+    const some = mount(FacilityChargesSwitch, { props: { modelValue: false, count: 128 }, global: { plugins: plugins() } })
+    const none = mount(FacilityChargesSwitch, { props: { modelValue: false, count: 0 }, global: { plugins: plugins() } })
+    expect(some.text()).toBe('Include facility-only charges (128)')
+    expect(some.find('input').attributes('disabled')).toBeUndefined()
+    expect(none.find('input').attributes('disabled')).toBeDefined()
+  })
+})
+
+describe('AnswerTile', () => {
+  it('shows a label, one big figure and one line', () => {
+    const wrapper = mount(AnswerTile, { props: { label: 'Same price in both plans', figure: '77%', line: 'of 8,544 prices' }, global: { plugins: plugins() } })
+    expect(wrapper.get('[data-testid="answer-figure"]').text()).toBe('77%')
+    expect(wrapper.get('[data-testid="answer-line"]').text()).toBe('of 8,544 prices')
   })
 })
