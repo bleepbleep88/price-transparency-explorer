@@ -96,6 +96,23 @@ public sealed class PracticeNameTests(PracticeNameTests.Factory factory) : IClas
 
         var suggestions = await client.GetFromJsonAsync<JsonElement>("/api/v1/providers?q=lin%20family", ct);
         suggestions.EnumerateArray().Select(item => item.GetProperty("businessName").GetString()).Should().Equal("Lin Family Medicine PC");
+        suggestions[0].GetProperty("listedAs").ValueKind.Should().Be(JsonValueKind.Null, "its own name matched");
+    }
+
+    [Fact(Timeout = 120_000)]
+    public async Task The_typeahead_finds_a_practice_by_the_plans_network_name_and_says_so()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = factory.CreateClient();
+        await factory.WaitForIngestionAsync(ct);
+
+        var suggestions = (await client.GetFromJsonAsync<JsonElement>("/api/v1/providers?q=big%20network", ct)).EnumerateArray().ToList();
+
+        var lin = suggestions.Single(item => item.GetProperty("providerKey").GetString() == Lin);
+        lin.GetProperty("businessName").GetString().Should().Be("Lin Family Medicine PC");
+        lin.GetProperty("listedAs").GetString().Should().Be("Big Network IPA", "the page says \"listed by the plan as Big Network IPA\"");
+        suggestions.Single(item => item.GetProperty("providerKey").GetString() == "550000000")
+            .GetProperty("listedAs").ValueKind.Should().Be(JsonValueKind.Null, "the network's home shows that name itself");
     }
 
     private async Task<IReadOnlyList<JsonElement>> RowsAsync(string url, CancellationToken ct)

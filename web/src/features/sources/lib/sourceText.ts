@@ -80,10 +80,10 @@ export function timingLine(file: SourceFile): string | null {
   return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`
 }
 
-/** "85 MB", or "120 KB" for the small allowed-amount files. */
+/** "96 MB", or "120 KB" for the small allowed-amount files: decimal units, as the README gives sizes. */
 export function fileSize(bytes: number | null | undefined): string {
   if (bytes == null) return 'size unknown'
-  return bytes < 1_048_576 ? `${wholeNumber(Math.max(1, Math.round(bytes / 1024)))} KB` : `${wholeNumber(Math.round(bytes / 1_048_576))} MB`
+  return bytes < 1_000_000 ? `${wholeNumber(Math.max(1, Math.round(bytes / 1000)))} KB` : `${wholeNumber(Math.round(bytes / 1_000_000))} MB`
 }
 
 /** How every file is cleaned, short, for the bottom of the page. */

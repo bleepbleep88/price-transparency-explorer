@@ -38,6 +38,7 @@ export function monthDay(value: string | null | undefined): string {
   return Number.isNaN(parsed.getTime()) ? value : calendarDay.format(parsed)
 }
 
+/** Decimal megabytes, as the README and the sources page give file sizes. */
 export function megabytes(bytes: number | null | undefined): string {
-  return bytes == null ? '—' : `${whole.format(Math.round(bytes / 1_048_576))} MB`
+  return bytes == null ? '—' : `${whole.format(Math.round(bytes / 1_000_000))} MB`
 }

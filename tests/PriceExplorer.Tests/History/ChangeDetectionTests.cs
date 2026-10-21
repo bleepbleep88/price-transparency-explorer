@@ -214,6 +214,23 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_biggest_moves_come_first_in_dollars_up_or_down_with_the_bigger_percentage_on_a_tie()
+    {
+        // A drop can't pass -100%, so by percent the small rises would come first; by dollars the big drop leads.
+        await PairAsync("ambetter|CPT|10001|facility|asc||negotiated", "small-rise", 10m, 30m, name: "small rise");
+        await PairAsync("ambetter|CPT|10002|facility|asc||negotiated", "big-drop", 1000m, 900m, name: "big drop");
+        await PairAsync("ambetter|CPT|10003|facility|asc||negotiated", "tie-cheap", 50m, 70m, name: "tie cheap");
+        await PairAsync("ambetter|CPT|10004|facility|asc||negotiated", "tie-dear", 500m, 520m, name: "tie dear");
+
+        var largest = await ChangesAsync(new GetChangesQuery());
+        var byPercent = await ChangesAsync(new GetChangesQuery(Sort: "-changePct"));
+
+        // Three rises of $20 each: the bigger percentage first.
+        largest.Rows.Items.Select(row => row.ProviderKey).Should().Equal("big-drop", "small-rise", "tie-cheap", "tie-dear");
+        byPercent.Rows.Items.Select(row => row.ProviderKey).Should().Equal("small-rise", "tie-cheap", "tie-dear", "big-drop");
+    }
+
+    [Fact]
     public async Task Facility_charges_with_no_procedure_named_are_left_out_unless_asked_for_and_their_count_follows_the_filters()
     {
         // A facility charge with no procedure named doesn't compare like for like, so it isn't ranked with the rest (decision 89).

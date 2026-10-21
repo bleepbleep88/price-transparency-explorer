@@ -55,13 +55,13 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
         // New and dropped leave out Delta's rate, relabeled into another setting; the listed-elsewhere counts say so.
         Counts(result).Should().Equal(5, 4, 1, 1, 1, 1, 1, 8);
 
-        // Biggest moves first, then new and dropped rates by amount.
+        // Biggest moves in dollars first, up or down, then new and dropped rates by amount.
         Rows(result).Select(Describe).Should().Equal(
-            "changed 88-7777777 99213 45.00→50.00 11.1",
             "changed 22-1111111 45378 600.00→660.00 10.0",
             "changed masked 45378 500.00→450.00 -10.0",
-            "changed 44-3333333 45378 450.00→459.00 2.0",
             "changed 22-1111111 45378 610.00→620.00 1.6",
+            "changed 44-3333333 45378 450.00→459.00 2.0",
+            "changed 88-7777777 99213 45.00→50.00 11.1",
             "dropped 77-6666666 45378 800.00→",
             "new 66-5555555 45378 →750.00");
     }
@@ -151,7 +151,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     }
 
     [Theory(Timeout = 60_000)]
-    [InlineData("kind=changed&minChangePct=5", 3, "88-7777777|22-1111111|masked")]
+    [InlineData("kind=changed&minChangePct=5", 3, "22-1111111|masked|88-7777777")]
     [InlineData("kind=new", 1, "66-5555555")]
     [InlineData("kind=new&includeListedElsewhere=true", 2, "66-5555555|55-4444444")]
     [InlineData("kind=dropped&code=45378", 1, "77-6666666")]
@@ -161,7 +161,7 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     [InlineData("sort=changePct&kind=changed", 5, "masked|22-1111111|44-3333333|22-1111111|88-7777777")]
     [InlineData("sort=-changePct&kind=changed&minChangePct=2", 4, "88-7777777|22-1111111|44-3333333|masked")]
     [InlineData("sort=provider&kind=dropped&includeListedElsewhere=true", 2, "55-4444444|77-6666666")]
-    [InlineData("kind=increased", 4, "88-7777777|22-1111111|44-3333333|22-1111111")]
+    [InlineData("kind=increased", 4, "22-1111111|22-1111111|44-3333333|88-7777777")]
     [InlineData("kind=decreased", 1, "masked")]
     public async Task Filters_and_sorts_narrow_the_rows_and_counts(string filters, int total, string providers)
     {

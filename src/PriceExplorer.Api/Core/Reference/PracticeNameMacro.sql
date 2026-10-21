@@ -25,8 +25,14 @@ CREATE OR REPLACE MACRO practice_name(in_file, of_provider, listed_name) AS coal
      WHERE p.file_id = in_file AND p.provider_key = of_provider AND p.plan_name = listed_name),
     listed_name);
 
--- A provider name filter: the typed text (lower case) appears in the group's name as published or as shown, so a
--- practice is found by either.
+-- Whether a rate file's names as published can be trusted (name_checks): false for a file whose names belong to other
+-- tax IDs (the Sep 28 Essential Plan file); true for a file not checked yet.
+CREATE OR REPLACE MACRO listed_name_reliable(in_file) AS
+    NOT coalesce((SELECT n.unreliable FROM name_checks n WHERE n.file_id = in_file), false);
+
+-- A provider name filter: the typed text (lower case) appears in the name shown, or in the name as published when the
+-- file's names can be trusted. A network's name ("Big Network IPA") still finds its member practices, but a name an
+-- unreliable file gives another tax ID ("Teladoc" on Memorial Sloan Kettering) finds nothing.
 CREATE OR REPLACE MACRO provider_name_matches(in_file, of_provider, listed_name, text) AS
-    contains(lower(coalesce(listed_name, '')), text)
-    OR contains(lower(coalesce(practice_name(in_file, of_provider, listed_name), '')), text);
+    contains(lower(coalesce(practice_name(in_file, of_provider, listed_name), '')), text)
+    OR (contains(lower(coalesce(listed_name, '')), text) AND listed_name_reliable(in_file));

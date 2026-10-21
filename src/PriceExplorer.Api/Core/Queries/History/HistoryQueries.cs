@@ -20,7 +20,8 @@ namespace PriceExplorer.Api.Core.Queries.History;
 /// <param name="Kind">changed | increased | decreased (changed, by direction) | new | dropped. Omit for changed, new and
 /// dropped.</param>
 /// <param name="MinChangePct">Only changes of at least this many percent, up or down (changed rates only).</param>
-/// <param name="Sort">largest (biggest moves first) | -changePct | changePct | code | -code | provider | -provider.</param>
+/// <param name="Sort">largest (biggest moves in dollars first, up or down; the bigger percentage on a tie) | -changePct |
+/// changePct | code | -code | provider | -provider.</param>
 /// <param name="IncludeFacilityCharges">true adds facility charges with no procedure named (filed under a revenue code
 /// alone). Hospitals bundle different services under them, so by default they're left out of the rows and counts, as on
 /// the insights endpoints (decision 89); counts.facilityCharges says how many there are.</param>

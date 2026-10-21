@@ -199,11 +199,12 @@ public sealed class SuggestProvidersHandler(DuckDbConnectionFactory connections)
                 row.EinUnverified,
                 names.FirstOrDefault() ?? "Name not published",
                 names.Skip(1).ToList(),
-                row.Rates);
+                row.Rates,
+                row.ListedAs);
         }).ToList();
     }
 
-    private sealed record ProviderRow(string ProviderKey, string? Ein, bool EinUnverified, string? BusinessNames, long Rates);
+    private sealed record ProviderRow(string ProviderKey, string? Ein, bool EinUnverified, string? BusinessNames, long Rates, string? ListedAs);
 }
 
 public sealed class GetReferenceListsHandler(ReferenceCatalog catalog, ProviderDirectoryInfo directory)
