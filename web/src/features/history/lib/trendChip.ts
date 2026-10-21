@@ -1,6 +1,6 @@
 import type { GroupTrend, TrendPoint } from '../api/types'
-import { sameAsShown, upDown } from './changesText'
-import { comparablePoints } from './trend'
+import { sameAsShown, upDown, type Shown } from './changesText'
+import { comparablePoints, monthOf } from './trend'
 
 // The history chip on a price tile (decision 90): a few words on how the typical price moved up to the month on
 // screen. "Rates steady since Jul", "Up $12 since Aug", "Down $9 since Aug". A move that only reflects which providers are
@@ -9,14 +9,6 @@ import { comparablePoints } from './trend'
 
 /** A group's history across the loaded files, as GET /api/v1/rates/trend returns it. */
 export type TrendGroup = GroupTrend
-
-const month = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' })
-
-/** "2026-07-27" → "Jul": the files are monthly. */
-function monthOf(date: string | null): string {
-  const parsed = date ? new Date(`${date.slice(0, 10)}T00:00:00Z`) : null
-  return parsed && !Number.isNaN(parsed.getTime()) ? month.format(parsed) : 'the first file'
-}
 
 /**
  * same: the typical price looks the same in both files. listed: it moved, but every provider listed in both kept its
@@ -30,6 +22,34 @@ function stepKind(before: TrendPoint, after: TrendPoint): StepKind {
   return step && step.raised === 0 && step.lowered === 0 ? 'listed' : 'priced'
 }
 
+interface Reading {
+  date: string | null
+  value: number
+}
+
+/**
+ * The chip for readings up to the file on screen, with how each step moved (kinds[i]: readings[i] to readings[i + 1]):
+ * "<steady> since Jul" with no price move, else the last run of price moves the same way ("Up $20 since Jul" for $100,
+ * $110, $120), with no amount when a move that only reflects who's listed came after it.
+ */
+function chipFor(readings: readonly Reading[], kinds: readonly StepKind[], shown: Shown, steady: string): string {
+  const last = kinds.lastIndexOf('priced')
+  if (last === -1) return `${steady} since ${monthOf(readings[0]!.date)}`
+  const direction = Math.sign(readings[last + 1]!.value - readings[last]!.value)
+  let start = last
+  while (start > 0 && kinds[start - 1] === 'priced' && Math.sign(readings[start]!.value - readings[start - 1]!.value) === direction) start--
+  const since = monthOf(readings[start]!.date)
+  if (kinds.slice(last + 1).includes('listed')) return `Rates ${direction > 0 ? 'up' : 'down'} since ${since}`
+  const amount = upDown(readings[start]!.value, readings[readings.length - 1]!.value, shown)
+  return amount ? `${amount} since ${since}` : `${steady} since ${since}`
+}
+
+/** The complete points with a value up to the file on screen (the newest when none is picked); none when it has none. */
+function upTo(points: readonly TrendPoint[], selectedId: number | null): TrendPoint[] {
+  const end = selectedId == null ? points.length - 1 : points.findIndex((point) => point.snapshotId === selectedId)
+  return end < 1 ? [] : points.slice(0, end + 1)
+}
+
 /**
  * A few words for a price tile, up to the file on screen (the newest when none is picked); null when there's no history
  * to tell: fewer than two complete files with a typical price, or the file on screen has none (it's incomplete, too
@@ -37,24 +57,21 @@ function stepKind(before: TrendPoint, after: TrendPoint): StepKind {
  */
 export function trendChipText(trend: TrendGroup | null | undefined, selectedSnapshotId: number | null): string | null {
   if (!trend) return null
-  const points = comparablePoints(trend).filter((point) => point.median != null)
-  const end = selectedSnapshotId == null ? points.length - 1 : points.findIndex((point) => point.snapshotId === selectedSnapshotId)
-  if (end < 1) return null
-  const shown = points.slice(0, end + 1)
+  const shown = upTo(comparablePoints(trend).filter((point) => point.median != null), selectedSnapshotId)
+  if (shown.length < 2) return null
   const kinds = shown.slice(1).map((after, index) => stepKind(shown[index]!, after))
+  return chipFor(shown.map((point) => ({ date: point.indexDate, value: point.median! })), kinds, 'typical', 'Rates steady')
+}
 
-  // kinds[i] is the step from shown[i] to shown[i + 1].
-  const last = kinds.lastIndexOf('priced')
-  if (last === -1) return `Rates steady since ${monthOf(shown[0]!.indexDate)}`
-
-  // The run of price moves the same way that ends with the last one: "Up $20 since Jul" for $100, $110, $120.
-  const direction = Math.sign(shown[last + 1]!.median! - shown[last]!.median!)
-  let start = last
-  while (start > 0 && kinds[start - 1] === 'priced' && Math.sign(shown[start]!.median! - shown[start - 1]!.median!) === direction) start--
-  const since = monthOf(shown[start]!.indexDate)
-
-  // A later move that only reflects who's listed would be counted in an amount to the file on screen: say the way only.
-  if (kinds.slice(last + 1).includes('listed')) return `Rates ${direction > 0 ? 'up' : 'down'} since ${since}`
-  const amount = upDown(shown[start]!.median!, shown[end]!.median!, 'typical')
-  return amount ? `${amount} since ${since}` : `Rates steady since ${since}`
+/**
+ * The searched provider's own rate, for the providers lens: "Steady since Jul", "Up $17.41 since Jul" (to the cent, as
+ * its rate shows). Its own rate moving is a price change, so there's no who's-listed rule here.
+ */
+export function providerChipText(trend: TrendGroup | null | undefined, selectedSnapshotId: number | null): string | null {
+  if (!trend) return null
+  const shown = upTo(comparablePoints(trend).filter((point) => point.provider), selectedSnapshotId)
+  if (shown.length < 2) return null
+  const readings = shown.map((point) => ({ date: point.indexDate, value: point.provider!.rate }))
+  const kinds = readings.slice(1).map((after, index): StepKind => (sameAsShown(readings[index]!.value, after.value, 'rate') ? 'same' : 'priced'))
+  return chipFor(readings, kinds, 'rate', 'Steady')
 }

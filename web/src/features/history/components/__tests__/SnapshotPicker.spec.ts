@@ -58,7 +58,7 @@ describe('SnapshotPicker', () => {
     expect(wrapper!.get('[data-testid="snapshot-picker"]').text()).toContain('Sep 28, 2026')
     await open()
     const options = [...document.body.querySelectorAll('[data-testid^="snapshot-option-"]')].map((element) => element.textContent?.trim())
-    expect(options).toEqual(['Sep 28, 2026Newest, shown by default', 'Aug 31, 2026', 'Jul 27, 2026'])
+    expect(options).toEqual(['Sep 28, 2026Newest', 'Aug 31, 2026', 'Jul 27, 2026'])
   })
 
   it('puts the picked snapshot in the URL, starting at page 1 and comparing with the file before it again', async () => {

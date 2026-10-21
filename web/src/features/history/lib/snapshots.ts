@@ -1,4 +1,3 @@
-import { monthDay, shortDate } from '@/lib/format'
 import type { SnapshotSummary } from '@/features/rates/api/types'
 
 // Which snapshot a page shows, and how the picker names each one.
@@ -33,22 +32,15 @@ export function olderSnapshots(snapshots: readonly SnapshotSummary[], snapshot: 
   return usableSnapshots(snapshots).filter((other) => other.indexDate != null && other.indexDate < snapshot.indexDate!)
 }
 
-/** "Aug 31" when every snapshot is in one year, else "Aug 31, 2026". */
-export function snapshotLabel(snapshot: SnapshotSummary | null, all: readonly SnapshotSummary[]): string {
-  if (!snapshot) return '—'
-  const years = new Set(all.map((other) => other.indexDate?.slice(0, 4)))
-  return years.size <= 1 ? monthDay(snapshot.indexDate) : shortDate(snapshot.indexDate)
-}
-
 /** Product names whose file in this snapshot looks incomplete next to nearby snapshots. */
 export function partialProducts(snapshot: SnapshotSummary): string[] {
   return snapshot.products.filter((product) => product.completeness?.partial).map((product) => product.productLabel)
 }
 
-/** One line under a snapshot in the picker: "Newest, shown by default", "Essential Plan looks incomplete", "Still loading". */
+/** One line under a month in the picker: "Newest", "Essential Plan looks incomplete", "Still loading". */
 export function snapshotNote(snapshot: SnapshotSummary): string {
   const notes: string[] = []
-  if (snapshot.isLatest) notes.push('Newest, shown by default')
+  if (snapshot.isLatest) notes.push('Newest')
   const partial = partialProducts(snapshot)
   if (partial.length) notes.push(`${partial.join(' and ')} ${partial.length === 1 ? 'looks' : 'look'} incomplete`)
   if (snapshot.status === 'loading') notes.push('Still loading')
