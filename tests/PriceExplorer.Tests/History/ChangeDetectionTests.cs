@@ -119,7 +119,7 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_rate_listed_under_other_modifiers_is_new_and_dropped_and_says_it_is_listed_elsewhere()
+    public async Task A_rate_listed_under_other_modifiers_is_left_out_unless_asked_for_and_counted_either_way()
     {
         // The same telehealth rate, with GQ dropped from its modifiers, as Centene did between 2026-07-27 and 2026-08-31.
         await ValueAsync(August, "ambetter|CPT|99213|professional|telehealth-other|95,GQ,GT|negotiated", "111111111", 75m);
@@ -128,17 +128,23 @@ public sealed class ChangeDetectionTests : IAsyncLifetime
         await ValueAsync(August, "ambetter|CPT|99214|professional|telehealth-other|95,GT|negotiated", "111111111", 110m);
         await ValueAsync(September, "ambetter|CPT|99213|professional|telehealth-other|95,GT|negotiated", "222222222", 75m);
 
-        var result = await ChangesAsync(new GetChangesQuery(Sort: "code"));
+        var plain = await ChangesAsync(new GetChangesQuery(Sort: "code"));
+        var all = await ChangesAsync(new GetChangesQuery(Sort: "code", IncludeListedElsewhere: true));
 
-        result.Rows.Items.Select(row => (row.Kind, row.Code, row.ProviderKey, row.ListedElsewhere)).Should().BeEquivalentTo(
+        // By default the relabeled rate is neither gone nor new: only the really new and dropped ones are.
+        plain.Rows.Items.Select(row => (row.Kind, row.Code, row.ProviderKey, row.ListedElsewhere)).Should().BeEquivalentTo(
+            [("new", "99213", "222222222", false), ("dropped", "99214", "111111111", false)]);
+        plain.Counts.Should().Match<ChangeCounts>(counts =>
+            counts.New == 1 && counts.NewListedElsewhere == 1 && counts.Dropped == 1 && counts.DroppedListedElsewhere == 1);
+        plain.Query.IncludeListedElsewhere.Should().BeFalse();
+        all.Rows.Items.Select(row => (row.Kind, row.Code, row.ProviderKey, row.ListedElsewhere)).Should().BeEquivalentTo(
         [
             ("dropped", "99213", "111111111", true), ("new", "99213", "111111111", true),
             ("new", "99213", "222222222", false), ("dropped", "99214", "111111111", false),
         ]);
-        result.Counts.Should().Match<ChangeCounts>(counts =>
-            counts.New == 2 && counts.NewListedElsewhere == 1 && counts.Dropped == 2 && counts.DroppedListedElsewhere == 1);
-        (await ChangesAsync(new GetChangesQuery(ListedElsewhere: false))).Rows.Items.Should().OnlyContain(row => !row.ListedElsewhere)
-            .And.HaveCount(2);
+        all.Counts.Should().Match<ChangeCounts>(counts =>
+            counts.New == 2 && counts.NewListedElsewhere == 1 && counts.Dropped == 2 && counts.DroppedListedElsewhere == 1,
+            "the listed-elsewhere counts say the same either way: what the switch adds");
     }
 
     [Fact]

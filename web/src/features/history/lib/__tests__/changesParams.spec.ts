@@ -11,7 +11,7 @@ describe('changes URL state', () => {
         code: '99213',
         kind: 'changed',
         minChangePct: '5',
-        listedElsewhere: 'false',
+        includeListedElsewhere: 'true',
         includeFacilityCharges: 'true',
         sort: '-changePct',
         page: '2',
@@ -24,7 +24,7 @@ describe('changes URL state', () => {
       code: '99213',
       kind: 'changed',
       minChangePct: 5,
-      hideListedElsewhere: true,
+      includeListedElsewhere: true,
       includeFacilityCharges: true,
       sort: '-changePct',
       page: 2,
@@ -37,7 +37,7 @@ describe('changes URL state', () => {
       code: undefined,
       kind: undefined,
       minChangePct: undefined,
-      hideListedElsewhere: false,
+      includeListedElsewhere: false,
       includeFacilityCharges: false,
       sort: 'largest',
       page: 1,
@@ -51,11 +51,11 @@ describe('changes URL state', () => {
   })
 
   it('keeps URLs short: defaults and cleared filters drop out', () => {
-    expect(mergeChangesQuery({ code: '45378', page: '3', snapshot: '2' }, { code: null, sort: 'largest', page: 1, hideListedElsewhere: true })).toEqual({
+    expect(mergeChangesQuery({ code: '45378', page: '3', snapshot: '2' }, { code: null, sort: 'largest', page: 1, includeListedElsewhere: true })).toEqual({
       snapshot: '2',
-      listedElsewhere: 'false',
+      includeListedElsewhere: 'true',
     })
-    expect(mergeChangesQuery({ listedElsewhere: 'false', kind: 'new' }, { hideListedElsewhere: false, kind: undefined, pageSize: 10 })).toEqual({
+    expect(mergeChangesQuery({ includeListedElsewhere: 'true', kind: 'new' }, { includeListedElsewhere: false, kind: undefined, pageSize: 10 })).toEqual({
       kind: 'new',
     })
     expect(mergeChangesQuery({ code: '0450' }, { includeFacilityCharges: true })).toEqual({ code: '0450', includeFacilityCharges: 'true' })
@@ -63,7 +63,7 @@ describe('changes URL state', () => {
   })
 
   it("sends the page's snapshot as the newer file and only what the API takes", () => {
-    const query = toChangesApiQuery(parseChangesQuery({ snapshot: '1', from: '2', code: 'RC 0490', listedElsewhere: 'false' }))
+    const query = toChangesApiQuery(parseChangesQuery({ snapshot: '1', from: '2', code: 'RC 0490', includeListedElsewhere: 'true' }))
     expect(query).toEqual({
       from: 2,
       to: 1,
@@ -71,8 +71,8 @@ describe('changes URL state', () => {
       code: 'RC 0490',
       kind: undefined,
       minChangePct: undefined,
-      listedElsewhere: false,
       includeFacilityCharges: undefined,
+      includeListedElsewhere: true,
       sort: undefined,
       page: 1,
       pageSize: 10,

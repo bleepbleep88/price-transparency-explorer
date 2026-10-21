@@ -9,11 +9,15 @@
 -- A new pair is listed_elsewhere when the same provider also has a dropped pair with the same product, code and fee type
 -- (and a dropped pair when it has such a new one): the rate moved to other modifiers or another setting (Centene reshuffles
 -- telehealth modifiers such as GQ and GT from month to month). A provider that simply has another group in the other file,
--- one it is still in, doesn't count. $listedElsewhere keeps only those (true) or leaves them out (false).
+-- one it is still in, doesn't count.
 -- of_kind: the pair is of $kind (changed, increased or decreased for changed ones by direction, new or dropped; NULL for
--- all). included: false for facility charges with no procedure named (code_type RC, as InsightSupport.IsFacilityChargeOnly:
+-- all). Two switches leave pairs out by default, and each count says what its switch would add:
+-- facility_ok: false for facility charges with no procedure named (code_type RC, as InsightSupport.IsFacilityChargeOnly:
 -- hospitals bundle different services under them, so they don't compare like for like, decision 89) unless
 -- $includeFacilityCharges.
+-- relabel_ok: false for listed_elsewhere pairs unless $includeListedElsewhere: the same provider and service, relabeled,
+-- would otherwise read as one rate gone and another new.
+-- included: both.
 -- ChangeCounts.sql and ChangeRows.sql each end this query with their own SELECT from shown.
 WITH older AS (
     SELECT *
@@ -78,9 +82,11 @@ shown AS (
             OR kind = $kind::VARCHAR
             OR ($kind::VARCHAR = 'increased' AND kind = 'changed' AND to_value > from_value)
             OR ($kind::VARCHAR = 'decreased' AND kind = 'changed' AND to_value < from_value)) AS of_kind,
-           (code_type <> 'RC' OR $includeFacilityCharges::BOOLEAN)                            AS included
+           (code_type <> 'RC' OR $includeFacilityCharges::BOOLEAN)                            AS facility_ok,
+           (NOT listed_elsewhere OR $includeListedElsewhere::BOOLEAN)                         AS relabel_ok,
+           (code_type <> 'RC' OR $includeFacilityCharges::BOOLEAN)
+               AND (NOT listed_elsewhere OR $includeListedElsewhere::BOOLEAN)                 AS included
     FROM flagged
     -- A change from $0 has no percentage, so a minimum leaves it out.
     WHERE (kind <> 'changed' OR $minChangePct::DOUBLE IS NULL OR abs(change_pct) >= $minChangePct::DOUBLE)
-      AND ($listedElsewhere::BOOLEAN IS NULL OR listed_elsewhere = $listedElsewhere::BOOLEAN)
 )

@@ -26,11 +26,11 @@ export interface ChangesEcho {
   codeType: string | null
   kind: ChangeFilter | null
   minChangePct: number | null
-  listedElsewhere: boolean | null
   sort: string
   page: number
   pageSize: number
   includeFacilityCharges: boolean
+  includeListedElsewhere: boolean
 }
 
 export interface ChangesProduct {
@@ -45,9 +45,13 @@ export interface ChangeCounts {
   increased: number
   decreased: number
   new: number
-  /** Of the new ones: the older file lists the provider for the same code under other modifiers or another setting. */
+  /**
+   * New rates the older file lists for the same provider and code under other modifiers or another setting: the same rate
+   * relabeled. What includeListedElsewhere adds to `new` (already in it when set).
+   */
   newListedElsewhere: number
   dropped: number
+  /** Gone rates the newer file lists relabeled: what includeListedElsewhere adds to `dropped`. */
   droppedListedElsewhere: number
   unchanged: number
   /**

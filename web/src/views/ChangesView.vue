@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@/lib/apiClient'
-import { monthDay, plural, shortDate } from '@/lib/format'
+import { monthDay, plural, shortDate, wholeNumber } from '@/lib/format'
 import PageHeader from '@/components/simple/PageHeader.vue'
 import DetailsPanel from '@/components/simple/DetailsPanel.vue'
 import LoadingPanel from '@/features/status/components/LoadingPanel.vue'
@@ -17,7 +17,7 @@ import {
   parseChangesQuery,
   type ChangesPatch,
 } from '@/features/history/lib/changesParams'
-import { listedElsewhereSummary, WAITING_SHORT, waitingText } from '@/features/history/lib/changesText'
+import { listedElsewhereSummary, relabeledCount, WAITING_SHORT, waitingText } from '@/features/history/lib/changesText'
 import FacilityChargesSwitch from '@/features/insights/components/FacilityChargesSwitch.vue'
 import { planName } from '@/features/rates/lib/answer'
 import { olderSnapshots } from '@/features/history/lib/snapshots'
@@ -87,6 +87,10 @@ const LIST_TITLES: Record<ChangeFilter, string> = {
 const listTitle = computed(() => LIST_TITLES[params.value.kind ?? 'changed'])
 
 const listedElsewhere = computed(() => (counts.value ? listedElsewhereSummary(counts.value) : null))
+// Same provider and service, relabeled (Centene reshuffles telehealth modifiers): left out of the counts and list unless
+// asked for, so a relabel never reads as one rate gone and another new.
+const relabeled = computed(() => relabeledCount(counts.value, params.value.kind))
+const relabeledLabel = computed(() => `Include relabeled rates${relabeled.value ? ` (${wholeNumber(relabeled.value)})` : ''}`)
 const compared = computed(() => {
   if (!result.value) return ''
   const files = `${shortDate(result.value.from.indexDate)} and ${shortDate(result.value.to.indexDate)} files, compared by provider (tax ID), service, setting and plan.`
@@ -168,14 +172,15 @@ const notCompared = computed(() => result.value?.products.filter((product) => !p
           />
         </div>
         <v-switch
-          :model-value="params.hideListedElsewhere"
-          label="Hide rates only listed differently"
+          :model-value="params.includeListedElsewhere"
+          :label="relabeledLabel"
+          :disabled="!params.includeListedElsewhere && relabeled === 0"
           color="primary"
           density="compact"
           hide-details
           inset
-          data-testid="changes-hide-listed"
-          @update:model-value="(hide) => update({ hideListedElsewhere: Boolean(hide) })"
+          data-testid="changes-include-relabeled"
+          @update:model-value="(include) => update({ includeListedElsewhere: Boolean(include) })"
         />
         <FacilityChargesSwitch
           :model-value="params.includeFacilityCharges"
