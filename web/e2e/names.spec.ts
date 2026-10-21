@@ -105,3 +105,17 @@ test("a provider search matches the names shown, not the names the mislabelled f
   await expect(page.getByRole('option').first()).toContainText('Teladoc Physicians')
   await expect(page.getByRole('listbox')).not.toContainText(/Memorial Sloan|Starrett City/)
 })
+
+test("a provider found by the plan's name for it says so in both provider typeaheads", async ({ page }) => {
+  // The plan lists RS Naghavi MD PLLC, among others, under its network's name, "Beacon IPA LLC".
+  await page.goto('/providers')
+  await page.getByTestId('provider-lookup').locator('input').fill('beacon')
+  await expect(page.getByRole('option').filter({ hasText: 'RS Naghavi' })).toContainText('Listed by the plan as Beacon IPA')
+  // A name that matched as shown needs no note.
+  await expect(page.getByRole('option').filter({ hasText: 'Beacon Christian' })).not.toContainText('Listed by the plan')
+
+  await page.goto('/?code=99213')
+  await page.getByTestId('filters-toggle').click()
+  await page.getByTestId('provider-input').locator('input').fill('beacon')
+  await expect(page.getByRole('option').filter({ hasText: 'RS Naghavi' })).toContainText('Listed by the plan as Beacon IPA')
+})

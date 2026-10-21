@@ -423,6 +423,11 @@ export interface ProviderSuggestion {
   businessName: string
   otherNames: string[]
   rates: number
+  /**
+   * The plan's name for the provider when the search matched only that, not the name shown (a network's name on a
+   * member practice: "Beacon IPA LLC"). Null when the shown name matched.
+   */
+  listedAs: string | null
 }
 
 export interface SettingOption {

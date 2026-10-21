@@ -1,8 +1,9 @@
 // Plain names for the main view (decision 90): what a five-year-old would call a place, a bill or a provider.
 // The API keeps the precise labels; Details panels can still show them.
 
-import type { ModifierRef } from '@/features/rates/api/types'
+import type { ModifierRef, ProviderSuggestion } from '@/features/rates/api/types'
 import { ALIASES, CODE_NAMES } from './codeNames'
+import { plural } from './format'
 
 const SETTING_NAMES: Record<string, string> = {
   asc: 'Surgery center',
@@ -293,6 +294,15 @@ export function providerName(name: string): string {
       .join(' ')
   }
   return clean || name
+}
+
+/**
+ * A provider typeahead's second line: "28 prices", or, when only the plan's name for the provider matched,
+ * "Listed by the plan as Beacon IPA · 28 prices", so a search for "beacon" explains a practice with another name.
+ */
+export function providerSuggestionLine(item: Pick<ProviderSuggestion, 'rates' | 'listedAs'>): string {
+  const prices = plural(item.rates, 'price')
+  return item.listedAs ? `Listed by the plan as ${providerName(item.listedAs)} · ${prices}` : prices
 }
 
 /** A place without the state when it's New York: "Rome, NY (Oneida County)" → "Rome"; "Newark, NJ" stays. */
