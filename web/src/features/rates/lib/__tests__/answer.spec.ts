@@ -164,5 +164,11 @@ describe('role lines', () => {
       query: { ...colonoscopy.query, npi: '1234567893' },
     })
     expect(tileFor(pinned.groups[0]!, pinned).yours).toBe('Yours: $247.85 · Lower than most · $263.15 less than typical')
+    expect(roleLines('providers', pinned, pinned.groups[0]!)).toEqual([{ text: 'Yours: $247.85 · Lower than most · $263.15 less than typical' }])
+  })
+
+  it('never asks for an NPI or tax ID the search already has', () => {
+    const searched = result([essentialCenter], { query: { ...colonoscopy.query, ein: '113466729' } })
+    expect(roleLines('providers', searched, essentialCenter)).toEqual([{ text: 'Not on this bill. Pick another above.' }])
   })
 })

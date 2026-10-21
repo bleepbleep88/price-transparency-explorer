@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { LocationQuery, LocationQueryRaw } from 'vue-router'
 import type { QueryValue } from '@/lib/apiClient'
-import { isEinOrProviderKey, isValidNpi, npiDigits } from './providerIds'
+import { isEinOrProviderKey, isValidNpi, normalizeEin, npiDigits } from './providerIds'
 
 // The URL query string is the single source of truth for a search: shareable, bookmarkable, and Back works.
 
@@ -203,6 +203,21 @@ export function npiCheckDigitWarning(npi: string | null | undefined): string | n
   return npiDigits(npi).length === 10 && !isValidNpi(npi)
     ? 'This NPI fails the standard check-digit test. Some plan files publish NPIs like this, so you can still search.'
     : null
+}
+
+/** What the provider role's box says when the text is neither an NPI nor a tax ID. */
+export const PROVIDER_ID_ERROR = 'Enter a 10-digit NPI or a 9-digit tax ID.'
+
+/**
+ * The provider role's one box, read with the form's own rules: 10 digits is an NPI, 9 digits (dash optional) a tax ID.
+ * Returns the search to run (the other one cleared, so they never disagree), or null when it's neither.
+ */
+export function providerIdPatch(text: string | null | undefined): QueryPatch | null {
+  const value = (text ?? '').trim()
+  if (!value) return null
+  if (searchFormSchema.shape.npi.safeParse(value).success) return { npi: npiDigits(value), ein: null }
+  if (searchFormSchema.shape.ein.safeParse(value).success) return { ein: normalizeEin(value) ?? value, npi: null }
+  return null
 }
 
 export function formValuesFrom(params: SearchParams): SearchFormValues {

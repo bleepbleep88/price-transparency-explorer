@@ -23,6 +23,11 @@ const title = computed(() => resultTitle(props.result))
 const showCode = computed(() => !title.value.includes(code.value))
 const chips = computed(() => activeFilterChips(props.result, props.params, props.products, props.settings, props.locations ?? []))
 const empty = computed(() => !props.result.groups.length)
+// With an NPI or tax ID in the search, the prices are there; that provider just isn't listed for them.
+const emptyLine = computed(() => {
+  const { npi, ein } = props.result.query
+  return npi ? 'No prices for this NPI here.' : ein ? 'No prices for this tax ID here.' : 'No prices for this in these files.'
+})
 // How the plan filed the code (revenue codes, procedure lists) is for Details once there are prices to show.
 const hints = computed(() => props.result.hints.filter((hint) => !TECHNICAL_HINTS.has(hint.kind)))
 const links = computed(() => props.result.hints.flatMap((hint) => hint.links))
@@ -52,7 +57,7 @@ const links = computed(() => props.result.hints.flatMap((hint) => hint.links))
 
     <!-- No prices: one short line and what to try; the reasons are under "Why". -->
     <template v-if="empty">
-      <p class="empty-line" data-testid="no-prices">No prices for this in these files.</p>
+      <p class="empty-line" data-testid="no-prices">{{ emptyLine }}</p>
       <div v-if="links.length" class="d-flex flex-wrap ga-2">
         <v-btn v-for="link in links" :key="link.label" size="small" variant="outlined" @click="emit('update', { ...link.query, group: null })">
           {{ link.label }}
