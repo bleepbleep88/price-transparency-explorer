@@ -96,6 +96,13 @@ const isCurrent = (item: { names: string[] }) => item.names.includes(String(rout
   color: inherit;
   text-decoration: none;
   font-weight: 600;
+  white-space: nowrap;
+}
+
+/* On a phone the brand keeps its full name: the title doesn't shrink below it. */
+:deep(.v-app-bar-title) {
+  flex: 0 0 auto;
+  min-width: max-content;
 }
 
 .app-footer {

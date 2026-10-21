@@ -56,7 +56,7 @@ const router = createRouter({
 
 router.afterEach((to) => {
   const title = to.meta.title as string | undefined
-  document.title = title ? `${title} · Price Transparency Explorer` : 'Price Transparency Explorer'
+  document.title = title ? `${title} · Price Explorer` : 'Price Explorer'
 })
 
 export default router

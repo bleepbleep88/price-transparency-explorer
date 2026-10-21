@@ -45,7 +45,7 @@ const overall = computed(() => (result.value ? overallReading(result.value) : nu
 watch(
   [result, () => route.fullPath],
   ([value]) => {
-    if (value && route.name === 'scorecard') document.title = `${providerName(value.provider.name)} · Price Transparency Explorer`
+    if (value && route.name === 'scorecard') document.title = `${providerName(value.provider.name)} · Price Explorer`
   },
   { immediate: true },
 )
