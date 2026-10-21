@@ -11,6 +11,7 @@ import {
   placesCount,
   plainNameMatches,
   providerName,
+  providerSuggestionLine,
   sentenceCase,
   serviceTitle,
   settingName,
@@ -74,6 +75,13 @@ describe('plain names', () => {
     // Acronyms stay: no vowel, or three letters or fewer.
     expect(providerName('MVHS INC')).toBe('MVHS')
     expect(providerName('NYU LANGONE HOSPITALS')).toBe('NYU Langone Hospitals')
+  })
+
+  it("says when a provider was found by the plan's name for it, not the name shown", () => {
+    expect(providerSuggestionLine({ rates: 87, listedAs: null })).toBe('87 prices')
+    expect(providerSuggestionLine({ rates: 1, listedAs: null })).toBe('1 price')
+    // A search for "beacon" finds member practices the plan lists under their network's name.
+    expect(providerSuggestionLine({ rates: 45, listedAs: 'Beacon IPA LLC' })).toBe('Listed by the plan as Beacon IPA · 45 prices')
   })
 
   it("titles a HCPCS code from CMS's long or short name, a revenue code from its label, and finds plain names typed", () => {

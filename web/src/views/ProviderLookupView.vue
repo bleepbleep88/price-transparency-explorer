@@ -2,8 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { mdiMagnify } from '@mdi/js'
-import { plural } from '@/lib/format'
-import { providerName } from '@/lib/plainNames'
+import { providerName, providerSuggestionLine } from '@/lib/plainNames'
 import PageHeader from '@/components/simple/PageHeader.vue'
 import type { ProviderSuggestion } from '@/features/rates/api/types'
 import { useProviderSuggestions } from '@/features/rates/composables/useRateQueries'
@@ -58,7 +57,7 @@ function open(item: ProviderSuggestion | null) {
       @update:model-value="open"
     >
       <template #item="{ props: itemProps, item }">
-        <v-list-item v-bind="itemProps" :subtitle="plural(item.rates, 'price')" />
+        <v-list-item v-bind="itemProps" :subtitle="providerSuggestionLine(item)" :lines="item.listedAs ? 'two' : 'one'" />
       </template>
     </v-autocomplete>
   </v-container>

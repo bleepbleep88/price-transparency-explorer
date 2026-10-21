@@ -2,7 +2,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { mdiMagnify } from '@mdi/js'
 import { plural } from '@/lib/format'
-import { looksLikeCode, plainNameMatches, serviceTitle, settingName } from '@/lib/plainNames'
+import { looksLikeCode, plainNameMatches, providerSuggestionLine, serviceTitle, settingName } from '@/lib/plainNames'
 import type {
   CodeSuggestion,
   LocationOption,
@@ -290,7 +290,8 @@ function onSubmit() {
                 <template #item="{ props: itemProps, item }">
                   <v-list-item
                     v-bind="itemProps"
-                    :subtitle="plural(item.rates, 'price')"
+                    :subtitle="providerSuggestionLine(item)"
+                    :lines="item.listedAs ? 'two' : 'one'"
                   />
                 </template>
               </v-combobox>
