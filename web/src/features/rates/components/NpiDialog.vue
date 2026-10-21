@@ -7,10 +7,12 @@ import { ApiError } from '@/lib/apiClient'
 import { providerName } from '@/lib/plainNames'
 import type { RateRow } from '../api/types'
 import { useRateNpis } from '../composables/useRateQueries'
+import { useReturnFocus } from '../composables/useReturnFocus'
 import { formatNpi } from '../lib/providerIds'
 
 // The clinicians (NPIs) the plan lists for a row, as published. A row's details: the main view never shows NPIs.
 const open = defineModel<boolean>({ required: true })
+useReturnFocus(open)
 const props = defineProps<{ row: RateRow | null }>()
 
 const PAGE_SIZE = 50

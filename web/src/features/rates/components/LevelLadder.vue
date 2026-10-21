@@ -57,7 +57,7 @@ const headers = [
 
     <LevelLadderChart :steps="steps" :current="code!.code" />
 
-    <DetailsPanel testid="level-details">
+    <DetailsPanel label="Details: levels" testid="level-details">
       <!-- In Details: on the main view both bills can read the same ("Doctor · in the office"); only modifiers differ. -->
       <p v-if="note" data-testid="level-note">{{ note }}</p>
       <v-select

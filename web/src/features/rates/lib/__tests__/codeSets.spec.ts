@@ -144,6 +144,42 @@ describe('dose math', () => {
     expect(reason).toBeNull()
   })
 
+  it("prices from the reader's plan and tile, never another plan's price (J1100: Essential $0.11, Ambetter $0.09)", () => {
+    const j1100 = (plan: 'essential-plan' | 'ambetter', overrides: Partial<RateGroup> = {}) =>
+      group({
+        key: `${plan}|HCPCS|J1100|professional|office||negotiated`,
+        productKey: plan,
+        productLabel: plan === 'ambetter' ? 'Ambetter from Fidelis Care' : 'Essential Plan',
+        code: 'J1100',
+        stats: stats(plan === 'ambetter' ? 0.09 : 0.11, { p10: null, p90: null }),
+        ...overrides,
+      })
+    // Ambetter has more places, so with no plan it would lead.
+    const groups = [j1100('ambetter', { providerCount: 40 }), j1100('essential-plan', { providerCount: 12 })]
+    const essential = dosePricing(result(groups), { plan: 'essential-plan' })
+    expect(essential.options.map((option) => option.typical)).toEqual([0.11])
+    expect(doseLine(8, { amount: 1, unit: 'mg', text: '1 mg' }, essential.options[0]!.typical)!.text).toBe('8 mg = 8 units → $0.88')
+    expect(dosePricing(result(groups), { plan: 'ambetter' }).options.map((option) => option.typical)).toEqual([0.09])
+    expect(dosePricing(result(groups)).options.map((option) => option.typical)).toEqual([0.09, 0.11])
+
+    // The reader's tile leads its plan, even with a modifier and fewer places.
+    const injected = j1100('essential-plan', { key: 'tile', modifiers: [{ code: 'JA', label: 'Given into a vein' }], providerCount: 6, stats: stats(0.15, { p10: null, p90: null }) })
+    expect(dosePricing(result([...groups, injected]), { plan: 'essential-plan', group: 'tile' }).options.map((option) => option.groupKey)).toEqual([
+      'tile',
+      'essential-plan|HCPCS|J1100|professional|office||negotiated',
+    ])
+    // A tile that can't price a dose (discarded drug) leaves the plan's best card first.
+    const thrownAway = j1100('essential-plan', { key: 'jw-tile', modifiers: discarded, providerCount: 50 })
+    expect(dosePricing(result([...groups, thrownAway]), { plan: 'essential-plan', group: 'jw-tile' }).options[0]!.typical).toBe(0.11)
+  })
+
+  it("says why the reader's plan can't price a dose, even when another plan can", () => {
+    const groups = [group({ key: 'ambetter', productKey: 'ambetter' }), group({ key: 'essential-jw', modifiers: discarded, providerCount: 7 })]
+    expect(dosePricing(result(groups), { plan: 'essential-plan' })).toEqual({ options: [], reason: 'Only priced for thrown-away drug. No dose price.' })
+    // A plan with no per-unit price at all: no reason, the calculator stays away.
+    expect(dosePricing(result(groups), { plan: 'other-plan' })).toEqual({ options: [], reason: null })
+  })
+
   it('says why it can price no dose: only discarded drug has a typical price, or too few providers', () => {
     expect(dosePricing(result([group({ modifiers: discarded, providerCount: 7 }), group({ key: 'small', providerCount: 2 })]))).toEqual({
       options: [],

@@ -19,6 +19,7 @@ test('an office visit shows every level side by side, numbers in Details', async
   await expect(ladder.getByTestId('level-ladder-chart')).toHaveAttribute('aria-label', /^Typical price by level: Level 1 \$/)
   await expect(ladder.getByTestId('level-table')).toBeHidden()
 
+  await expect(ladder.getByTestId('level-details-toggle')).toHaveText('Details: levels')
   await ladder.getByTestId('level-details-toggle').click()
   await expect(ladder.getByTestId('level-step')).toHaveCount(5)
   await expect(ladder.getByTestId('level-step').nth(2)).toContainText(/Level 3\s*99213/)
@@ -62,4 +63,26 @@ test('a drug priced only for discarded amounts gets no dose cost, and says why',
   const calculator = page.getByTestId('dose-calculator')
   await expect(calculator.getByTestId('dose-reason')).toHaveText('Only priced for thrown-away drug. No dose price.')
   await expect(calculator.getByTestId('dose-answer')).toHaveCount(0)
+})
+
+test('the source drawer and the NPI list give focus back to what opened them', async ({ page }) => {
+  await page.goto('/?code=99213')
+
+  const row = page.getByTestId('place-row').first()
+  await row.focus()
+  await page.keyboard.press('Enter')
+  const drawer = page.getByTestId('source-drawer')
+  await expect(drawer.getByTestId('source-json-path')).toBeVisible()
+  await drawer.getByRole('button', { name: 'Close' }).click()
+  await expect(row).toBeFocused()
+
+  await page.getByTestId('see-all').click()
+  const menu = page.getByTestId('row-menu').first()
+  await menu.focus()
+  await page.keyboard.press('Enter')
+  await page.getByText(/^Who works here/).first().click()
+  const dialog = page.getByTestId('npi-dialog')
+  await expect(dialog.getByTestId('npi-count')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(menu).toBeFocused()
 })

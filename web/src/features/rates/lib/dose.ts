@@ -94,13 +94,21 @@ function discardLine(group: RateGroup): boolean {
   return group.modifiers.some((modifier) => modifier.code === 'JW' || modifier.code === 'JZ')
 }
 
+/** The plan tab and the tile the reader is looking at; the dose is priced from them. */
+export interface DoseFocus {
+  plan?: string | null
+  group?: string | null
+}
+
 /**
  * The cards priced per unit under the drug's own code, in dollars, with a typical price, for drug that's given: not
  * revenue-code facility charges (one amount for the case), not a percentage of billed charges, not discarded-drug (JW)
- * or none-discarded (JZ) lines. Cards without modifiers first, then the most providers.
+ * or none-discarded (JZ) lines. Only the reader's plan, so the answer never borrows another plan's price; the reader's
+ * tile first, then cards without modifiers, then the most providers.
  */
-export function dosePricing(result: RateSearchResult): DosePricing {
-  const perUnit = result.groups.filter((group) => group.perUnit && !filedUnderRevenueCode(group) && group.negotiatedType !== 'percentage')
+export function dosePricing(result: RateSearchResult, focus: DoseFocus = {}): DosePricing {
+  const inPlan = focus.plan ? result.groups.filter((group) => group.productKey === focus.plan) : result.groups
+  const perUnit = inPlan.filter((group) => group.perUnit && !filedUnderRevenueCode(group) && group.negotiatedType !== 'percentage')
   const priced = perUnit.filter((group) => typicalPrice(priceSummary(group)) != null)
   const options = priced
     .filter((group) => !discardLine(group))
@@ -116,9 +124,13 @@ export function dosePricing(result: RateSearchResult): DosePricing {
           most,
         },
         modifiers: group.modifiers.length,
+        picked: group.key === focus.group,
       }
     })
-    .sort((a, b) => Number(a.modifiers > 0) - Number(b.modifiers > 0) || b.option.providers - a.option.providers)
+    .sort(
+      (a, b) =>
+        Number(b.picked) - Number(a.picked) || Number(a.modifiers > 0) - Number(b.modifiers > 0) || b.option.providers - a.option.providers,
+    )
     .map(({ option }) => option)
 
   if (options.length || !perUnit.length) return { options, reason: null }
