@@ -1,12 +1,13 @@
 -- Who a provider (tax ID) is in a snapshot's rate files: its tax ID, every name on its provider groups that carry a
--- current rate, whether any of those is a contract with the whole tax ID (npi [0]), and the distinct NPIs they list.
+-- current rate (as shown: practice_name), whether any of those is a contract with the whole tax ID (npi [0]), and the distinct NPIs they list.
 WITH target_files AS (
     SELECT file_id
     FROM source_files
     WHERE snapshot_id = $snapshotId AND kind = 'in_network' AND status IN ('loaded', 'partial')
 ),
 groups AS (
-    SELECT DISTINCT pg.file_id, pg.provider_ref_id, pg.group_idx, pg.ein, pg.ein_unverified, pg.ein_level, pg.business_name
+    SELECT DISTINCT pg.file_id, pg.provider_ref_id, pg.group_idx, pg.ein, pg.ein_unverified, pg.ein_level,
+           practice_name(pg.file_id, pg.provider_key, pg.business_name) AS business_name
     FROM provider_groups pg
     JOIN target_files tf ON tf.file_id = pg.file_id
     WHERE pg.provider_key = $provider

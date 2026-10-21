@@ -78,6 +78,22 @@ test('compare plans leads with how often the price is the same, then the biggest
   await expect(page).toHaveURL(/[?&]ein=/)
   await expect(page).toHaveURL(/[?&]group=/)
 
+  // Health centers are left out until the switch adds them; Details says why.
+  await page.goto('/insights/compare')
+  await expect(page.getByTestId('compare-pair').first()).toBeVisible()
+  await expect(page.getByTestId('compare-pairs')).not.toContainText('Health center')
+  const healthCenters = page.getByTestId('health-centers')
+  await expect(healthCenters).toContainText(/^Include health centers \([\d,]+\)$/)
+  const before = await page.getByTestId('compare-same').innerText()
+  await page.getByTestId('compare-details-toggle').click()
+  await expect(page.getByTestId('compare-health-reason')).toHaveText(
+    "Health centers are paid by visit rules the files don't explain, so price differences there aren't like for like.",
+  )
+  await healthCenters.locator('input').check()
+  await expect(page).toHaveURL(/[?&]includeHealthCenters=true(&|$)/)
+  await expect(page.getByTestId('compare-same')).not.toHaveText(before)
+  await expect(page.getByTestId('compare-pairs')).toContainText('Health center')
+
   // Under 5 places there's no share to give: each price is listed instead.
   await page.goto('/insights/compare?category=other')
   await expect(page.getByTestId('compare-few')).toContainText(/Only [1-4] places?/)
@@ -113,13 +129,15 @@ test('a provider found by name opens its scorecard: one reading, above and below
 })
 
 test('a scorecard reached under another of its names says so, and an unknown provider gets a way back', async ({ page }) => {
-  // The search row named this provider "The Trustees of Columbia…"; its scorecard is titled with its tax ID's own name.
-  const came = 'The Trustees of Columbia University in the City of NY'
-  await page.goto(`/providers/113466729?as=${encodeURIComponent(came)}`)
+  // NYU's faculty practice has two names of its own; a search row under the second links here with it.
+  await page.goto(`/providers/135562308?as=${encodeURIComponent('NYU dba NYU Faculty Group Practice')}`)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('NYU School of Medicine Faculty')
+  await expect(page.getByTestId('scorecard-also')).toHaveText('Also listed as NYU Faculty Group Practice')
+  // A practice listed under someone else's name shows its own on both the search row and the scorecard.
+  await page.goto('/providers/113466729')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Gastrointestinal Care of Long Island')
-  await expect(page.getByTestId('scorecard-also')).toHaveText(`Also listed as ${came}`)
   // A name that isn't one of its own is never shown.
-  await page.goto('/providers/113466729?as=Someone%20Else')
+  await page.goto('/providers/135562308?as=Someone%20Else')
   await expect(page.getByTestId('scorecard-also')).not.toContainText('Someone Else')
 
   await page.goto('/providers/999999999')

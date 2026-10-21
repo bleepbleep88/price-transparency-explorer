@@ -43,7 +43,8 @@ internal sealed record RateFactRow(
     bool WithoutName = true,
     bool WithoutSpecialty = true,
     bool WithoutCounty = true,
-    bool WithoutDirectory = true);
+    bool WithoutDirectory = true,
+    string? ListedAs = null);
 
 internal sealed record AssemblyOptions(
     string? Product,
@@ -281,7 +282,10 @@ internal static class RateSearchAssembler
                 FirstRateId: view.SourceRateId,
                 Matched: provider.Matched,
                 RateIds: view.RateIds,
-                WholeTaxIdRateId: view.WholeTaxIdRateId);
+                WholeTaxIdRateId: view.WholeTaxIdRateId)
+            {
+                ListedAs = provider.ListedAsFor(name, view.SourceRateId),
+            };
         }
     }
 
@@ -504,6 +508,7 @@ internal static class RateSearchAssembler
         private readonly SortedSet<string> _matchedNames = new(StringComparer.Ordinal);
         private readonly Dictionary<long, SortedSet<string>> _namesByRate = [];
         private readonly Dictionary<long, SortedSet<string>> _matchedNamesByRate = [];
+        private readonly Dictionary<long, List<(string Published, string Shown)>> _listedByRate = [];
         private readonly Dictionary<long, RateEntry> _rates = [];
         private RateView? _all;
         private RateView? _matched;
@@ -540,6 +545,19 @@ internal static class RateSearchAssembler
             : filtered ? MatchedDisplayName : DisplayName;
 
         public IReadOnlyList<string> NamesOtherThan(string name) => _names.Where(other => other != name).ToList();
+
+        /// <summary>
+        /// The plan's name(s) as published behind a shown name that replaced them (a network's shared name, or a name from
+        /// an unreliable file), from the rate the row shows, else any of its rates. Null when the plan's name is shown.
+        /// </summary>
+        public string? ListedAsFor(string shown, long sourceRateId)
+        {
+            var pairs = _listedByRate.TryGetValue(sourceRateId, out var onRate) && onRate.Any(pair => pair.Shown == shown)
+                ? onRate
+                : _listedByRate.Values.SelectMany(rate => rate);
+            var published = pairs.Where(pair => pair.Shown == shown).Select(pair => pair.Published).Distinct().Order(StringComparer.Ordinal).ToList();
+            return published.Count > 0 ? string.Join("; ", published) : null;
+        }
 
         /// <summary>The EIN when it can be shown: null when masked (a prefix the IRS never issues).</summary>
         public string? VerifiedEin => EinUnverified ? null : Ein;
@@ -578,6 +596,22 @@ internal static class RateSearchAssembler
             {
                 _names.Add(name);
                 NamesOf(_namesByRate, fact.RateId).Add(name);
+            }
+
+            // "published␟shown" pairs split by ␞ (chr(31) and chr(30) in SearchRates.sql).
+            foreach (var pair in (fact.ListedAs ?? "").Split('\u001e', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = pair.Split('\u001f');
+                if (parts.Length == 2)
+                {
+                    if (!_listedByRate.TryGetValue(fact.RateId, out var listed))
+                    {
+                        listed = [];
+                        _listedByRate[fact.RateId] = listed;
+                    }
+
+                    listed.Add((parts[0], parts[1]));
+                }
             }
 
             if (fact.FilterMatch)

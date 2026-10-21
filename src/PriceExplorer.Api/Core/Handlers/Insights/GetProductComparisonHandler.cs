@@ -66,14 +66,18 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
             }
         }
 
-        // Facility charges with no procedure named are left out unless asked for (InsightSupport.IsFacilityChargeOnly).
-        // The count is what including them would add under every filter, the category included.
+        // Facility charges with no procedure named (InsightSupport.IsFacilityChargeOnly) and health-center prices
+        // (InsightSupport.IsHealthCenter) are left out unless asked for. Each count is what including them would add under
+        // every other filter, the category and the other switch included. Asking for a health-center setting includes them.
+        var includeHealthCenters = request.IncludeHealthCenters || InsightSupport.IsHealthCenter(InsightSupport.Clean(request.Setting));
         bool InCategory(Pair pair) => category is null || pair.Category.Key == category;
-        var facilityCharges = comparable.Count(pair => InsightSupport.IsFacilityChargeOnly(pair.Row.CodeType) && InCategory(pair));
-        if (!request.IncludeFacilityCharges)
-        {
-            comparable = comparable.Where(pair => !InsightSupport.IsFacilityChargeOnly(pair.Row.CodeType)).ToList();
-        }
+        bool IsFacilityCharge(Pair pair) => InsightSupport.IsFacilityChargeOnly(pair.Row.CodeType);
+        bool IsHealthCenter(Pair pair) => InsightSupport.IsHealthCenter(pair.Row.SettingKey);
+        var facilityCharges = comparable.Count(pair => IsFacilityCharge(pair) && (includeHealthCenters || !IsHealthCenter(pair)) && InCategory(pair));
+        var healthCenters = comparable.Count(pair => IsHealthCenter(pair) && (request.IncludeFacilityCharges || !IsFacilityCharge(pair)) && InCategory(pair));
+        comparable = comparable
+            .Where(pair => (request.IncludeFacilityCharges || !IsFacilityCharge(pair)) && (includeHealthCenters || !IsHealthCenter(pair)))
+            .ToList();
 
         var categories = comparable
             .GroupBy(pair => pair.Category.Key, StringComparer.Ordinal)
@@ -94,6 +98,12 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
             notes.Add(InsightSupport.FacilityChargesLeftOut(facilityCharges, "pair"));
         }
 
+        if (!includeHealthCenters && healthCenters > 0)
+        {
+            notes.Add($"{Count(healthCenters, "price")} at health centers left out: they're paid by visit rules the files don't explain, " +
+                "so price differences there aren't like for like. Ask with includeHealthCenters=true to include them.");
+        }
+
         if (differentUnits > 0)
         {
             notes.Add($"{Count(differentUnits, "price")} left out: the two plans price {(differentUnits == 1 ? "it" : "them")} in different units.");
@@ -107,12 +117,13 @@ internal sealed class GetProductComparisonHandler(DuckDbConnectionFactory connec
         return new ProductComparison(
             statistics,
             new ProductComparisonEcho(InsightSupport.Clean(request.Code), codes, category, InsightSupport.Clean(request.Setting),
-                request.IncludeFacilityCharges, sort, request.Page, request.PageSize),
+                request.IncludeFacilityCharges, includeHealthCenters, sort, request.Page, request.PageSize),
             product,
             versus,
             products,
             categories,
             facilityCharges,
+            healthCenters,
             Summarize(shown),
             InsightMath.Bands
                 .Select(band => new RatioBand(band.Key, band.Label, band.Direction, shown.Count(pair => InsightMath.BandOf(pair.Ratio) == band.Key)))

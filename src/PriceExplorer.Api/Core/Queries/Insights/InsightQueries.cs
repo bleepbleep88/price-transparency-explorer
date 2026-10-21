@@ -60,6 +60,7 @@ public sealed record GetProductComparisonQuery(
     string? Category = null,
     string? Setting = null,
     bool IncludeFacilityCharges = false,
+    bool IncludeHealthCenters = false,
     string? Sort = null,
     int? Snapshot = null,
     int Page = 1,

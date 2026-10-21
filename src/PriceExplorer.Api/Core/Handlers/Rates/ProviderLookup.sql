@@ -13,7 +13,7 @@ WITH target_files AS (
     WHERE snapshot_id = $snapshotId AND kind = 'in_network' AND status IN ('loaded', 'partial')
 ),
 groups AS (
-    SELECT pg.*
+    SELECT pg.*, practice_name(pg.file_id, pg.provider_key, pg.business_name) AS shown_name
     FROM provider_groups pg
     JOIN target_files tf ON tf.file_id = pg.file_id
     WHERE ($npi::BIGINT IS NULL OR EXISTS (
@@ -35,15 +35,15 @@ tax_ids AS (
     SELECT provider_key,
            any_value(CASE WHEN ein_unverified THEN NULL ELSE ein END) AS ein,
            bool_or(ein_unverified) AS masked,
-           min(business_name) AS name,
-           count(DISTINCT business_name) - 1 AS other_names
+           min(shown_name) AS name,
+           count(DISTINCT shown_name) - 1 AS other_names
     FROM groups
     GROUP BY provider_key
 ),
 whole_tin AS (
     SELECT DISTINCT
         pg.provider_key,
-        pg.business_name
+        practice_name(pg.file_id, pg.provider_key, pg.business_name) AS business_name
     FROM provider_groups pg
     JOIN target_files tf ON tf.file_id = pg.file_id
     JOIN rate_provider_refs rr ON rr.file_id = pg.file_id AND rr.provider_ref_id = pg.provider_ref_id

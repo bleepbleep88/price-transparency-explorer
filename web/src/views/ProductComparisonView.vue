@@ -13,13 +13,14 @@ import { useReferenceLists, useSnapshots } from '@/features/rates/composables/us
 import type { ComparisonPair, CompareSort } from '@/features/insights/api/types'
 import AnswerTile from '@/features/insights/components/AnswerTile.vue'
 import FacilityChargesSwitch from '@/features/insights/components/FacilityChargesSwitch.vue'
+import IncludeSwitch from '@/features/insights/components/IncludeSwitch.vue'
 import InsightSection from '@/features/insights/components/InsightSection.vue'
 import StatisticsNote from '@/features/insights/components/StatisticsNote.vue'
 import { useProductComparison } from '@/features/insights/composables/useInsightQueries'
 import { searchLocation } from '@/features/insights/lib/insightLinks'
 import { COMPARE_PAGE_SIZE, mergeInsightQuery, parseCompareQuery, pickProducts, type InsightPatch } from '@/features/insights/lib/insightParams'
 import { serviceName, share, statisticsLine } from '@/features/insights/lib/insightText'
-import { FACILITY_CHARGE_REASON, groupLine, pairWords, paysWords, planName, serviceLabel, tellApart } from '@/features/insights/lib/plainWords'
+import { FACILITY_CHARGE_REASON, groupLine, HEALTH_CENTER_REASON, pairWords, paysWords, planName, serviceLabel, tellApart } from '@/features/insights/lib/plainWords'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,6 +34,8 @@ const result = computed(() => (comparison.isError.value ? undefined : comparison
 const apiError = computed(() => (comparison.error.value instanceof ApiError ? comparison.error.value : null))
 const problem = computed(() => (apiError.value ? (Object.values(apiError.value.fieldErrors).flat()[0] ?? apiError.value.message) : null))
 const filtered = computed(() => Boolean(params.value.code || params.value.category || params.value.setting))
+// Health centers (federally qualified, rural): paid by visit rules the files don't explain, so left out unless asked for.
+const healthCenterPlace = computed(() => params.value.setting === 'fqhc' || params.value.setting === 'rhc')
 // Until the first statistics build there is nothing to compare; the note says so, and the page claims nothing else.
 const saved = computed(() => result.value?.statistics.builtAt != null)
 // Everyday plan names on the main view ("Ambetter"); the pickers and Details keep the full ones.
@@ -216,6 +219,15 @@ const kinds = computed(() => [...(result.value?.byCategory ?? [])].sort((a, b) =
           :count="result?.facilityCharges ?? 0"
           @update:model-value="(value) => update({ includeFacilityCharges: value ? 'true' : null })"
         />
+        <!-- Picking a health center as the place already includes them. -->
+        <IncludeSwitch
+          v-if="!healthCenterPlace"
+          :model-value="params.includeHealthCenters ?? false"
+          :count="result?.healthCenters ?? 0"
+          label="Include health centers"
+          testid="health-centers"
+          @update:model-value="(value) => update({ includeHealthCenters: value ? 'true' : null })"
+        />
       </div>
     </div>
 
@@ -236,8 +248,19 @@ const kinds = computed(() => [...(result.value?.byCategory ?? [])].sort((a, b) =
 
     <template v-else-if="result && saved">
       <div v-if="!result.summary.pairs" class="d-flex flex-column align-start ga-2" data-testid="compare-empty">
-        <p class="text-body-large">No place has this in both plans.</p>
-        <v-btn v-if="filtered" variant="tonal" color="primary" @click="clearFilters">Clear filters</v-btn>
+        <p class="text-body-large">{{ result.healthCenters ? 'Only health centers have this in both plans.' : 'No place has this in both plans.' }}</p>
+        <div class="d-flex flex-wrap ga-2">
+          <v-btn
+            v-if="result.healthCenters"
+            variant="tonal"
+            color="primary"
+            data-testid="compare-include-health-centers"
+            @click="update({ includeHealthCenters: 'true' })"
+          >
+            Include health centers
+          </v-btn>
+          <v-btn v-if="filtered" variant="tonal" color="primary" @click="clearFilters">Clear filters</v-btn>
+        </div>
       </div>
 
       <div v-else class="d-flex flex-column ga-10" :style="{ opacity: comparison.isPlaceholderData.value ? 0.6 : 1 }">
@@ -370,8 +393,9 @@ const kinds = computed(() => [...(result.value?.byCategory ?? [])].sort((a, b) =
             </tr>
           </tbody>
         </v-table>
-        <p v-for="note in result.notes.filter((note) => !note.includes('facility charges'))" :key="note" data-testid="compare-note">{{ note }}</p>
+        <p v-for="note in result.notes.filter((note) => !note.includes('facility charges') && !note.includes('health centers'))" :key="note" data-testid="compare-note">{{ note }}</p>
         <p>{{ FACILITY_CHARGE_REASON }}</p>
+        <p data-testid="compare-health-reason">{{ HEALTH_CENTER_REASON }}</p>
         <div v-if="result.pairs.items.length">
           <p class="font-weight-medium">The prices on this page, by tax ID and billing code</p>
           <ul class="detail-list">

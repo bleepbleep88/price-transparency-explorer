@@ -16,7 +16,9 @@ public sealed class ChangesController(ISender sender) : ControllerBase
     /// partial in either snapshot are left out, and the response says why. A change means the file says something
     /// different; it isn't a claim. Until both snapshots' saved statistics are built and current, the response has
     /// current: false, a message, and no counts or rows. Facility charges with no procedure named are left out
-    /// unless includeFacilityCharges is set; counts.facilityCharges says how many there are.
+    /// unless includeFacilityCharges is set; counts.facilityCharges says how many there are. New and dropped rates that
+    /// are the same provider and service relabeled are left out unless includeListedElsewhere is set;
+    /// counts.newListedElsewhere and counts.droppedListedElsewhere say how many.
     /// </summary>
     [HttpGet]
     [ProducesResponseType<ChangesResult>(StatusCodes.Status200OK, "application/json")]

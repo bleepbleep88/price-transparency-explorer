@@ -40,10 +40,8 @@ test('words people use find the service: botox, then mri', async ({ page }) => {
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(page).toHaveURL(/[?&]code=J0585(&|$)/)
   await expect(page.getByTestId('service-title')).toHaveText('Botox')
-  // The tile is never the thrown-away-drug price unless that's all there is, and then it says so.
-  for (const tile of await page.getByTestId('price-tile').allInnerTexts()) {
-    if (/JW|discarded/i.test(tile)) expect(tile).toContain('for drug thrown away')
-  }
+  // On the Essential Plan, Botox's only price with a typical is for drug thrown away: the tile says so.
+  await expect(page.getByTestId('price-tile').first()).toContainText('for drug thrown away')
 
   await page.getByRole('combobox', { name: 'Service or code' }).fill('mri')
   await page.getByRole('button', { name: 'Search', exact: true }).click()

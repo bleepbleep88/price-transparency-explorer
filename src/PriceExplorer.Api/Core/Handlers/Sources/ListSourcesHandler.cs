@@ -16,6 +16,9 @@ public sealed class ListSourcesHandler(DuckDbConnectionFactory connections) : IR
         var rejects = (await connection.QueryAsync<RejectRow>(SqlFile.For<ListSourcesHandler>("SourceRejects.sql")))
             .ToLookup(reject => reject.FileId);
         var latestId = await connection.ExecuteScalarAsync<int?>(SqlFile.For<DuckDbConnectionFactory>("LatestSnapshot.sql"));
+        var names = (await connection.QueryAsync<NamesRow>(SqlFile.For<ListSourcesHandler>("SourceNames.sql")))
+            .GroupBy(row => row.FileId)
+            .ToDictionary(file => file.Key, NamesOf);
 
         return rows
             .GroupBy(row => row.SnapshotId)
@@ -35,9 +38,24 @@ public sealed class ListSourcesHandler(DuckDbConnectionFactory connections) : IR
                     first.SnapshotError,
                     IsLatest: first.SnapshotId == latestId,
                     UtcTimestamps.From(first.UpdatedAt),
-                    snapshot.Where(row => row.FileId is not null).Select(row => ToFile(row, rejects[row.FileId!.Value])).ToList());
+                    snapshot
+                        .Where(row => row.FileId is not null)
+                        .Select(row => ToFile(row, rejects[row.FileId!.Value]) with { ProviderNames = names.GetValueOrDefault(row.FileId!.Value) })
+                        .ToList());
             })
             .ToList();
+    }
+
+    /// <summary>A file's unreliable names in percent (rounded to whole numbers), and the two files most names come from instead.</summary>
+    private static SourceFileNames NamesOf(IEnumerable<NamesRow> rows)
+    {
+        var list = rows.ToList();
+        var first = list[0];
+        return new SourceFileNames(
+            (int)Math.Round((first.Agreement ?? 0) * 100, MidpointRounding.AwayFromZero),
+            first.TypicalAgreement is { } typical ? (int)Math.Round(typical * 100, MidpointRounding.AwayFromZero) : null,
+            list.Where(row => row.SourceLabel is not null).Take(2).Select(row => new SourceFileRef(row.SourceLabel!, row.SourceDate)).ToList(),
+            first.UnknownTaxIds);
     }
 
     private static SourceFile ToFile(SourceRow row, IEnumerable<RejectRow> rejects)
@@ -83,6 +101,9 @@ public sealed class ListSourcesHandler(DuckDbConnectionFactory connections) : IR
                 .ToList(),
             new SourceFileTiming(row.DownloadMs, row.ParseMs, UtcTimestamps.From(row.LoadedAt)));
     }
+
+    private sealed record NamesRow(
+        int FileId, double? Agreement, double? TypicalAgreement, long UnknownTaxIds, string? SourceLabel, DateOnly? SourceDate, long? Names);
 
     private sealed record SourceRow(
         int SnapshotId,

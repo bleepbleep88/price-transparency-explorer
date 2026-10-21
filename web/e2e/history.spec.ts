@@ -102,14 +102,26 @@ test('a count is the filter: rises, then one code, then a row opens and leads to
   await expect(page).toHaveURL(/[?&]group=[^&]+/)
 })
 
-test('more filters hide rates only listed differently and add facility charges with no procedure named', async ({ page }) => {
+test('relabeled rates stay out of the counts until more filters adds them, and facility charges likewise', async ({ page }) => {
   await page.goto('/changes')
-  const before = await page.getByTestId('changes-kind-new').innerText()
-  await page.getByTestId('changes-more-toggle').click()
+  const count = async (kind: string) => Number((await page.getByTestId(`changes-kind-${kind}`).innerText()).replace(/\D/g, ''))
+  await expect(page.getByTestId('change-row').first()).toBeVisible()
+  const [newBefore, goneBefore] = [await count('new'), await count('dropped')]
+  await page.getByTestId('changes-details-toggle').click()
+  const line = await page.getByTestId('changes-listed-elsewhere').innerText()
+  const [, relabeledNew, relabeledGone] = line.match(/^([\d,]+) new and ([\d,]+) gone are the same provider and service, relabeled\.$/)!
+  await page.getByTestId('changes-details-toggle').click()
 
-  await page.getByTestId('changes-hide-listed').locator('input').check()
-  await expect(page).toHaveURL(/[?&]listedElsewhere=false(&|$)/)
-  await expect(page.getByTestId('changes-kind-new')).not.toHaveText(before)
+  await page.getByTestId('changes-more-toggle').click()
+  const relabeled = page.getByTestId('changes-include-relabeled')
+  await expect(relabeled).toContainText(/^Include relabeled rates \([\d,]+\)$/)
+  await relabeled.locator('input').check()
+  await expect(page).toHaveURL(/[?&]includeListedElsewhere=true(&|$)/)
+  // The relabeled ones are added back: New and Gone grow by exactly what the Details line said.
+  await expect.poll(() => count('new')).toBe(newBefore + Number(relabeledNew!.replace(/,/g, '')))
+  expect(await count('dropped')).toBe(goneBefore + Number(relabeledGone!.replace(/,/g, '')))
+  await relabeled.locator('input').uncheck()
+  await expect(page).not.toHaveURL(/includeListedElsewhere/)
 
   const facility = page.getByTestId('facility-charges')
   await expect(facility).toContainText(/Include facility-only charges \([\d,]+\)/)

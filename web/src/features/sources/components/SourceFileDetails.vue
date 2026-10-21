@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { mdiOpenInNew } from '@mdi/js'
 import { wholeNumber } from '@/lib/format'
 import type { SourceFile } from '../api/types'
-import { cleaningLines, contentsLine, datesLine, fileSize, kindLabel, publishedLine, timingLine } from '../lib/sourceText'
+import { cleaningLines, contentsLine, datesLine, fileSize, kindLabel, namesLine, publishedLine, timingLine } from '../lib/sourceText'
 
 // One file's details: what it held, how it was cleaned, what was set aside and how to trace it.
 const props = defineProps<{ file: SourceFile }>()
@@ -12,6 +12,7 @@ const published = computed(() => publishedLine(props.file))
 const contents = computed(() => contentsLine(props.file))
 const cleaning = computed(() => cleaningLines(props.file))
 const timing = computed(() => timingLine(props.file))
+const names = computed(() => namesLine(props.file))
 </script>
 
 <template>
@@ -29,6 +30,7 @@ const timing = computed(() => timingLine(props.file))
       <ul v-if="cleaning.length" class="lines" data-testid="source-cleaning">
         <li v-for="line in cleaning" :key="line">{{ line }}</li>
       </ul>
+      <p v-if="names" data-testid="source-names">{{ names }}</p>
       <p v-if="!file.rejects.length" data-testid="source-no-rejects">Nothing was set aside.</p>
       <v-table v-else density="compact" class="rejects">
         <thead>

@@ -45,6 +45,7 @@ function rateText(rate: number, rateHigh: number): string {
         <div class="flex-grow-1">
           <h2 class="dialog-title">{{ row ? providerName(row.businessName) : 'Clinicians' }}</h2>
           <p v-if="row" class="muted">Tax ID {{ row.einDisplay }}</p>
+          <p v-if="row?.listedAs" class="muted" data-testid="npi-listed-as">Listed by the plan as {{ row.listedAs }}</p>
         </div>
         <v-btn :icon="mdiClose" variant="text" aria-label="Close" @click="open = false" />
       </div>
