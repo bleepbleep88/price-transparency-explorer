@@ -53,12 +53,14 @@ Every page leads with one answer in plain words, like "Surgery center $511" or "
 
 ## Tech
 
-- **API:** .NET 10, ASP.NET Core, MediatR, FluentValidation, Dapper, DuckDB (embedded), Serilog, OpenAPI.
+- **API:** .NET 10, ASP.NET Core, MediatR 12.5 (the last free version), FluentValidation, Dapper, DuckDB (embedded), Serilog, OpenAPI.
 - **Web:** Vue 3, Vite, TypeScript, Vuetify, TanStack Vue Query, zod.
 - **Tests:** xUnit (681), Vitest (329), Playwright on the real data (54). CI builds and runs the xUnit and Vitest tests, and builds the Docker images, on every PR.
 
-## Tradeoffs
+## Assumptions and tradeoffs
 
+- **A price here is what the plan pays, not what a patient pays.** Deductibles and coinsurance decide that.
+- **A provider is a tax ID.** Its clinicians (NPIs) are listed under it, and an NPI search shows that NPI's own price.
 - **C# instead of Go.** These are the patterns I ship every day. Each query and handler maps one-to-one to a Go handler.
 - **DuckDB instead of memory.** It's embedded, fast at the math, and keeps the data across restarts. There's no server to run.
 - **Three months, not one.** Price changes need more than one file. The brief's month is the middle one.
@@ -68,13 +70,15 @@ Every page leads with one answer in plain words, like "Surgery center $511" or "
 
 ## Data problems found
 
+Figures are from the Aug 31 files unless noted.
+
 | Problem | Example | What the app does |
 |---|---|---|
 | The procedure code is hidden in a notes field | Knee arthroscopy (29881) exists only under revenue code 0490 | Searches by the hidden code |
 | Most rows are copies | Ambetter, Aug 31: 179,948 prices, 7,727 unique (96% copies) | Drops copies while loading |
 | Leading zeros are missing | `490` is 0490; anesthesia `812` is 00812 | Restores them; both forms search |
 | One file names the wrong providers | Sep 28 Essential Plan file: names match the other files for 9% of practices, against about 98% elsewhere | Takes names from the reliable files; 134 show "Unknown practice" |
-| Networks put their name on their members | "Chinese American IPA" is on 253 practices' tax IDs | Shows each practice's own name |
+| Networks put their name on their members | "Chinese American IPA" is on 253 practices' tax IDs (Ambetter, Sep 28) | Shows each practice's own name |
 | Group IDs change every month | `provider_group_id` is renumbered in each file | Matches providers by tax ID |
 | Suspect IDs | 2 NPIs fail their check digit; 326 tax IDs in Ambetter's file use prefixes the IRS never issues (likely Social Security numbers) | Flags the NPIs; masks those tax IDs |
 | Relabeled rates look like churn | Aug → Sep: 5,855 "new" and 5,853 "gone" rates are the same provider and service | Leaves them out of the change counts by default |
@@ -99,7 +103,7 @@ More detail on each rule and finding: [docs/details.md](docs/details.md).
 |---|---|---|
 | API | .NET 10 SDK | `dotnet run --project src/PriceExplorer.Api` (http://localhost:5080) |
 | Web | Node 24 | `cd web && npm ci && npm run dev` (http://localhost:5173) |
-| Tests | | `dotnet test` · `cd web && npm run test:unit && npm run test:e2e` |
+| Tests | | `dotnet test` · `cd web && npm run test:unit` · `npm run test:e2e` (with the app running) |
 
 ## Built with AI
 
