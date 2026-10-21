@@ -10,7 +10,10 @@ import { useDataStatus } from '@/features/status/useDataStatus'
 import SourceFileDetails from '@/features/sources/components/SourceFileDetails.vue'
 import { useSources } from '@/features/sources/composables/useSources'
 import {
+  AFTER_COPIES,
   CLEANING_RULES,
+  fileLinkText,
+  fileSize,
   leadSnapshot,
   planFiles,
   planProblems,
@@ -52,9 +55,12 @@ const totals = computed(() => (lead.value ? priceTotals(lead.value) : null))
 
       <section v-if="lead && totals" class="answer" data-testid="sources-total">
         <p class="big" :aria-label="totalsText(totals)">
-          <span>{{ plural(totals.published, 'price') }}</span> <span class="nowrap">→ {{ wholeNumber(totals.unique) }}</span>
+          <span>{{ plural(totals.published, 'price') }}</span> <span class="nowrap">→ {{ wholeNumber(totals.unique) }}</span>{{ ' ' }}<span
+            class="big-unit"
+            >{{ AFTER_COPIES }}</span
+          >
         </p>
-        <p>{{ shortDate(lead.indexDate) }} files, exact copies counted once</p>
+        <p>{{ shortDate(lead.indexDate) }} files</p>
       </section>
 
       <section
@@ -79,20 +85,20 @@ const totals = computed(() => (lead.value ? priceTotals(lead.value) : null))
                 :href="plan.prices.url"
                 target="_blank"
                 rel="noopener"
-                :aria-label="`${plan.productLabel} prices file, ${shortDate(snapshot.indexDate)}`"
+                :aria-label="`${plan.productLabel} prices file, ${shortDate(snapshot.indexDate)}, ${fileSize(plan.prices.contentLength)}`"
                 data-testid="source-link-prices"
               >
-                Prices <v-icon :icon="mdiOpenInNew" size="16" aria-hidden="true" />
+                {{ fileLinkText('Prices', plan.prices) }} <v-icon :icon="mdiOpenInNew" size="16" aria-hidden="true" />
               </a>
               <a
                 v-if="plan.outOfNetwork"
                 :href="plan.outOfNetwork.url"
                 target="_blank"
                 rel="noopener"
-                :aria-label="`${plan.productLabel} out of network file, ${shortDate(snapshot.indexDate)}`"
+                :aria-label="`${plan.productLabel} out of network file, ${shortDate(snapshot.indexDate)}, ${fileSize(plan.outOfNetwork.contentLength)}`"
                 data-testid="source-link-oon"
               >
-                Out of network <v-icon :icon="mdiOpenInNew" size="16" aria-hidden="true" />
+                {{ fileLinkText('Out of network', plan.outOfNetwork) }} <v-icon :icon="mdiOpenInNew" size="16" aria-hidden="true" />
               </a>
             </span>
             <span v-for="problem in planProblems(plan)" :key="problem" class="problem plan-problem" data-testid="source-plan-problem">
@@ -152,6 +158,13 @@ const totals = computed(() => (lead.value ? priceTotals(lead.value) : null))
   white-space: nowrap;
 }
 
+.big-unit {
+  font-family: var(--v-font-body);
+  font-size: 1rem;
+  font-weight: 500;
+  color: rgba(var(--v-theme-on-background), var(--v-medium-emphasis-opacity));
+}
+
 .month {
   display: flex;
   flex-direction: column;
@@ -205,7 +218,7 @@ const totals = computed(() => (lead.value ? priceTotals(lead.value) : null))
 .plan-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 8px 16px;
 }
 
 .plan-links a,

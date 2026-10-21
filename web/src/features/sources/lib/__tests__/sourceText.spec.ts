@@ -4,6 +4,7 @@ import {
   cleaningLines,
   contentsLine,
   datesLine,
+  fileLinkText,
   fileProblem,
   fileSize,
   kindLabel,
@@ -65,10 +66,16 @@ describe('source readings', () => {
     expect(fileSize(null)).toBe('size unknown')
   })
 
+  it('puts the size on a file link, since the link downloads the whole file', () => {
+    expect(fileLinkText('Prices', sourceFile())).toBe('Prices · 85 MB')
+    expect(fileLinkText('Out of network', ALLOWED_FILE)).toBe('Out of network · 508 KB')
+    expect(fileLinkText('Prices', sourceFile({ contentLength: null }))).toBe('Prices')
+  })
+
   it('gives the one answer: prices in the rate files, and what is left once exact copies count once', () => {
     const totals = priceTotals(septemberSnapshot())
     expect(totals).toEqual({ published: 573393, unique: 17140 })
-    expect(totalsText(totals!)).toBe('573,393 prices → 17,140')
+    expect(totalsText(totals!)).toBe('573,393 prices → 17,140 after removing copies')
     // Allowed-amount files hold amounts, not prices; files not loaded yet count for nothing.
     expect(priceTotals(sourceSnapshot([ALLOWED_FILE]))).toBeNull()
     expect(priceTotals(sourceSnapshot([sourceFile({ counts: null })]))).toBeNull()

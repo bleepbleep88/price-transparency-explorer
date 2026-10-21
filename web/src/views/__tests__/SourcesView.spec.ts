@@ -75,9 +75,9 @@ describe('SourcesView', () => {
     expect(wrapper.get('h1').text()).toBe('Where the data comes from')
     expect(wrapper.text()).toContain('2 months of public files from Centene Management Company')
     const total = wrapper.get('[data-testid="sources-total"]')
-    expect(total.get('.big').attributes('aria-label')).toBe('573,393 prices → 17,140')
-    expect(total.get('.big').text()).toBe('573,393 prices → 17,140')
-    expect(total.text()).toContain('Sep 28, 2026 files, exact copies counted once')
+    expect(total.get('.big').attributes('aria-label')).toBe('573,393 prices → 17,140 after removing copies')
+    expect(total.get('.big').text().replace(/\s+/g, ' ')).toBe('573,393 prices → 17,140 after removing copies')
+    expect(total.text()).toContain('Sep 28, 2026 files')
 
     const months = wrapper.findAll('[data-testid="source-snapshot"]')
     expect(months.map((month) => month.get('h2').text())).toEqual(['Sep 28, 2026', 'Aug 31, 2026'])
@@ -87,8 +87,12 @@ describe('SourcesView', () => {
     expect(plans.map((plan) => plan.get('.plan-name').text())).toEqual(['Ambetter from Fidelis Care', 'Essential Plan'])
     const prices = plans[1]!.get('[data-testid="source-link-prices"]')
     expect(prices.attributes('href')).toBe('https://www.centene.com/2026-09-28_centene-management-company-llc_fidelis-es_in-network.json')
-    expect(prices.attributes('aria-label')).toBe('Essential Plan prices file, Sep 28, 2026')
-    expect(plans[1]!.get('[data-testid="source-link-oon"]').attributes('href')).toBe(ALLOWED_FILE.url)
+    // Each link downloads the whole file, so it says how big it is.
+    expect(prices.text()).toBe('Prices · 85 MB')
+    expect(prices.attributes('aria-label')).toBe('Essential Plan prices file, Sep 28, 2026, 85 MB')
+    const outOfNetwork = plans[1]!.get('[data-testid="source-link-oon"]')
+    expect(outOfNetwork.attributes('href')).toBe(ALLOWED_FILE.url)
+    expect(outOfNetwork.text()).toBe('Out of network · 508 KB')
     expect(wrapper.find('[data-testid="source-plan-problem"]').exists()).toBe(false)
 
     expect(mainViewText(wrapper)).not.toMatch(NOT_ON_MAIN_VIEW)
