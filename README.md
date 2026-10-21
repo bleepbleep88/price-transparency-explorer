@@ -2,6 +2,8 @@
 
 Search what a health plan has agreed to pay for a service, and see how each provider's rate compares with every other provider's rate for the same service in the same setting.
 
+Design: [docs/architecture.md](docs/architecture.md)
+
 It reads three monthly **Transparency in Coverage** indexes from Centene's Fidelis Care (2026-07-27, the brief's 2026-08-31, and 2026-09-28), loads every in-network rate file they list (Ambetter from Fidelis Care and the Essential Plan, about 810 MB of JSON in all) and their out-of-network allowed-amount files, cleans and de-duplicates them into DuckDB, and serves a search API and a Vue web app. Pages show the newest month; the app bar switches to any other.
 
 **Search** needs a billing code (CPT, HCPCS or revenue code). NPI and EIN are optional and narrow the results to one provider, which is then shown against the market.
