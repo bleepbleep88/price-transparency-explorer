@@ -61,7 +61,8 @@ const showOutOfNetwork = computed(() => visibleGroups(outOfNetworkResult.value, 
 // The plan tab, and the bill whose places are listed: the one picked, else the plan's first tile.
 const plan = computed(() => (result.value ? currentPlan(result.value, params.value.plan) : null))
 const lead = computed(() => (result.value ? leadGroup(result.value, plan.value, params.value.group) : null))
-const shownTiles = computed(() => (result.value ? tileGroups(result.value, plan.value, params.value.group).map((group) => group.key) : []))
+const tiles = computed(() => (result.value ? tileGroups(result.value, plan.value, params.value.group) : []))
+const shownTiles = computed(() => tiles.value.map((group) => group.key))
 
 // The places list follows one bill. A new search starts on the plan's first tile; the URL keeps the pick.
 watch(
@@ -180,6 +181,7 @@ function onTableOptions(options: { page: number; pageSize: number; sort: SortKey
                 :result="result"
                 :params="params"
                 :group="lead"
+                :tiles="tiles"
                 @update="update"
                 @cases="(cases) => replace({ cases })"
                 @focus-npi="searchForm?.focusNpi()"

@@ -124,13 +124,17 @@ describe('bill tiles', () => {
     const shown = tileGroups(colonoscopy, 'essential-plan').map((g) => g.key)
     expect(otherPrices(colonoscopy, shown)).toEqual([
       { groupKey: ambetterCenter.key, plan: 'Ambetter', bill: 'Surgery center', price: '$569', count: '29 places' },
-      { groupKey: ambetterOffice.key, plan: 'Ambetter', bill: "Doctor · in the office · equipment used in a doctor's office", price: 'Only 3 places', count: '3 places' },
+      { groupKey: ambetterOffice.key, plan: 'Ambetter', bill: "Doctor · in the office · equipment used in a doctor's office", price: 'Only 3 places', count: '' },
     ])
   })
 })
 
 describe('role lines', () => {
   it('gives each role one short line about the bill picked', () => {
+    // The employer line speaks for the bill with the most to gain, named: not the doctor's $1.
+    expect(roleLines('employers', colonoscopy, essentialDoctor, 40, [essentialDoctor, essentialCenter])).toEqual([
+      { text: 'Surgery center: the cheapest quarter of places get at least $60 less per case.', yearly: 'About $2,400 less a year for your 40 cases at lower-priced providers.' },
+    ])
     expect(roleLines('employers', colonoscopy, essentialCenter, 40)).toEqual([
       { text: 'The cheapest quarter of places get at least $60 less per case.', yearly: 'About $2,400 less a year for your 40 cases at lower-priced providers.' },
     ])

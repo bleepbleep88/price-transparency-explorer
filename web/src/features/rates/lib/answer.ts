@@ -140,7 +140,8 @@ export function otherPrices(result: RateSearchResult, shown: string[]): OtherPri
         plan: planName(group.productLabel),
         bill: billLine(group),
         price: typical == null ? `Only ${group.providerCount === 1 ? '1 place' : `${group.providerCount} places`}` : `${dollars(typical)}${unit}`,
-        count: placesCount(group.providerCount),
+        // "Only 3 places" already says how many.
+        count: typical == null ? '' : placesCount(group.providerCount),
       }
     })
 }
@@ -153,8 +154,21 @@ export interface RoleLine {
   action?: 'npi' | 'api' | 'drug' | null
 }
 
-/** One or two short lines for the reader's role, about the bill the places list follows. */
-export function roleLines(lens: Lens, result: RateSearchResult, group: RateGroup | null, cases?: number | null): RoleLine[] {
+/** The bill with the most to gain from a cheaper place: the biggest difference between typical and the cheapest quarter. */
+export function biggestGap(groups: RateGroup[]): { group: RateGroup; gap: number } | null {
+  let best: { group: RateGroup; gap: number } | null = null
+  for (const group of groups) {
+    const gap = gapOf(priceSummary(group))
+    if (gap != null && gap > 0 && (!best || gap > best.gap)) best = { group, gap }
+  }
+  return best
+}
+
+/**
+ * One or two short lines for the reader's role, about the bill the places list follows. An employer's line speaks for
+ * the bill with the most to gain (of the tiles shown), named, so a fixed doctor's fee doesn't hide a surgery center's.
+ */
+export function roleLines(lens: Lens, result: RateSearchResult, group: RateGroup | null, cases?: number | null, tiles: RateGroup[] = []): RoleLine[] {
   const summary = group ? priceSummary(group) : null
   const gap = summary ? gapOf(summary) : null
   switch (lens) {
@@ -170,13 +184,17 @@ export function roleLines(lens: Lens, result: RateSearchResult, group: RateGroup
       return [{ text: `${range?.replace('Most: ', 'Most places get ')}. Highest: ${dollars(summary.max)}.` }]
     }
     case 'employers': {
-      if (gap == null) return [{ text: 'Needs 10 places to say what cheaper ones save.' }]
-      if (gap <= 0) return [{ text: 'Cheaper places get the same price here.' }]
-      const per = lessPerCase(gap, group?.perUnit ?? false)
+      const best = biggestGap(tiles.length ? tiles : group ? [group] : [])
+      if (!best) {
+        const anyRange = (tiles.length ? tiles : group ? [group] : []).some((tile) => gapOf(priceSummary(tile)) != null)
+        return [{ text: anyRange ? 'Cheaper places get the same price here.' : 'Needs 10 places to say what cheaper ones save.' }]
+      }
+      const per = lessPerCase(best.gap, best.group.perUnit)
+      const bill = tiles.length > 1 ? `${billName(best.group).name}: ` : ''
       return [
         {
-          text: `The cheapest quarter of places get at least ${per}.`,
-          yearly: !group?.perUnit && cases ? yearlyLine(gap, cases) : null,
+          text: `${bill}the cheapest quarter of places get at least ${per}.`.replace(/^the/, 'The'),
+          yearly: !best.group.perUnit && cases ? yearlyLine(best.gap, cases) : null,
         },
       ]
     }

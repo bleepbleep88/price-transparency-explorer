@@ -8,7 +8,7 @@ import { apiSearchUrl } from '../lib/lenses'
 import { MAX_CASES, type Lens, type QueryPatch, type SearchParams } from '../lib/searchParams'
 
 // "I'm a…": one or two short lines for the reader's role, about the bill picked above.
-const props = defineProps<{ result: RateSearchResult; params: SearchParams; group: RateGroup | null }>()
+const props = defineProps<{ result: RateSearchResult; params: SearchParams; group: RateGroup | null; tiles?: RateGroup[] }>()
 const emit = defineEmits<{
   update: [patch: QueryPatch]
   cases: [cases: number | null]
@@ -17,8 +17,8 @@ const emit = defineEmits<{
 }>()
 
 const lens = computed(() => props.params.lens ?? null)
-const lines = computed(() => (lens.value ? roleLines(lens.value, props.result, props.group, props.params.cases) : []))
-const showCases = computed(() => lens.value === 'employers' && props.group && !props.group.perUnit)
+const lines = computed(() => (lens.value ? roleLines(lens.value, props.result, props.group, props.params.cases, props.tiles ?? []) : []))
+const showCases = computed(() => lens.value === 'employers' && (props.tiles?.length ? props.tiles : props.group ? [props.group] : []).some((tile) => !tile.perUnit))
 const apiUrl = computed(() => apiSearchUrl(props.params, window.location.origin))
 // One link on to the page that answers the role's next question, when that page has something for this service.
 const nextLink = computed(() => {
