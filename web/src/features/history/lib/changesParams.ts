@@ -30,7 +30,7 @@ export interface ChangesParams {
   code?: string
   kind?: ChangeFilter
   minChangePct?: number
-  /** Leave out new and dropped rates the other file lists under other modifiers or another setting. */
+  /** Add new and dropped rates the other file lists under other modifiers or another setting (left out by default). */
   includeListedElsewhere: boolean
   /** Add facility charges with no procedure named, which are left out by default as on the insights pages (decision 89). */
   includeFacilityCharges: boolean

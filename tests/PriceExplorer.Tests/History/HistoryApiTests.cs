@@ -236,6 +236,23 @@ public sealed class HistoryApiTests(HistoryApiTests.Factory factory) : IClassFix
     }
 
     [Fact(Timeout = 60_000)]
+    public async Task The_retired_listedElsewhere_filter_points_to_its_replacement_and_false_changes_nothing()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/api/v1/changes?listedElsewhere=true", ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        problem.GetProperty("errors").GetProperty("listedElsewhere").ToString().Should().Contain("Use includeListedElsewhere");
+
+        var plain = await GetAsync("/api/v1/changes", ct);
+        var withFalse = await GetAsync("/api/v1/changes?listedElsewhere=false", ct);
+        withFalse.GetProperty("counts").ToString().Should().Be(plain.GetProperty("counts").ToString());
+        Rows(withFalse).Should().HaveCount(Rows(plain).Count());
+    }
+
+    [Fact(Timeout = 60_000)]
     public async Task Snapshots_that_cant_be_compared_say_why()
     {
         var ct = TestContext.Current.CancellationToken;

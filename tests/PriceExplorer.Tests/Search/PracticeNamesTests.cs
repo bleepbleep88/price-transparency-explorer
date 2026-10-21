@@ -81,6 +81,45 @@ public sealed class PracticeNamesTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_network_name_has_no_home_when_its_busiest_tax_ID_has_a_name_of_its_own()
+    {
+        // Like "Beacon IPA LLC": its busiest tax ID is Lefferts Medical Associates, PC, a member practice.
+        await FileAsync(1, snapshot: 1, "ambetter");
+        await FileAsync(2, snapshot: 1, "essential");
+        foreach (var key in new[] { "lefferts", "lefferts", "lefferts", "k1", "k2", "k3", "k4" })
+        {
+            await GroupAsync(1, key, "Beacon IPA LLC", 1000);
+        }
+
+        await GroupAsync(2, "lefferts", "Lefferts Medical Associates, PC", 1000);
+        await GroupAsync(2, "k1", "K1 Practice PC", 1000);
+        await RefreshAsync();
+
+        (await ShownAsync(1, "lefferts", "Beacon IPA LLC")).Should().Be("Lefferts Medical Associates, PC");
+        (await ShownAsync(1, "k1", "Beacon IPA LLC")).Should().Be("K1 Practice PC");
+        (await ShownAsync(1, "k2", "Beacon IPA LLC")).Should().Be("Beacon IPA LLC", "a member with no name of its own keeps the network's");
+    }
+
+    [Fact]
+    public async Task An_unreliable_files_name_stays_only_when_another_file_confirms_it_and_never_becomes_a_networks()
+    {
+        await FileAsync(1, snapshot: 1, "ambetter");
+        await FileAsync(2, snapshot: 1, "essential");
+        await FileAsync(3, snapshot: 2, "ambetter");
+        // t0 to t5 carry a network's name in the reliable files; t6 on have names of their own.
+        await ManyAsync(1, "CASE WHEN i < 6 THEN 'Big IPA' ELSE 'Practice ' || i END");
+        await ManyAsync(3, "CASE WHEN i < 6 THEN 'Big IPA' ELSE 'Practice ' || i END");
+        await ManyAsync(2, "CASE WHEN i = 50 THEN 'Practice 50' ELSE 'Shuffled ' || ((i + 7) % 120) END");
+        await RefreshAsync();
+
+        (await ShownAsync(2, "t50", "Practice 50")).Should().Be("Practice 50", "the other files give t50 the same name");
+        (await QueryAsync<long>("SELECT count(*) FROM practice_names WHERE file_id = 2 AND provider_key = 't50'")).Should().Equal(0);
+        (await ShownAsync(2, "t60", "Shuffled 67")).Should().Be("Practice 60");
+        (await ShownAsync(2, "t3", "Shuffled 10")).Should().Be(PracticeNames.UnknownPracticeName, "a network's name is never a practice's own");
+        (await ShownAsync(1, "t3", "Big IPA")).Should().Be("Big IPA");
+    }
+
+    [Fact]
     public async Task A_name_on_four_tax_ids_is_one_practices_and_stays()
     {
         await FileAsync(1, snapshot: 1, "ambetter");
@@ -168,12 +207,12 @@ public sealed class PracticeNamesTests : IAsyncLifetime
         (await QueryAsync<int>("SELECT source_file_id FROM practice_names WHERE file_id = 1 AND provider_key = 't5'")).Should().Equal(2);
         (await ShownAsync(1, "x1", "Shuffled A")).Should().Be("X1 Health Center Inc");
         (await ShownAsync(1, "x2", "Shuffled B")).Should().Be("Cy Do, NP");
-        (await ShownAsync(1, "x3", "Shuffled C")).Should().Be("Shuffled C");
+        (await ShownAsync(1, "x3", "Shuffled C")).Should().Be(PracticeNames.UnknownPracticeName, "nothing confirms the file's name");
 
         // The sources page says so, and cites the file the names came from.
         var file = (await new ListSourcesHandler(_connections).Handle(new ListSourcesQuery(), TestContext.Current.CancellationToken))
             .SelectMany(snapshot => snapshot.Files).Single(candidate => candidate.FileId == 1);
-        file.ProviderNames.Should().BeEquivalentTo(new SourceFileNames(0, 100, [new SourceFileRef("essential", new DateOnly(2026, 8, 31))]));
+        file.ProviderNames.Should().BeEquivalentTo(new SourceFileNames(0, 100, [new SourceFileRef("essential", new DateOnly(2026, 8, 31))], 1));
     }
 
     [Fact]
@@ -212,6 +251,7 @@ public sealed class PracticeNamesTests : IAsyncLifetime
     [Fact]
     public async Task Statistics_go_stale_when_a_snapshots_shown_names_change()
     {
+        var ct = TestContext.Current.CancellationToken;
         await FileAsync(1, snapshot: 1, "ambetter");
         await FileAsync(2, snapshot: 1, "essential");
         foreach (var key in new[] { "k0", "k0", "k1", "k2", "k3", "k4" })
@@ -220,12 +260,15 @@ public sealed class PracticeNamesTests : IAsyncLifetime
         }
 
         await RefreshAsync();
-        var before = await RateFilesAsync();
-        before.Should().NotContain(" names:", "no name is replaced yet");
+        // Build the statistics as loading does: they match search.
+        await new SnapshotStatisticsBuilder(_connections, new ReferenceCatalog(), TimeProvider.System).BuildAsync(
+            await StateAsync(), (_, _) => { }, ct);
+        (await StateAsync()).Current.Should().BeTrue();
 
+        // k1 gets a name of its own, so search shows it instead of "Big IPA": the saved statistics no longer match.
         await GroupAsync(2, "k1", "K1 Practice PC", 1000);
         await RefreshAsync();
-        (await RateFilesAsync()).Should().StartWith(before + " names:");
+        (await StateAsync()).Current.Should().BeFalse();
     }
 
     private async Task RefreshAsync() =>
@@ -234,10 +277,10 @@ public sealed class PracticeNamesTests : IAsyncLifetime
     private async Task<string> ShownAsync(int file, string key, string name) =>
         (await QueryAsync<string>("SELECT practice_name($file, $key, $name)", new { file, key, name })).Single();
 
-    private async Task<string> RateFilesAsync()
+    private async Task<StatisticsState> StateAsync()
     {
         await using var connection = await _connections.OpenAsync(TestContext.Current.CancellationToken);
-        return (await SavedStatistics.StateAsync(connection, 1)).Single().RateFiles;
+        return (await SavedStatistics.StateAsync(connection, 1)).Single();
     }
 
     private Task FileAsync(int file, int snapshot, string product) => ExecuteAsync(

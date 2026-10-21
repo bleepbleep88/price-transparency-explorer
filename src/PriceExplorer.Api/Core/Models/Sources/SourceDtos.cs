@@ -52,7 +52,8 @@ public sealed record SourceFile(
 /// across the other files), in percent.</param>
 /// <param name="TypicalAgreementPct">The same between the other files (their middle one), in percent; null with no other to compare.</param>
 /// <param name="NamesFrom">The files the names shown instead come from, the most names first (at most two).</param>
-public sealed record SourceFileNames(int AgreementPct, int? TypicalAgreementPct, IReadOnlyList<SourceFileRef> NamesFrom);
+/// <param name="UnknownTaxIds">Tax IDs no other file, nor the registry, names: they show as "Unknown practice".</param>
+public sealed record SourceFileNames(int AgreementPct, int? TypicalAgreementPct, IReadOnlyList<SourceFileRef> NamesFrom, long UnknownTaxIds);
 
 /// <summary>A rate file by its plan and the date of its list of files.</summary>
 public sealed record SourceFileRef(string ProductLabel, DateOnly? IndexDate);

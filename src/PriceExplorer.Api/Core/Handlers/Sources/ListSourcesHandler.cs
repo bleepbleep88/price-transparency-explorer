@@ -54,7 +54,8 @@ public sealed class ListSourcesHandler(DuckDbConnectionFactory connections) : IR
         return new SourceFileNames(
             (int)Math.Round((first.Agreement ?? 0) * 100, MidpointRounding.AwayFromZero),
             first.TypicalAgreement is { } typical ? (int)Math.Round(typical * 100, MidpointRounding.AwayFromZero) : null,
-            list.Where(row => row.SourceLabel is not null).Take(2).Select(row => new SourceFileRef(row.SourceLabel!, row.SourceDate)).ToList());
+            list.Where(row => row.SourceLabel is not null).Take(2).Select(row => new SourceFileRef(row.SourceLabel!, row.SourceDate)).ToList(),
+            first.UnknownTaxIds);
     }
 
     private static SourceFile ToFile(SourceRow row, IEnumerable<RejectRow> rejects)
@@ -101,7 +102,8 @@ public sealed class ListSourcesHandler(DuckDbConnectionFactory connections) : IR
             new SourceFileTiming(row.DownloadMs, row.ParseMs, UtcTimestamps.From(row.LoadedAt)));
     }
 
-    private sealed record NamesRow(int FileId, double? Agreement, double? TypicalAgreement, string? SourceLabel, DateOnly? SourceDate, long? Names);
+    private sealed record NamesRow(
+        int FileId, double? Agreement, double? TypicalAgreement, long UnknownTaxIds, string? SourceLabel, DateOnly? SourceDate, long? Names);
 
     private sealed record SourceRow(
         int SnapshotId,

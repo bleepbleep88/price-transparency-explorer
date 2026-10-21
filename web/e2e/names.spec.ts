@@ -69,7 +69,27 @@ test("the sources page says the Sep 28 Essential file's names don't match, in De
   await september.getByTestId('details-toggle').click()
   await expect(september.getByTestId('source-names')).toHaveText(
     'Provider names in this file match the other files for only 9% of the same tax IDs (about 98% between the other files). ' +
-      "Names shown come from the same tax ID in Ambetter's Sep 28 file, else Essential Plan's Aug 31 file.",
+      "Names shown come from the same tax ID in Ambetter's Sep 28 file, else Essential Plan's Aug 31 file. " +
+      `134 names couldn't be found: they show as "Unknown practice".`,
   )
   await expect(september.getByTestId('source-names')).toHaveCount(1)
+})
+
+test("a network's busiest member keeps its own name in every month", async ({ page }) => {
+  // Both are the busiest tax ID under "Beacon IPA LLC" in some month (snapshots 1 to 3: Sep 28, Aug 31, Jul 27).
+  for (const snapshot of [1, 2, 3]) {
+    await page.goto(`/providers/562325021?snapshot=${snapshot}`)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Lefferts Medical Associates')
+    await page.goto(`/providers/113211425?snapshot=${snapshot}`)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Advanced Dermatology')
+  }
+})
+
+test("a name only the mislabelled file gives reads \"Unknown practice\", with the plan's name in the drawer", async ({ page }) => {
+  // The Sep 28 Essential Plan file puts "Jacobi Medical Center" on 84 tax IDs; nothing else names 52-2331239.
+  await page.goto('/?code=99213&ein=522331239&plan=essential-plan')
+  const row = page.getByTestId('place-row').first()
+  await expect(row.locator('.name')).toHaveText('Unknown practice')
+  await row.click()
+  await expect(page.getByTestId('source-listed-as')).toHaveText('Listed by the plan as Jacobi Medical Center')
 })

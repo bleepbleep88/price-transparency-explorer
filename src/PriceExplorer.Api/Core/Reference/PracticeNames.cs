@@ -38,6 +38,13 @@ internal sealed class PracticeNames(DuckDbConnectionFactory connections, ILogger
     /// </summary>
     internal const int FilesToJudgeBy = 2;
 
+    /// <summary>
+    /// What a row from an unreliable file reads when no other file, nor the registry, names its tax ID: the file's own name
+    /// is likely another provider's ("Jacobi Medical Center" on 84 of its tax IDs), so it's shown only under "Listed by the
+    /// plan as …".
+    /// </summary>
+    internal const string UnknownPracticeName = "Unknown practice";
+
     /// <summary>Creates the macros, and empty tables when there are none, so queries never meet a missing one.</summary>
     public static Task EnsureAsync(DuckDBConnection connection, CancellationToken cancellationToken) =>
         connection.ExecuteAsync(new CommandDefinition(SqlFile.For<PracticeNames>("PracticeNameMacro.sql"), cancellationToken: cancellationToken));
@@ -62,7 +69,9 @@ internal sealed class PracticeNames(DuckDbConnectionFactory connections, ILogger
                 new { comparableTaxIds = ComparableTaxIds, reliableAgreement = ReliableAgreement, filesToJudgeBy = FilesToJudgeBy },
                 cancellationToken: cancellationToken));
             await connection.ExecuteAsync(new CommandDefinition(
-                SqlFile.For<PracticeNames>("PracticeNames.sql"), new { sharedTaxIds = SharedNameTaxIds }, cancellationToken: cancellationToken));
+                SqlFile.For<PracticeNames>("PracticeNames.sql"),
+                new { sharedTaxIds = SharedNameTaxIds, unknownName = UnknownPracticeName },
+                cancellationToken: cancellationToken));
             var (names, unreliable) = await connection.QuerySingleAsync<(long, long)>(
                 "SELECT (SELECT count(*) FROM practice_names), (SELECT count(*) FROM name_checks WHERE unreliable)");
             logger.LogInformation(

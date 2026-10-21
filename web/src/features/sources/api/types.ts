@@ -81,6 +81,8 @@ export interface SourceFileNames {
   typicalAgreementPct: number | null
   /** The files the names shown instead come from, the most names first (at most two). */
   namesFrom: SourceFileRef[]
+  /** Tax IDs no other file, nor the registry, names: they show as "Unknown practice". */
+  unknownTaxIds: number
 }
 
 export interface SourceFileRef {

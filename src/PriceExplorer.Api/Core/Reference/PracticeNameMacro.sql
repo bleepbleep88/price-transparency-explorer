@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS practice_names (
     provider_key   VARCHAR NOT NULL,
     plan_name      VARCHAR NOT NULL,  -- provider_groups.business_name, as published
     practice_name  VARCHAR NOT NULL,
-    source         VARCHAR NOT NULL,  -- plan | organization | clinician: where the name came from
+    source         VARCHAR NOT NULL,  -- plan | organization | clinician | unknown: where the name came from
     source_file_id INTEGER            -- with source plan: the rate file the name comes from
 );
 
