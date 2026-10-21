@@ -35,6 +35,8 @@ export interface CompareParams {
   setting?: string
   /** Also compare charges filed under a revenue code with no procedure named (off by default: not like for like). */
   includeFacilityCharges?: boolean
+  /** Also compare health centers, paid by visit rules the files don't explain (off by default: not like for like). */
+  includeHealthCenters?: boolean
   sort: CompareSort
   page: number
   pageSize: number
@@ -83,6 +85,7 @@ export function parseCompareQuery(query: LocationQuery): CompareParams {
     category: first(query.category),
     setting: first(query.setting),
     includeFacilityCharges: first(query.includeFacilityCharges) === 'true' || undefined,
+    includeHealthCenters: first(query.includeHealthCenters) === 'true' || undefined,
     sort: compareSort.parse(first(query.sort)),
     page: positiveInteger(first(query.page)) ?? 1,
     pageSize: positiveInteger(first(query.pageSize), 100) ?? COMPARE_PAGE_SIZE,

@@ -40,6 +40,12 @@ describe('parseCompareQuery', () => {
     expect(compareApiQuery(parseCompareQuery({ code: '99213' }))).toMatchObject({ code: '99213', sort: 'difference' })
   })
 
+  it('leaves health centers out unless the address asks for them', () => {
+    expect(parseCompareQuery({}).includeHealthCenters).toBeUndefined()
+    expect(parseCompareQuery({ includeHealthCenters: 'true' }).includeHealthCenters).toBe(true)
+    expect(compareApiQuery(parseCompareQuery({ includeHealthCenters: 'true' }))).toMatchObject({ includeHealthCenters: true })
+  })
+
   it('shows the biggest differences ten at a time unless the address says otherwise', () => {
     expect(parseCompareQuery({}).pageSize).toBe(10)
     expect(parseCompareQuery({ pageSize: '25' }).pageSize).toBe(25)
