@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-10-21T17:42:01.164877+00:00",
+  "generatedAt": "2026-10-21T17:59:06.2620256+00:00",
   "nppes": "https://download.cms.gov/nppes/NPPES_Data_Dissemination_October_2026_V2.zip",
   "medicareSpecialties": "https://data.cms.gov/sites/default/files/2026-08/c90ddab5-0837-4b87-bd01-1f1831117909/Medicare_Provider_and_Supplier_Taxonomy_Crosswalk_August_2026.csv",
   "medicareSpecialtiesRelease": "2026-08-01",
   "census": "https://www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/tab20_zcta520_county20_natl.txt",
-  "npisRequested": 58688,
-  "npisFound": 58688
+  "npisRequested": 68878,
+  "npisFound": 68876
 }
