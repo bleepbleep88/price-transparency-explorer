@@ -64,7 +64,10 @@ public sealed class GetRateSourceHandler(DuckDbConnectionFactory connections, Re
                 group.NpiCount,
                 group.EinLevel,
                 group.NetworkNames,
-                group.ProviderMatch)).ToList(),
+                group.ProviderMatch)
+            {
+                ShownName = group.ShownName != group.BusinessName ? group.ShownName : null,
+            }).ToList(),
             (int)groupCount);
     }
 
@@ -86,7 +89,7 @@ public sealed class GetRateSourceHandler(DuckDbConnectionFactory connections, Re
 
     private sealed record GroupRow(
         int ProviderGroupId, int GroupIndex, string? TinType, string? TinValue, string? Ein, bool EinUnverified,
-        string? BusinessName, int NpiCount, bool EinLevel, string? NetworkNames, bool ProviderMatch);
+        string? BusinessName, string? ShownName, int NpiCount, bool EinLevel, string? NetworkNames, bool ProviderMatch);
 }
 
 public sealed class ListRateNpisHandler(DuckDbConnectionFactory connections) : IRequestHandler<ListRateNpisQuery, RateNpisPage>

@@ -268,13 +268,24 @@ CREATE TABLE IF NOT EXISTS provider_values (
     rate_set             VARCHAR NOT NULL          -- its distinct rates in the group, ascending, '0.0000' each, comma-separated
 );
 
+-- The practice's own name for provider groups whose published name is a network's shared name or comes from an
+-- unreliable file (Core/Reference/PracticeNames.sql rebuilds it; practice_name() reads it). Startup also creates it for
+-- databases made before it existed (PracticeNameMacro.sql), so adding it needed no schema version bump.
+CREATE TABLE IF NOT EXISTS practice_names (
+    file_id       INTEGER NOT NULL,
+    provider_key  VARCHAR NOT NULL,
+    plan_name     VARCHAR NOT NULL,   -- provider_groups.business_name, as published
+    practice_name VARCHAR NOT NULL,
+    source        VARCHAR NOT NULL    -- plan | organization | clinician: where the name came from
+);
+
 -- One row per snapshot with saved statistics: what they were built from. They stay current (SavedStatistics.sql) until
 -- a rate file is saved again (its loaded_at changes), a republished index renames or regroups a file's product, the
 -- app's code changes, or a rate they include passes its expiration date (search stops showing it the next day). The
 -- next load rebuilds what isn't current; readers are told meanwhile. A restart with none of these keeps them.
 CREATE TABLE IF NOT EXISTS stats_builds (
     snapshot_id    INTEGER NOT NULL,
-    rate_files     VARCHAR NOT NULL,  -- each saved rate file as file_id@loaded_at@product_key@product_label
+    rate_files     VARCHAR NOT NULL,  -- each saved rate file as file_id@loaded_at@product_key@product_label, then a fingerprint of its practice names, if any
     code_version   VARCHAR NOT NULL,  -- the app build (module version id) whose search code built them
     expires_on     DATE,              -- the earliest expiration date among the rates they include; NULL = none ends
     built_at       TIMESTAMP NOT NULL,

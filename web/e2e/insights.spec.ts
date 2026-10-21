@@ -113,13 +113,15 @@ test('a provider found by name opens its scorecard: one reading, above and below
 })
 
 test('a scorecard reached under another of its names says so, and an unknown provider gets a way back', async ({ page }) => {
-  // The search row named this provider "The Trustees of Columbia…"; its scorecard is titled with its tax ID's own name.
-  const came = 'The Trustees of Columbia University in the City of NY'
-  await page.goto(`/providers/113466729?as=${encodeURIComponent(came)}`)
+  // NYU's faculty practice has two names of its own; a search row under the second links here with it.
+  await page.goto(`/providers/135562308?as=${encodeURIComponent('NYU dba NYU Faculty Group Practice')}`)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('NYU School of Medicine Faculty')
+  await expect(page.getByTestId('scorecard-also')).toHaveText('Also listed as NYU Faculty Group Practice')
+  // A practice listed under someone else's name shows its own on both the search row and the scorecard.
+  await page.goto('/providers/113466729')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Gastrointestinal Care of Long Island')
-  await expect(page.getByTestId('scorecard-also')).toHaveText(`Also listed as ${came}`)
   // A name that isn't one of its own is never shown.
-  await page.goto('/providers/113466729?as=Someone%20Else')
+  await page.goto('/providers/135562308?as=Someone%20Else')
   await expect(page.getByTestId('scorecard-also')).not.toContainText('Someone Else')
 
   await page.goto('/providers/999999999')

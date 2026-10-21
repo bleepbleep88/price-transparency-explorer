@@ -9,14 +9,15 @@ namespace PriceExplorer.Api.Core.Reference;
 
 /// <summary>
 /// Loads the provider directory (NPI → name, specialty, location; see reference/README.md) into DuckDB at every startup,
-/// then the macro that decides which NPIs match a specialty or location filter, then CMS's HCPCS names and RBCS
-/// categories. A missing or damaged file leaves an empty table: the provider filters then match nothing and rows carry
+/// then the macro that decides which NPIs match a specialty or location filter, then each practice's own name where the
+/// plan's is a network's or unreliable (<see cref="PracticeNames"/>), then CMS's HCPCS names and RBCS categories. A missing or damaged file leaves an empty table: the provider filters then match nothing and rows carry
 /// no profile, codes keep only the plan's own names, and categories fall back to the code ranges. Search keeps working.
 /// </summary>
 internal sealed class ReferenceDataLoader(
     DuckDbConnectionFactory connections,
     ProviderDirectoryInfo directoryInfo,
     CodeReference codeReference,
+    PracticeNames practiceNames,
     IOptions<ReferenceOptions> options,
     ILogger<ReferenceDataLoader> logger)
 {
@@ -54,6 +55,8 @@ internal sealed class ReferenceDataLoader(
         }
 
         await connection.ExecuteAsync(SqlFile.For<ReferenceDataLoader>("DirectoryMatches.sql"));
+        await PracticeNames.EnsureAsync(connection, cancellationToken);
+        await practiceNames.RefreshAsync(connection, cancellationToken);
         await LoadCodeSetsAsync(connection);
     }
 

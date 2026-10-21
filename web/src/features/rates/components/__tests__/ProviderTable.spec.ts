@@ -75,6 +75,7 @@ function makeRow(name: string, groupKey: string, rate: number, band: RateRow['ba
     wholeTaxIdRateId: null,
     profile: null,
     flags: [],
+    listedAs: null,
   }
 }
 

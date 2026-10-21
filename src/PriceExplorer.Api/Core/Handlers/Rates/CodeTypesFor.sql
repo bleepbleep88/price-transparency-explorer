@@ -43,7 +43,7 @@ SELECT
               WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
                 AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
           AND ($ein::VARCHAR IS NULL OR pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR)
-          AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))
+          AND ($provider::VARCHAR IS NULL OR provider_name_matches(pg.file_id, pg.provider_key, pg.business_name, $provider::VARCHAR))
           AND (($specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL) OR EXISTS (
               SELECT 1 FROM group_npis gn
               JOIN directory_matches($specialty::VARCHAR, $county::VARCHAR) dm ON dm.npi = gn.npi
@@ -62,7 +62,7 @@ SELECT
                   WHERE gn.file_id = pg.file_id AND gn.provider_ref_id = pg.provider_ref_id
                     AND gn.group_idx = pg.group_idx AND gn.npi = $npi::BIGINT))
               AND ($ein::VARCHAR IS NULL OR pg.provider_key = $ein::VARCHAR OR pg.ein = $ein::VARCHAR)
-              AND ($provider::VARCHAR IS NULL OR contains(lower(coalesce(pg.business_name, '')), $provider::VARCHAR))
+              AND ($provider::VARCHAR IS NULL OR provider_name_matches(pg.file_id, pg.provider_key, pg.business_name, $provider::VARCHAR))
               AND (($specialty::VARCHAR IS NULL AND $county::VARCHAR IS NULL) OR EXISTS (
                   SELECT 1 FROM group_npis gn
                   JOIN directory_matches($specialty::VARCHAR, $county::VARCHAR) dm ON dm.npi = gn.npi

@@ -30,6 +30,7 @@ function providerGroup(wholeTaxId: boolean): RateSourceProviderGroup {
     wholeTaxId,
     networkNames: null,
     providerMatch: true,
+    shownName: null,
   }
 }
 
@@ -96,8 +97,8 @@ const Host = defineComponent({
 
 let wrapper: VueWrapper | undefined
 
-async function mountDrawer(wholeTaxIdRateId: number | null) {
-  source.mockImplementation((rateId) => Promise.resolve(makeSource(rateId)))
+async function mountDrawer(wholeTaxIdRateId: number | null, edit: (source: RateSource) => RateSource = (same) => same) {
+  source.mockImplementation((rateId) => Promise.resolve(edit(makeSource(rateId))))
   wrapper = mount(Host, {
     props: { open: true, wholeTaxIdRateId },
     attachTo: document.body,
@@ -152,6 +153,21 @@ describe('SourceDrawer', () => {
     expect(w.get('[data-testid="source-json-path"]').text()).toBe('$.in_network[1236].negotiated_rates[14].negotiated_prices[0]')
     expect(w.find('[data-testid="whole-tax-id-shown"]').exists()).toBe(false)
     expect(w.find('[data-testid="whole-tax-id-contract"]').exists()).toBe(true)
+  })
+
+  it("traces a practice's own name back to the plan's, in the heading and on its group", async () => {
+    const w = await mountDrawer(null, (s) => ({
+      ...s,
+      providerGroups: s.providerGroups.map((group) => ({ ...group, businessName: 'Chinese American IPA Assoc/CAIPA', shownName: 'Alcohol & Dependency Services, Inc/Buffalo' })),
+    }))
+    expect(w.get('[data-testid="source-listed-as"]').text()).toBe('Listed by the plan as Chinese American IPA Assoc/CAIPA')
+    const group = w.get('[data-testid="source-drawer"] .v-list-item')
+    expect(group.text()).toContain('Alcohol & Dependency Services, Inc/Buffalo')
+    expect(group.text()).toContain('Listed by the plan as Chinese American IPA Assoc/CAIPA · Tax ID 16-1078102')
+  })
+
+  it("says nothing about the plan's name when it's the one shown", async () => {
+    expect((await mountDrawer(null)).find('[data-testid="source-listed-as"]').exists()).toBe(false)
   })
 
   it('says nothing about a whole-tax-ID contract when the row has none', async () => {

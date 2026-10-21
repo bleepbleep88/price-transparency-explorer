@@ -48,6 +48,7 @@ public sealed record RateSourceSnapshot(int SnapshotId, string IndexUrl, DateOnl
 
 /// <param name="ProviderGroupId">provider_group_id in the file (negative for groups written inline on the rate).</param>
 /// <param name="WholeTaxId">The file lists npi [0]: the contract covers anyone billing under this tax ID.</param>
+/// <param name="BusinessName">The name on the group, as published.</param>
 /// <param name="ProviderMatch">This group belongs to the provider passed to the source endpoint (listed first).</param>
 public sealed record RateSourceProviderGroup(
     int ProviderGroupId,
@@ -58,7 +59,14 @@ public sealed record RateSourceProviderGroup(
     int NpiCount,
     bool WholeTaxId,
     string? NetworkNames,
-    bool ProviderMatch);
+    bool ProviderMatch)
+{
+    /// <summary>
+    /// The practice's own name that lists show instead of <see cref="BusinessName"/> (a network's shared name, or a name
+    /// from an unreliable file). Null when lists show the published name.
+    /// </summary>
+    public string? ShownName { get; init; }
+}
 
 public sealed record RateNpisPage(long RateId, string? ProviderKey, int Total, int Page, int PageSize, IReadOnlyList<ListedNpi> Items);
 

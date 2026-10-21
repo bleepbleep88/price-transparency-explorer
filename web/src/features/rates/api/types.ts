@@ -233,6 +233,11 @@ export interface RateRow {
   profile: ProviderProfile | null
   /** "Check this" notes: the rate may be listed for a provider who doesn't perform the service. */
   flags: RowFlag[]
+  /**
+   * The plan's name as published when `businessName` is the practice's own instead (the plan's was a network's shared
+   * name, or came from a file whose names are unreliable). Null when the plan's name is shown.
+   */
+  listedAs: string | null
 }
 
 export interface SpecialtyCount {
@@ -339,6 +344,8 @@ export interface RateSourceProviderGroup {
   networkNames: string | null
   /** The group belongs to the provider the drawer was opened for (listed first). */
   providerMatch: boolean
+  /** The practice's own name that lists show instead of `businessName`; null when lists show the published name. */
+  shownName: string | null
 }
 
 export interface RateSource {

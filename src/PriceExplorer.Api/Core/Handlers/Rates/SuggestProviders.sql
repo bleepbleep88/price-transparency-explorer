@@ -1,4 +1,5 @@
--- Typeahead over provider business names (and exact EINs) in the snapshot, busiest first. Names are listed in a fixed
+-- Typeahead over provider business names, as published or as shown (practice_name), and exact EINs in the snapshot,
+-- busiest first. It lists the shown names. Names are listed in a fixed
 -- order (the first is the label) and ties break on the provider key, so the same text always gives the same list.
 WITH target_files AS (
     SELECT file_id
@@ -8,10 +9,11 @@ WITH target_files AS (
 matches AS (
     SELECT
         pg.provider_key,
-        pg.ein, pg.ein_unverified, pg.business_name, pg.file_id, pg.provider_ref_id
+        pg.ein, pg.ein_unverified, practice_name(pg.file_id, pg.provider_key, pg.business_name) AS business_name,
+        pg.file_id, pg.provider_ref_id
     FROM provider_groups pg
     JOIN target_files tf ON tf.file_id = pg.file_id
-    WHERE contains(lower(coalesce(pg.business_name, '')), $text)
+    WHERE provider_name_matches(pg.file_id, pg.provider_key, pg.business_name, $text)
        OR ($digits <> '' AND pg.ein = $digits)
 )
 SELECT
