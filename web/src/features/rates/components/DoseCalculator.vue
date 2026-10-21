@@ -7,19 +7,21 @@ import { doseLine, dosePricing, doseRange, doseUnits, doseUnitWord, MAX_DOSE_UNI
 import { isDrugCode } from '../lib/lenses'
 import { parseDose } from '../lib/searchParams'
 
-// A dose box and one answer: "45 mg = 5 units → $4.75". Which price it uses, and why, sits in Details.
-const props = defineProps<{ result: RateSearchResult; dose?: number }>()
+// A dose box and one answer: "45 mg = 5 units → $4.75". Which price it uses, and why, sits in Details. The price is
+// the plan tab's (`plan`), from the tile the reader is looking at (`group`) when that tile can price a dose.
+const props = defineProps<{ result: RateSearchResult; dose?: number; plan?: string | null; group?: string | null }>()
 const emit = defineEmits<{ dose: [dose: number | null] }>()
 
 const code = computed(() => props.result.code)
 const unit = computed(() => (isDrugCode(code.value) ? code.value?.doseUnit : null) ?? null)
-const pricing = computed(() => dosePricing(props.result))
+const pricing = computed(() => dosePricing(props.result, { plan: props.plan, group: props.group }))
 const options = computed(() => pricing.value.options)
 
-// The card whose price the math uses: the reader's pick, else the first (no modifiers, most providers).
+// The card whose price the math uses: the reader's pick in Details, else the first (the tile, else no modifiers and the
+// most providers). Another code, plan or tile drops the pick.
 const picked = ref<string | null>(null)
 watch(
-  () => code.value?.code,
+  () => [code.value?.code, props.plan, props.group],
   () => (picked.value = null),
 )
 const option = computed(() => options.value.find((candidate) => candidate.groupKey === picked.value) ?? options.value[0] ?? null)
@@ -79,7 +81,7 @@ function onDoseInput(text: string) {
       </div>
       <p v-if="answer && unitDefinition(unit)" class="muted" data-testid="dose-unit">{{ unitDefinition(unit) }}</p>
 
-      <DetailsPanel testid="dose-details">
+      <DetailsPanel label="Details: dose" testid="dose-details">
         <v-select
           v-if="options.length > 1"
           :model-value="option.groupKey"

@@ -7,11 +7,13 @@ import { megabytes, money, plural, shortDate } from '@/lib/format'
 import { ApiError } from '@/lib/apiClient'
 import { providerName as cleanName } from '@/lib/plainNames'
 import { useRateSource } from '../composables/useRateQueries'
+import { useReturnFocus } from '../composables/useReturnFocus'
 
 // Where a price comes from, every traceable field kept, under short plain headings: the file, the spot in it, the
 // values as published, repeats, and the provider groups the price covers.
 
 const open = defineModel<boolean>({ required: true })
+useReturnFocus(open)
 const props = defineProps<{
   rateId: number | null
   providerName?: string

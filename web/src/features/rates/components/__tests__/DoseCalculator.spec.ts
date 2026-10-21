@@ -45,7 +45,7 @@ const office: RateGroup = {
   notes: [],
 }
 
-function mountCalculator(dose?: number, code: CodeInfo = propofol, groups: RateGroup[] = [office]) {
+function mountCalculator(dose?: number, code: CodeInfo = propofol, groups: RateGroup[] = [office], focus: { plan?: string; group?: string } = {}) {
   const result: RateSearchResult = {
     query: {
       code: 'J2704',
@@ -72,7 +72,7 @@ function mountCalculator(dose?: number, code: CodeInfo = propofol, groups: RateG
     hints: [],
     quality: { publishedRows: 0, uniqueRates: 0, duplicatesCollapsed: 0, providersWithMultipleRates: 0, maskedTaxIds: 0, wholeTaxIdContracts: 0 },
   }
-  return mount(DoseCalculator, { props: { result, dose }, global: { plugins: [createVuetify()] } })
+  return mount(DoseCalculator, { props: { result, dose, ...focus }, global: { plugins: [createVuetify()] } })
 }
 
 // The main view: a dose box and one answer line, a handful of words. Everything else is in Details.
@@ -136,6 +136,30 @@ describe('DoseCalculator', () => {
   it('says when every card has too few places', () => {
     const wrapper = mountCalculator(200, propofol, [{ ...office, providerCount: 3, statsLevel: 'list' }])
     expect(wrapper.get('[data-testid="dose-reason"]').text()).toBe('Too few prices to work out a dose.')
+  })
+
+  it("uses the plan tab's price, and follows the tab (J1100: Essential $0.11, Ambetter $0.09)", async () => {
+    const dexamethasone: CodeInfo = { ...propofol, code: 'J1100', doseUnit: { amount: 1, unit: 'mg', text: '1 mg' } }
+    const plan = (key: string, label: string, median: number, providers: number): RateGroup => ({
+      ...office,
+      key: `${key}|HCPCS|J1100|professional|office||negotiated`,
+      productKey: key,
+      productLabel: label,
+      code: 'J1100',
+      providerCount: providers,
+      stats: { ...office.stats, median },
+    })
+    const groups = [plan('ambetter-from-fidelis-care', 'Ambetter from Fidelis Care', 0.09, 40), plan('essential-plan', 'Essential Plan', 0.11, 12)]
+    const wrapper = mountCalculator(8, dexamethasone, groups, { plan: 'essential-plan', group: groups[1]!.key })
+    expect(wrapper.get('[data-testid="dose-answer"]').text()).toBe('8 mg = 8 units → $0.88')
+    expect(wrapper.get('[data-testid="dose-card-label"]').text()).toContain('Essential Plan')
+
+    await wrapper.setProps({ plan: 'ambetter-from-fidelis-care', group: groups[0]!.key })
+    expect(wrapper.get('[data-testid="dose-answer"]').text()).toBe('8 mg = 8 units → $0.72')
+  })
+
+  it('labels its Details button for the dose', () => {
+    expect(mountCalculator(45).get('[data-testid="dose-details-toggle"]').text()).toBe('Details: dose')
   })
 
   it('stays hidden for a code whose name states no unit', () => {
