@@ -55,7 +55,7 @@ Every page leads with one answer in plain words, like "Surgery center $511" or "
 
 - **API:** .NET 10, ASP.NET Core, MediatR 12.5 (the last free version), FluentValidation, Dapper, DuckDB (embedded), Serilog, OpenAPI.
 - **Web:** Vue 3, Vite, TypeScript, Vuetify, TanStack Vue Query, zod.
-- **Tests:** xUnit (681), Vitest (329), Playwright on the real data (54). CI builds and runs the xUnit and Vitest tests, and builds the Docker images, on every PR.
+- **Tests:** xUnit (689), Vitest (340), Playwright on the real data (62). CI builds and runs the xUnit and Vitest tests, and builds the Docker images, on every PR.
 
 ## Assumptions and tradeoffs
 
